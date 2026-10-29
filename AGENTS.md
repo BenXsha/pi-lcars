@@ -267,17 +267,18 @@ LCARS 原版用 `Swiss 911 Ultra Compressed`（压缩粗体）。**本项目不�
 
 ### 7.6b 空态补偿（LCARS filler）
 
-LCARS 的左轨**从不留纯黑空洞**：内容排不满时，剩余高度由一根竖脊 + 几条**渐窄的横条**吃掉，
-最末一条通常带强调色，整列最终收在底部的肘形/脚块上 —— 空白由结构占着，而不是留白。
+LCARS 的左轨**从不留纯黑空洞**：内容排不满时，纵向剩余由**一根弹性矩形块**吃掉，
+它读作列的延续（如同 LCARS 左侧那根通到底的竖条），而不是装饰。
 
 本地规则：
 
-- 条宽递减 `148 → 112 → 76`，条高 22，间距 4（与全站同一套黑缝），左对齐。
-- 最后一条用 `color-mix(--orange 22%)` 收尾，其余用 `--g0`，避免抢内容。
-- 竖脊 `8px` 宽、`flex:1`，吃掉剩余高度；整块 `pointer-events:none`、`aria-hidden`。
-- 列表本身 `flex: 0 1 auto`（不抢空间），补块 `flex: 1 1 auto`（吃剩余）；
-  当列表内容超过可用高度（要滚动了）就**整块隐藏** —— 否则会露出被裁一半的条。
-  用 `ResizeObserver` 判 `scrollHeight > clientHeight`，落到 `data-cramped`。
+- **一块**，不是一组：宽 `96px`、`flex: 1 1 auto` 吃掉剩余高度、`--g0` 底色、
+  右下角 6px 圆角收口、与下方导航留 4px 黑缝。
+- 只做延伸，不承载信息：`pointer-events:none`、`aria-hidden`，不加文字、不加色条。
+- 宽度**小于列宽**（320 → 96），否则会读成一块面板而不是一根条。
+- 列表 `flex: 0 1 auto`（不抢空间），补块 `flex: 1 1 auto`（独占剩余）；
+  一旦列表要滚动（`scrollHeight > clientHeight`，由 `ResizeObserver` 判定 → `data-cramped`）
+  就**整块隐藏**，避免露出被裁一半的条。
 
 ### 7.7 会话块（列表项）
 

@@ -289,13 +289,11 @@ function Sidenav({
         ))}
       </div>
 
-      {/* LCARS filler: the left column never shows a void — leftover space is
-          taken by graduated bars ending in a vertical stem. */}
+      {/* LCARS filler: one elastic block extends the column instead of
+          leaving a void. It grows with the leftover height and disappears
+          once the list itself scrolls. */}
       <div class="lfiller" aria-hidden="true">
-        <span class="stem" />
-        <span class="bar b1" />
-        <span class="bar b2" />
-        <span class="bar b3" />
+        <span class="stretch" />
       </div>
 
       <div class="lnav">
