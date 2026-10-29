@@ -217,7 +217,7 @@ function Sidenav({
 
   return (
     <aside class="sidenav">
-      <TopCap w={320} h={100} bar={44}>
+      <TopCap w={375} h={100} bar={44}>
         <span class="cap-ttl">PI AGENT CONSOLE</span>
         <span class="cap-sub">LCARS / SESSION CONSOLE</span>
       </TopCap>

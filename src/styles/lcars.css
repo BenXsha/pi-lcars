@@ -53,7 +53,7 @@ button { cursor: pointer; }
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 0 12px 0 16px;
+  padding: 0 12px 0 70px; /* cap (col + r) overhangs the bar's left edge */
   background: var(--orange);
   color: #000;
 }
