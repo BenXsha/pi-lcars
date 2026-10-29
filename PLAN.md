@@ -148,6 +148,12 @@ pi-lcars/
   PLAN.md  AGENTS.md
 ```
 
+### 2.5 主题支持（已提前落地）
+
+`themes.css` 四套预设（tng / voy / ds9 / mono），九语义角色不随主题改变，
+`scripts/check-themes.mjs` 做 16 组对比度门禁。UI 入口在 Craft 页 THEME 段，
+M0 之后收到 SYSTEM 站里。浅色主题明确不做。
+
 ## 3. 输出流 v2
 
 ### 3.1 item 类型（服务端归一化后）

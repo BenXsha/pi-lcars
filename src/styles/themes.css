@@ -1,0 +1,87 @@
+/* ============================================================
+   LCARS colour themes.
+   Nine semantic roles per theme — the role never changes, only the hue.
+   Rule: black text sits on every block colour, so each block must stay
+   light (WCAG ≥ 4.5:1 vs #000). scripts/check-themes.mjs enforces it.
+   ============================================================ */
+
+/* ---------- TNG / Okuda (default) — 31° warm, hue spread 0..300 ---------- */
+:root,
+[data-theme="tng"] {
+  --orange: #ff9c00; /* focus / operator */
+  --amber: #ffce9c; /* secondary metalabels */
+  --tang: #ff9966; /* tool running */
+  --tomato: #cc6666; /* error / approval */
+  --lilac: #cc99cc; /* memory */
+  --lav: #9999ff; /* subagents */
+  --ice: #99ccff; /* read-only refs */
+  --moon: #cccc99; /* plan / pending */
+  --cyan: #99cccc; /* system / ok */
+
+  --w: #ffffff;
+  --g3: #999999;
+  --g2: #666666;
+  --g1: #333333;
+  --g0: #1a1a1a;
+  --bg: #000000;
+}
+
+/* ---------- VOY / Voyager — 210° cool; violet focus, mint system ---------- */
+[data-theme="voy"] {
+  --orange: #8fa9ff; /* focus: violet-blue, not orange */
+  --amber: #c9d4f5;
+  --tang: #7fd0e8;
+  --tomato: #e07e7e;
+  --lilac: #d3a3e0;
+  --lav: #b9a3ff;
+  --ice: #9fd3ff;
+  --moon: #c9d9a3;
+  --cyan: #8fe0d0;
+
+  --w: #f2f7ff;
+  --g3: #93a2b8;
+  --g2: #5f6f85;
+  --g1: #2b3a4d;
+  --g0: #16202b;
+  --bg: #05090f;
+}
+
+/* ---------- DS9 / bronze — 30° dark, olive + copper ---------- */
+[data-theme="ds9"] {
+  --orange: #e8a33d;
+  --amber: #d9be8c;
+  --tang: #e08a4a;
+  --tomato: #c96f5a;
+  --lilac: #c79fc7;
+  --lav: #a9a0c9;
+  --ice: #9fb8c9;
+  --moon: #c2c08a;
+  --cyan: #9fc2b8;
+
+  --w: #fff6ea;
+  --g3: #a3937f;
+  --g2: #6d604f;
+  --g1: #3a332a;
+  --g0: #1f1a14;
+  --bg: #070604;
+}
+
+/* ---------- MONO / LCARS 47 — desaturated neutrals + one ice accent ------ */
+[data-theme="mono"] {
+  --orange: #e8e8e8; /* focus is white, not a hue */
+  --amber: #b8b8b8;
+  --tang: #a8c8d8;
+  --tomato: #d98a8a;
+  --lilac: #c0b8cc;
+  --lav: #a8a8d8;
+  --ice: #c8d8e8;
+  --moon: #c8c8a8;
+  --cyan: #a8c8c8;
+
+  --w: #ffffff;
+  --g3: #9a9a9a;
+  --g2: #636363;
+  --g1: #2e2e2e;
+  --g0: #171717;
+  --bg: #000000;
+}

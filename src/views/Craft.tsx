@@ -1,5 +1,6 @@
 import { useState } from "preact/hooks";
 import { ICONS, type IconName } from "../icons";
+import { THEMES, appliedTheme, applyTheme, type ThemeId } from "../theme";
 import { Icon } from "../components/Icon";
 import {
   ApprovalDeck,
@@ -62,6 +63,7 @@ export function Craft() {
   const [apState, setApState] = useState<"pending" | "approved" | "denied">("pending");
   const [motionKey, setMotionKey] = useState(0);
   const [motion, setMotion] = useState<"wipe" | "swap" | "pulse">("wipe");
+  const [theme, setTheme] = useState<ThemeId>(appliedTheme());
 
   const replay = (m: typeof motion) => {
     setMotion(m);
@@ -158,6 +160,35 @@ export function Craft() {
               圆角只出现在外沿一侧，动效只用 linear 且不超过 240ms。
             </p>
           </header>
+
+          <Section id="theme" title="THEME / 配色" note="同一套语义角色，换一组色相">
+            <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
+              {THEMES.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  class="theme-card"
+                  data-active={theme === t.id ? "1" : "0"}
+                  onClick={() => {
+                    applyTheme(t.id);
+                    setTheme(t.id);
+                  }}
+                >
+                  <span class="sw">
+                    {t.swatch.map((c) => (
+                      <i key={c} style={{ background: c }} />
+                    ))}
+                  </span>
+                  <span class="nm">{t.name}</span>
+                  <span class="nt">{t.note}</span>
+                </button>
+              ))}
+            </div>
+            <span style={{ font: "400 11px/1.6 var(--mono)", color: "var(--g2)", maxWidth: "720px" }}>
+              九个语义角色（focus / secondary / running / error / memory / agent / readonly / plan / system）在每套主题里都保持色相分离；
+              已写入 localStorage，刷新后保持。新增主题只需在 themes.css 加一段 + THEMES 里加一行。
+            </span>
+          </Section>
 
           <Section id="geom" title="GEOMETRY / 曲线" note="elbow · pill · 单向圆角">
             <div style={{ display: "flex", gap: "24px", alignItems: "flex-start", flexWrap: "wrap" }}>

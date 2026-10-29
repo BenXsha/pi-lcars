@@ -67,10 +67,10 @@ export function ControlChip(props: {
       title={props.title}
       onClick={props.onClick}
     >
-      <Icon name={props.icon} size={12} />
+      <Icon name={props.icon} size={11} />
       <span class="k">{props.label}</span>
       <span class="v">{props.value}</span>
-      <Icon name={props.open ? "act-collapse" : "act-expand"} size={12} />
+      <Icon name={props.open ? "act-collapse" : "act-expand"} size={11} />
     </button>
   );
 }
@@ -104,11 +104,11 @@ export function PickRow(props: {
     <button type="button" class="opt" aria-selected={props.selected ? "true" : "false"} onClick={props.onClick}>
       <span class="st" />
       <span class="ic">
-        <Icon name={props.icon} size={14} />
+        <Icon name={props.icon} size={13} />
       </span>
       <span class="nm">{props.name}</span>
       <span class="mt">{props.meta ?? ""}</span>
-      <span class="ck">{props.selected ? <Icon name="status-ok" size={14} /> : null}</span>
+      <span class="ck">{props.selected ? <Icon name="status-ok" size={13} /> : null}</span>
     </button>
   );
 }
@@ -156,7 +156,7 @@ export function Station(props: {
       <span class="num">{props.num}</span>
       <span class="lbl">{props.label}</span>
       <span class="ic">
-        <Icon name={props.icon} size={14} />
+        <Icon name={props.icon} size={13} />
       </span>
     </button>
   );
@@ -192,7 +192,7 @@ export function ToolStrip(props: {
     <div class="tool" data-state={state}>
       <div class="st" />
       <div class="ic">
-        <Icon name={props.icon} size={15} />
+        <Icon name={props.icon} size={14} />
       </div>
       <div class="nm">
         <span>{props.name.toUpperCase()}</span>
@@ -268,7 +268,7 @@ export function MessageRow(props: {
     <div class={`row ${props.role} turn`}>
       <div class="chip">
         <span class="who">
-          <Icon name={isUser ? "role-user" : "role-agent"} size={15} />
+          <Icon name={isUser ? "role-user" : "role-agent"} size={14} />
           {props.name ?? (isUser ? "" : "PI")}
         </span>
         <span>{isUser ? props.time : props.model ?? ""}</span>
@@ -277,7 +277,7 @@ export function MessageRow(props: {
         {props.thinking ? (
           <div class="think" data-open={props.thinkingOpen ? "1" : "0"} onClick={props.onToggleThinking}>
             <span class="tl">
-              <Icon name="role-system" size={11} /> THINKING
+              <Icon name="role-system" size={10} /> THINKING
             </span>
             <span class="tb">{props.thinking}</span>
           </div>
@@ -356,7 +356,7 @@ export function FieldRow(props: {
     <label class="field" data-required={props.required ? "1" : "0"} data-state={props.state ?? "idle"}>
       <span class="st" />
       <span class="lb">
-        {props.icon ? <Icon name={props.icon} size={12} /> : null}
+        {props.icon ? <Icon name={props.icon} size={11} /> : null}
         {props.label}
       </span>
       <span class="fc">
