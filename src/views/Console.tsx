@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import type { DirEntry, Item, ModelInfo } from "../api";
+import type { DirEntry, Item, McpServer, ModelInfo } from "../api";
 import { api } from "../api";
 import { actions, connect, getState, subscribe } from "../store";
 import { Icon, type IconName } from "../components/Icon";
@@ -21,15 +21,13 @@ import {
 } from "../components/ui";
 
 /* ---------------------------------------------------------------- setup */
-type View = "session" | "tools" | "agents" | "context" | "skills" | "system";
+type View = "session" | "mcp" | "skills" | "providers" | "system";
 
-const STATIONS: { view: View; num: string; label: string; icon: IconName; tone: "orange" | "amber" | "lav" | "moon" | "ice" | "cyan"; w: number; h?: number }[] = [
-  { view: "session", num: "01", label: "SESSION", icon: "station-session", tone: "orange", w: 224, h: 56 },
-  { view: "tools", num: "02", label: "TOOLS", icon: "station-tools", tone: "amber", w: 196 },
-  { view: "agents", num: "03", label: "AGENTS", icon: "station-agents", tone: "lav", w: 168 },
-  { view: "context", num: "04", label: "CONTEXT", icon: "station-context", tone: "moon", w: 204 },
-  { view: "skills", num: "05", label: "SKILLS", icon: "station-skills", tone: "ice", w: 156 },
-  { view: "system", num: "06", label: "SYSTEM", icon: "station-system", tone: "cyan", w: 184 },
+const NAV: { view: View; label: string; icon: IconName; tone: "amber" | "lav" | "moon" | "ice" | "cyan" }[] = [
+  { view: "mcp", label: "MCP", icon: "station-mcp", tone: "lav" },
+  { view: "skills", label: "SKILLS", icon: "station-skills", tone: "ice" },
+  { view: "providers", label: "PROVIDERS", icon: "station-provider", tone: "cyan" },
+  { view: "system", label: "SETTINGS", icon: "station-system", tone: "moon" },
 ];
 
 const TOOL_ICON: Record<string, IconName> = {
@@ -51,12 +49,19 @@ const TOOL_ICON: Record<string, IconName> = {
   batch_status: "tool-batch",
   codemode: "tool-codemode",
 };
-
 const toolIcon = (name: string): IconName => TOOL_ICON[name] ?? "station-tools";
 
 const mmss = (ms: number) => {
   const s = Math.max(0, Math.round(ms / 1000));
   return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+};
+const ago = (ts: number | null) => {
+  if (!ts) return "";
+  const d = Date.now() - ts;
+  if (d < 60_000) return `${Math.max(1, Math.round(d / 1000))}s`;
+  if (d < 3_600_000) return `${Math.round(d / 60_000)}m`;
+  if (d < 86_400_000) return `${Math.round(d / 3_600_000)}h`;
+  return `${Math.round(d / 86_400_000)}d`;
 };
 const shortPath = (p: string) => p.replace(/^\/Users\/[^/]+/, "~");
 const fmtTok = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(1)}K` : String(n));
@@ -80,26 +85,10 @@ export function Console() {
 
   return (
     <div class="app">
-      <aside class="spine">
-        {STATIONS.map((st) => (
-          <Station
-            key={st.view}
-            num={st.num}
-            label={st.label}
-            icon={st.icon}
-            tone={st.tone}
-            w={st.w}
-            h={st.h}
-            active={view === st.view}
-            onClick={() => setView(st.view)}
-          />
-        ))}
-        <div class="filler" style={{ width: "120px", height: "56px" }} />
-        <div class="tail" />
-      </aside>
+      <Sidenav sessions={s.sessions} activeId={s.activeId} view={view} onView={setView} />
 
       <div class="main">
-        <Shelf brand="PI AGENT CONSOLE" tag={`MISSION LOG / ${STATIONS.find((x) => x.view === view)?.num ?? "01"}`}>
+        <Shelf brand="PI AGENT CONSOLE" tag={view === "session" ? "MISSION LOG" : view.toUpperCase()}>
           {meta ? (
             <>
               <ControlChip
@@ -135,19 +124,15 @@ export function Console() {
         {deck === "model" ? <ModelDeck current={meta?.modelId} onClose={() => setDeck(null)} /> : null}
         {deck === "think" ? <ThinkDeck current={meta?.thinking} onClose={() => setDeck(null)} /> : null}
 
-        <Tabs sessions={s.sessions} activeId={s.activeId} />
-
         <div class="body">
           <main class="center">
             <div class="center-head">
               <div>
-                <h1>{view === "session" ? titleOf(active, meta) : `STATION ${STATIONS.find((x) => x.view === view)?.num} / ${view.toUpperCase()}`}</h1>
-                <p>{view === "session" ? subtitleOf(meta, s.items, s.queue.waiting.length) : "runtime inspection"}</p>
+                <h1>{view === "session" ? titleOf(active, meta) : view.toUpperCase()}</h1>
+                <p>{view === "session" ? subtitleOf(meta, s.items, s.queue.waiting.length) : subtitleFor(view)}</p>
               </div>
               <div class="chips">
-                {s.link !== "open" ? (
-                  <span class="badge tomato">{s.link === "down" ? "LINK DOWN" : "LINKING"}</span>
-                ) : null}
+                {s.link !== "open" ? <span class="badge tomato">{s.link === "down" ? "LINK DOWN" : "LINKING"}</span> : null}
                 {meta?.pending ? <span class="badge tomato">{meta.pending} HELD</span> : null}
                 {s.queue.waiting.length ? (
                   <span class="badge moon">{s.queue.waiting.length} QUEUED</span>
@@ -165,8 +150,18 @@ export function Console() {
               </div>
             ) : null}
 
-            <div class="scroll">
-              {view === "session" ? <Transcript items={s.items} /> : <StationPanel view={view} items={s.items} meta={meta} policy={s.policy} />}
+            <div class="scroll" id="scroll">
+              {view === "session" ? (
+                <Transcript items={s.items} />
+              ) : view === "mcp" ? (
+                <McpPanel />
+              ) : view === "providers" ? (
+                <ProvidersPanel meta={meta} />
+              ) : view === "skills" ? (
+                <SkillsPanel meta={meta} policy={s.policy} />
+              ) : (
+                <SettingsPanel items={s.items} meta={meta} policy={s.policy} />
+              )}
             </div>
 
             <Composer running={!!meta?.running} disabled={s.link !== "open"} />
@@ -191,31 +186,99 @@ function subtitleOf(meta: { cwd: string; thinking: string; model: string } | nul
   const errs = items.filter((i) => i.kind === "tool" && i.status === "error").length;
   return `${shortPath(meta.cwd)} / ${meta.thinking} thinking / ${items.length} items / ${errs} errors${queued ? ` / ${queued} queued` : ""}`;
 }
+function subtitleFor(view: View) {
+  return {
+    mcp: "model context protocol servers, read from ~/.pi/agent/mcp.json",
+    skills: "skills loaded into the system prompt",
+    providers: "providers and models available to this session",
+    system: "runtime, policy and tool loadout",
+    session: "",
+  }[view];
+}
 
-/* ----------------------------------------------------------------- tabs */
-function Tabs({ sessions, activeId }: { sessions: { id: string; name?: string; items: number; running: boolean; queued: boolean }[]; activeId: string | null }) {
+/* ------------------------------------------------------------- sidenav */
+function Sidenav({
+  sessions,
+  activeId,
+  view,
+  onView,
+}: {
+  sessions: { id: string; name?: string; items: number; running: boolean; queued: boolean; lastTs: number | null; pending: boolean; modelId: string }[];
+  activeId: string | null;
+  view: View;
+  onView: (v: View) => void;
+}) {
+  const sorted = [...sessions].sort((a, b) => (b.lastTs ?? 0) - (a.lastTs ?? 0));
   return (
-    <div class="tabs">
-      {sessions.map((s) => (
-        <button
-          key={s.id}
-          type="button"
-          class="tab"
-          aria-selected={s.id === activeId ? "true" : "false"}
-          data-run={s.running ? "1" : "0"}
-          data-queued={s.queued ? "1" : "0"}
-          title={`${s.name ?? s.id}\n${s.id}`}
-          onClick={() => actions.activate(s.id)}
-        >
-          <i />
-          {s.name ?? s.id.slice(0, 10)}
-          <span class="ct">{s.items}</span>
-        </button>
-      ))}
-      <button type="button" class="tab-new" title="New session" onClick={() => actions.newSession()}>
-        <Icon name="act-new" size={13} />
+    <aside class="sidenav">
+      <button type="button" class="lnew" onClick={() => { actions.newSession(); onView("session"); }}>
+        <span style={{ display: "flex", alignItems: "center", gap: "6px", font: "700 12px/1.2 var(--din)", letterSpacing: "0.12em" }}>
+          <Icon name="act-new" size={13} /> NEW SESSION
+        </span>
+        <span style={{ font: "400 9px/1.2 var(--din)", letterSpacing: "0.1em", opacity: 0.7 }}>ENTER A WORKSPACE FROM THE SHELF</span>
       </button>
-    </div>
+
+      <div class="lsessions">
+        {sorted.length === 0 ? <div class="lempty">no sessions</div> : null}
+        {sorted.map((s) => (
+          <div
+            key={s.id}
+            class="sess"
+            data-active={s.id === activeId ? "1" : "0"}
+            data-run={s.running ? "1" : "0"}
+            role="button"
+            tabIndex={0}
+            title={`${s.name ?? s.id}\n${s.id}`}
+            onClick={() => {
+              actions.activate(s.id);
+              onView("session");
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                actions.activate(s.id);
+                onView("session");
+              }
+            }}
+          >
+            <span class="st" />
+            <span class="nm">
+              {s.name ?? s.id.slice(0, 12)}
+              <em>
+                {s.queued ? "queued" : s.running ? "running" : s.pending ? "held" : ago(s.lastTs)}
+                {s.items ? ` · ${s.items}` : ""}
+              </em>
+            </span>
+            <button
+              type="button"
+              class="del"
+              title="Delete session"
+              onClick={(e) => {
+                e.stopPropagation();
+                actions.remove(s.id);
+              }}
+            >
+              <Icon name="act-delete" size={12} />
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <div class="lnav">
+        {NAV.map((n) => (
+          <Station
+            key={n.view}
+            num=""
+            label={n.label}
+            icon={n.icon}
+            tone={n.tone}
+            full
+            h={42}
+            active={view === n.view}
+            onClick={() => onView(n.view)}
+          />
+        ))}
+      </div>
+    </aside>
   );
 }
 
@@ -229,8 +292,8 @@ function Transcript({ items }: { items: Item[] }) {
       <div class="empty-log">
         <b>STANDING BY.</b> This console is wired to a live <code>pi</code> session.
         <br />
-        Type below and press <code>ENTER</code>. Every row comes from a real event: text deltas,
-        tool executions, retries, truncation, approvals.
+        Type below and press <code>ENTER</code>. Every row comes from a real event: text deltas, tool
+        executions, retries, truncation, approvals.
       </div>
     );
   }
@@ -343,35 +406,48 @@ function Composer({ running, disabled }: { running: boolean; disabled: boolean }
     return () => window.removeEventListener("keydown", onKey);
   }, [running]);
 
+  const [focused, setFocused] = useState(false);
+  const chars = text.length;
+
   return (
-    <div class="composer">
-      <div class="chip" style={{ width: "84px", height: "100%", background: "var(--orange)", borderRadius: "0 var(--r-1) var(--r-1) 0" }}>
-        <span style={{ font: "700 12px/1.2 var(--din)", letterSpacing: "0.1em" }}>ENTRY</span>
-        <span style={{ font: "700 9px/1.2 var(--din)", letterSpacing: "0.1em" }}>CTRL K</span>
+    <div class="cmdbar">
+      <div class="entry-block">
+        <span class="el">ENTRY</span>
+        <span class="eh">{running ? "STEER" : "CTRL K"}</span>
       </div>
-      <div class="field" style={{ flex: "1 1 auto", minWidth: 0 }}>
-        <div class={`help ${running ? "live" : ""}`}>
-          {running ? "GENERATING / ESC TO INTERRUPT / ENTER QUEUES A STEER" : "ENTER SEND / SHIFT+ENTER NEWLINE"}
+
+      <div class="cmd-field" data-state={disabled ? "off" : running ? "live" : "idle"}>
+        <div class="cmd-help">
+          <span class={running ? "live" : ""}>
+            {running ? "GENERATING / ESC TO INTERRUPT / ENTER QUEUES A STEER" : "ENTER SEND / SHIFT+ENTER NEWLINE"}
+          </span>
+          <span class="cnt">{chars ? `${chars} CHARS` : "INPUT"}</span>
         </div>
-        <textarea
-          ref={ref}
-          rows={2}
-          placeholder={running ? "插入一条消息，不打断当前生成…" : "让 pi 构建、重构或调查…"}
-          value={text}
-          disabled={disabled}
-          onInput={(e) => setText((e.target as HTMLTextAreaElement).value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              submit();
-            }
-          }}
-        />
+        <label class="inputline" data-focused={focused ? "1" : "0"}>
+          <span class="caret" />
+          <textarea
+            ref={ref}
+            rows={2}
+            placeholder={running ? "插入一条消息，不打断当前生成…" : "让 pi 构建、重构或调查…"}
+            value={text}
+            disabled={disabled}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            onInput={(e) => setText((e.target as HTMLTextAreaElement).value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                submit();
+              }
+            }}
+          />
+        </label>
       </div>
+
       <div class="btns">
         <BarButton label={running ? "STEER" : "RUN"} hint="ENTER" tone="ok" disabled={disabled} onClick={submit} icon="act-send" />
         <BarButton label="STOP" hint="ESC" tone="stop" disabled={!running} onClick={() => actions.abort()} icon="act-stop" />
-        <BarButton label="NEW" hint="RESET" tone="quiet" onClick={() => actions.newSession()} icon="act-new" />
+        <BarButton label="FORK" hint="COPY" tone="quiet" onClick={() => actions.fork()} icon="act-copy" />
       </div>
     </div>
   );
@@ -380,14 +456,13 @@ function Composer({ running, disabled }: { running: boolean; disabled: boolean }
 /* ------------------------------------------------------------------ rail */
 function Rail({ items, meta, queue }: { items: Item[]; meta: ReturnType<typeof getState>["meta"]; queue: { waiting: string[] } }) {
   const stats = useMemo(() => {
-    const out: Record<string, { calls: number; fails: number; trunc: number; ms: number }> = {};
+    const out: Record<string, { calls: number; fails: number; trunc: number }> = {};
     for (const it of items) {
       if (it.kind !== "tool") continue;
-      out[it.name] ||= { calls: 0, fails: 0, trunc: 0, ms: 0 };
+      out[it.name] ||= { calls: 0, fails: 0, trunc: 0 };
       out[it.name].calls++;
       if (it.status === "error") out[it.name].fails++;
       if (it.truncated) out[it.name].trunc++;
-      out[it.name].ms += it.ms ?? 0;
     }
     return out;
   }, [items]);
@@ -421,13 +496,12 @@ function Rail({ items, meta, queue }: { items: Item[]; meta: ReturnType<typeof g
           {Object.keys(stats).length === 0 ? <div class="mrow"><span>NO CALLS YET</span><span>—</span></div> : null}
           {Object.entries(stats)
             .sort((a, b) => b[1].calls - a[1].calls)
-            .map(([name, s]) => (
+            .map(([name, v]) => (
               <div class="mrow" key={name}>
                 <span>{name.toUpperCase()}</span>
-                <span class={s.fails ? "bad" : s.trunc ? "warnval" : "ok"}>
-                  {s.calls}
-                  {s.fails ? ` / ${s.fails} FAIL` : ""}
-                  {s.trunc ? ` / ${s.trunc} TRUNC` : ""}
+                <span class={v.fails ? "bad" : v.trunc ? "warnval" : "ok"}>
+                  {v.calls}
+                  {v.fails ? ` / ${v.fails} FAIL` : ""}
                 </span>
               </div>
             ))}
@@ -566,18 +640,190 @@ function ThinkDeck({ current, onClose }: { current?: string; onClose: () => void
   );
 }
 
-/* ---------------------------------------------------------------- panels */
-function StationPanel({
-  view,
-  items,
-  meta,
-  policy,
-}: {
-  view: View;
-  items: Item[];
-  meta: ReturnType<typeof getState>["meta"];
-  policy: string;
-}) {
+/* ------------------------------------------------------------------ mcp */
+function McpPanel() {
+  const [data, setData] = useState<{ servers: McpServer[]; paths: { global: string; project: string }; exists: { global: boolean; project: boolean } } | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [name, setName] = useState("");
+  const [command, setCommand] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const load = () =>
+    api
+      .mcp()
+      .then((d) => {
+        setData(d);
+        setErr(null);
+      })
+      .catch((e) => setErr(e.message));
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const run = async (fn: () => Promise<unknown>) => {
+    setBusy(true);
+    try {
+      await fn();
+      await load();
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div class="pv">
+      <div class="pv-title">
+        MCP / {data?.servers.length ?? 0} SERVERS
+      </div>
+      <div class="pv-sub">
+        Read from <code>{shortPath(data?.paths.global ?? "~/.pi/agent/mcp.json")}</code>
+        {data?.exists.project ? ` with project overrides in ${shortPath(data.paths.project)}` : ""}. Changes are written with a{" "}
+        <code>.bak</code> backup and take effect on the next session.
+      </div>
+
+      {err ? (
+        <div class="errbar" style={{ margin: "0 0 8px" }}>
+          <Icon name="status-fail" size={13} /> {err}
+        </div>
+      ) : null}
+
+      {data?.servers.length === 0 ? <div class="pv-sub">No MCP servers configured.</div> : null}
+
+      {(data?.servers ?? []).map((m) => (
+        <div class="mcp-row" key={m.name} data-off={m.enabled ? "0" : "1"}>
+          <span class="st" />
+          <span class="ic">
+            <Icon name="station-mcp" size={14} />
+          </span>
+          <span class="nm">
+            {m.name}
+            <em>{m.transport === "stdio" ? `${m.command} ${m.args.join(" ")}` : m.url}</em>
+          </span>
+          <span class="mt">{m.exposure}{m.toolExposure ? ` · ${m.toolExposure} pinned` : ""}</span>
+          <button
+            type="button"
+            class="tgl"
+            aria-pressed={m.enabled ? "true" : "false"}
+            disabled={busy}
+            onClick={() => run(() => api.mcpToggle(m.name, !m.enabled))}
+          >
+            {m.enabled ? "ON" : "OFF"}
+          </button>
+          <button type="button" class="tgl ghost" disabled={busy} title="Remove server" onClick={() => run(() => api.mcpRemove(m.name))}>
+            <Icon name="act-delete" size={12} />
+          </button>
+        </div>
+      ))}
+
+      <div class="pv-title" style={{ fontSize: "13px", marginTop: "18px" }}>ADD SERVER</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--gap)", maxWidth: "820px" }}>
+        <FieldRow label="NAME" icon="station-mcp" value={name} placeholder="filesystem" onInput={setName} required />
+        <FieldRow label="COMMAND / URL" icon="fld-host" value={command} placeholder="npx -y @modelcontextprotocol/server-filesystem ." onInput={setCommand} />
+        <div style={{ display: "flex", gap: "var(--gap)" }}>
+          <BarButton
+            tone="ok"
+            label="ADD"
+            icon="act-new"
+            disabled={busy || !name || !command}
+            onClick={() =>
+              run(async () => {
+                const isUrl = /^https?:\/\//.test(command);
+                await api.mcpAdd(isUrl ? { name, url: command } : { name, command: command.split(/\s+/)[0], args: command.split(/\s+/).slice(1).join(" ") });
+                setName("");
+                setCommand("");
+              })
+            }
+          />
+          <BarButton tone="quiet" label="RELOAD" icon="act-reload" onClick={() => load()} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------ providers */
+function ProvidersPanel({ meta }: { meta: ReturnType<typeof getState>["meta"] }) {
+  const [models, setModels] = useState<ModelInfo[]>([]);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    api
+      .models()
+      .then((r) => setModels(r.models))
+      .catch((e) => setErr(e.message));
+  }, []);
+
+  const byProvider = models.reduce<Record<string, ModelInfo[]>>((acc, m) => {
+    (acc[m.provider] ||= []).push(m);
+    return acc;
+  }, {});
+
+  return (
+    <div class="pv">
+      <div class="pv-title">{Object.keys(byProvider).length} PROVIDERS</div>
+      <div class="pv-sub">
+        Providers come from your pi configuration and stored credentials. Editing keys and adding providers lands in M1 — for now you can switch the model, which takes effect next turn.
+      </div>
+      {err ? <div class="errbar" style={{ margin: "0 0 8px" }}>{err}</div> : null}
+      {Object.entries(byProvider).map(([provider, list]) => (
+        <div key={provider} style={{ display: "flex", flexDirection: "column", gap: "var(--gap)", marginBottom: "10px" }}>
+          <div class="pv-row">
+            <div class="st" style={{ background: "var(--cyan)" }} />
+            <div class="k">{provider.toUpperCase()}</div>
+            <div class="v">{list.length} models</div>
+            <div class="n">{meta?.modelId && list.some((m) => m.id === meta.modelId) ? "ACTIVE" : ""}</div>
+          </div>
+          {list.map((m) => (
+            <div class="pv-row" key={m.id} style={{ minHeight: "38px" }}>
+              <div class="st" />
+              <div class="k" style={{ background: "transparent", color: "var(--g3)" }}>{m.id === meta?.modelId ? "●" : ""}</div>
+              <div class="v">{m.id}</div>
+              <div class="n" style={{ font: "400 11px/1.4 var(--mono)", color: "var(--g3)" }}>
+                {m.contextWindow ? fmtTok(m.contextWindow) : "—"}
+              </div>
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* --------------------------------------------------------------- skills */
+function SkillsPanel({ meta, policy }: { meta: ReturnType<typeof getState>["meta"]; policy: string }) {
+  return (
+    <div class="pv">
+      <div class="pv-title">SKILLS / {meta?.skills ?? 0}</div>
+      <div class="pv-sub">
+        Skills are injected into the system prompt by the resource loader; the session API does not expose their names. Editing and per-skill toggles land in M3.
+      </div>
+      <div class="pv-row">
+        <div class="st" style={{ background: "var(--ice)" }} />
+        <div class="k">LOADED</div>
+        <div class="v">{meta?.skills ?? 0} skills in the system prompt</div>
+        <div class="n" />
+      </div>
+      <div class="pv-row">
+        <div class="st" style={{ background: meta?.approvalWired ? "var(--cyan)" : "var(--tomato)" }} />
+        <div class="k">APPROVAL</div>
+        <div class="v">{meta?.approvalWired ? "inline extension wired" : "not wired — check server log"}</div>
+        <div class="n" />
+      </div>
+      <div class="pv-row">
+        <div class="st" style={{ background: "var(--moon)" }} />
+        <div class="k">POLICY</div>
+        <div class="v">{policy}</div>
+        <div class="n" />
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------- settings */
+function SettingsPanel({ items, meta, policy }: { items: Item[]; meta: ReturnType<typeof getState>["meta"]; policy: string }) {
   const stats = useMemo(() => {
     const out: Record<string, { calls: number; fails: number; ms: number }> = {};
     for (const it of items) {
@@ -590,103 +836,37 @@ function StationPanel({
     return out;
   }, [items]);
 
-  const rows = (list: [string, string, string][]) => (
-    <div style={{ display: "flex", flexDirection: "column", gap: "var(--gap)" }}>
-      {list.map(([k, v, n]) => (
-        <div class="pv-row" key={k}>
-          <div class="st" />
-          <div class="k">{k}</div>
-          <div class="v">{v}</div>
-          <div class="n">{n}</div>
-        </div>
-      ))}
-    </div>
-  );
-
-  if (view === "tools") {
-    const names = [...(meta?.tools ?? [])].sort((a, b) => (stats[b]?.calls ?? 0) - (stats[a]?.calls ?? 0));
-    return (
-      <div class="pv">
-        <div class="pv-title">TOOL LOADOUT / {names.length}</div>
-        <div class="pv-sub">Everything the model can call in this session, from <code>getActiveToolNames()</code>.</div>
-        {rows(names.map((n) => [n.toUpperCase(), `${stats[n]?.calls ?? 0} calls · ${stats[n]?.fails ?? 0} failed`, stats[n]?.ms ? `${Math.round(stats[n].ms)}ms` : "—"]))}
-      </div>
-    );
-  }
-
-  if (view === "agents") {
-    const known = ["Agent", "SubagentWorkflow", "steer_subagent", "get_subagent_result"].filter((n) => (meta?.tools ?? []).includes(n));
-    return (
-      <div class="pv">
-        <div class="pv-title">AGENTS / {known.length} TOOLS</div>
-        <div class="pv-sub">Subagent tools loaded from your pi packages. A spawned agent appears here as soon as it runs.</div>
-        {rows(known.map((n) => [n.toUpperCase(), stats[n]?.calls ? `${stats[n].calls} runs · ${stats[n].fails} failed` : "idle · never called", "—"]))}
-        <div class="pv-sub" style={{ marginTop: "10px" }}>
-          Nested transcripts arrive with M7 — for now a subagent reports back as one tool result row.
-        </div>
-      </div>
-    );
-  }
-
-  if (view === "context") {
-    const u = meta?.usage ?? { input: 0, output: 0, cost: 0, total: 0 };
-    return (
-      <div class="pv">
-        <div class="pv-title">{meta?.contextPct ?? 0}% OF CONTEXT</div>
-        <div class="pv-sub">{fmtTok(u.total)} tokens in the last request · window {fmtTok(meta?.contextWindow ?? 200000)}</div>
-        <Meter segments={[{ tone: "sys", pct: 8 }, { tone: "tool", pct: 4 }, { tone: "hist", pct: Math.max(1, (meta?.contextPct ?? 0) - 12) }, { pct: Math.max(1, 100 - (meta?.contextPct ?? 0)) }]} />
-        {rows([
-          ["INPUT", fmtTok(u.input), ""],
-          ["OUTPUT", fmtTok(u.output), ""],
-          ["COST", `$${u.cost.toFixed(4)}`, ""],
-          ["COMPACTION", "auto at threshold", ""],
-        ])}
-      </div>
-    );
-  }
-
-  if (view === "skills") {
-    return (
-      <div class="pv">
-        <div class="pv-title">SKILLS / {meta?.skills ?? 0}</div>
-        <div class="pv-sub">
-          Loaded from your pi resource loader and injected into the system prompt. Editing and per-skill toggles land in M3.
-          {meta?.approvalWired ? "" : " Approval extension is not wired — check the server log."}
-        </div>
-        {rows([
-          ["SKILLS", `${meta?.skills ?? 0} loaded`, ""],
-          ["APPROVAL", meta?.approvalWired ? "inline extension wired" : "not wired", ""],
-          ["POLICY", policy, ""],
-        ])}
-      </div>
-    );
-  }
-
   return (
     <div class="pv">
-      <div class="pv-title">SYSTEM</div>
-      <div class="pv-sub">Runtime of the active session. Values are read from the live session, not from config files.</div>
-      {rows([
-        ["MODEL", meta?.model ?? "—", ""],
-        ["THINKING", meta?.thinking ?? "—", ""],
-        ["TOOLS", `${meta?.tools.length ?? 0} active`, ""],
-        ["CWD", shortPath(meta?.cwd ?? ""), ""],
-        ["SESSION", meta?.path ? shortPath(meta.path) : "unsaved", ""],
-      ])}
-      <div class="pv-title" style={{ fontSize: "14px", marginTop: "16px" }}>APPROVAL POLICY</div>
-      <div style={{ display: "flex", gap: "var(--gap)" }}>
+      <div class="pv-title">SETTINGS</div>
+      <div class="pv-sub">Runtime of the active session, read from the live session rather than from config files.</div>
+
+      <div class="pv-row"><div class="st" style={{ background: "var(--cyan)" }} /><div class="k">MODEL</div><div class="v">{meta?.model ?? "—"}</div><div class="n" /></div>
+      <div class="pv-row"><div class="st" style={{ background: "var(--cyan)" }} /><div class="k">THINKING</div><div class="v">{meta?.thinking ?? "—"}</div><div class="n" /></div>
+      <div class="pv-row"><div class="st" style={{ background: "var(--cyan)" }} /><div class="k">CWD</div><div class="v">{shortPath(meta?.cwd ?? "")}</div><div class="n" /></div>
+      <div class="pv-row"><div class="st" style={{ background: "var(--cyan)" }} /><div class="k">SESSION</div><div class="v">{meta?.path ? shortPath(meta.path) : "unsaved"}</div><div class="n" /></div>
+
+      <div class="pv-title" style={{ fontSize: "13px", marginTop: "18px" }}>APPROVAL POLICY</div>
+      <div style={{ display: "flex", gap: "var(--gap)", alignItems: "center", marginBottom: "10px" }}>
         {(["off", "risky", "all"] as const).map((m) => (
-          <BarButton
-            key={m}
-            label={m.toUpperCase()}
-            tone={policy === m ? "ok" : "quiet"}
-            onClick={() => actions.policy(m)}
-          />
+          <BarButton key={m} label={m.toUpperCase()} tone={policy === m ? "ok" : "quiet"} onClick={() => actions.policy(m)} />
         ))}
-        <span style={{ font: "400 11px/2.2 var(--mono)", color: "var(--g2)" }}>
-          risky = bash / write / edit · always releases on abort
+        <span style={{ font: "400 11px/1.6 var(--mono)", color: "var(--g2)" }}>
+          risky = bash / write / edit · pending calls are released on abort
         </span>
       </div>
+
+      <div class="pv-title" style={{ fontSize: "13px", marginTop: "10px" }}>TOOL LOADOUT / {meta?.tools.length ?? 0}</div>
+      {(meta?.tools ?? []).map((n) => (
+        <div class="pv-row" key={n} style={{ minHeight: "36px" }}>
+          <div class="st" />
+          <div class="k">{n.toUpperCase()}</div>
+          <div class="v">
+            {stats[n]?.calls ?? 0} calls · {stats[n]?.fails ?? 0} failed
+          </div>
+          <div class="n">{stats[n]?.ms ? `${Math.round(stats[n].ms)}ms` : "—"}</div>
+        </div>
+      ))}
     </div>
   );
 }

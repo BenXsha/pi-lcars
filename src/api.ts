@@ -48,6 +48,8 @@ export type SessionSummary = {
   running: boolean;
   queued: boolean;
   items: number;
+  lastTs: number | null;
+  pending: boolean;
   active: boolean;
 };
 
@@ -90,6 +92,26 @@ export type ModelInfo = {
 
 export type DirEntry = { name: string; path: string; items: number | null };
 
+export type McpServer = {
+  name: string;
+  transport: "stdio" | "http" | "unknown";
+  command: string | null;
+  args: string[];
+  url: string | null;
+  exposure: string;
+  enabled: boolean;
+  toolExposure: number;
+  description: string;
+  scope: "global" | "project";
+  override?: string;
+};
+
+export type McpConfig = {
+  servers: McpServer[];
+  paths: { global: string; project: string };
+  exists: { global: boolean; project: boolean };
+};
+
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
     ...init,
@@ -125,6 +147,11 @@ export const api = {
     post<{ thinking: string; requested: string; clamped: boolean }>("/api/thinking", { level }),
   setModel: (provider: string, model: string) => post<{ modelId: string }>("/api/model", { provider, model }),
   models: () => call<{ current: string; models: ModelInfo[] }>("/api/models"),
+  mcp: () => call<McpConfig>("/api/mcp"),
+  mcpToggle: (name: string, enabled: boolean) => post<unknown>("/api/mcp", { op: "toggle", name, enabled }),
+  mcpAdd: (payload: { name: string; command?: string; args?: string; url?: string; scope?: string }) =>
+    post<unknown>("/api/mcp", { op: "add", ...payload }),
+  mcpRemove: (name: string) => post<unknown>("/api/mcp", { op: "remove", name }),
   fs: (path?: string) =>
     call<{ path: string; parent: string | null; dirs: DirEntry[] }>(`/api/fs${path ? `?path=${encodeURIComponent(path)}` : ""}`),
 };

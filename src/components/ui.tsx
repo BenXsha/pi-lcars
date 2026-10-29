@@ -142,15 +142,17 @@ export function Station(props: {
   h?: number;
   tone?: "orange" | "amber" | "lav" | "moon" | "ice" | "cyan";
   active?: boolean;
+  full?: boolean;
+  badge?: string;
   onClick?: () => void;
 }) {
   return (
     <button
       type="button"
-      class="station"
+      class={`station ${props.full ? "is-full" : ""}`}
       data-tone={props.tone}
       aria-current={props.active ? "true" : "false"}
-      style={{ width: `${props.w ?? 196}px`, height: `${props.h ?? 52}px` }}
+      style={props.full ? { height: `${props.h ?? 44}px` } : { width: `${props.w ?? 196}px`, height: `${props.h ?? 52}px` }}
       onClick={props.onClick}
     >
       <span class="num">{props.num}</span>

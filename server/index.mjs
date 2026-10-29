@@ -17,6 +17,7 @@ import { Approvals } from "./pi/approval.mjs";
 import { createQueue } from "./pi/queue.mjs";
 import { Registry } from "./pi/registry.mjs";
 import { now } from "./pi/format.mjs";
+import { readMcp, setEnabled, addServer, removeServer } from "./pi/mcpConfig.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, "..");
@@ -296,6 +297,28 @@ const routes = {
     await entry.session.setModel(model);
     entry.pushMeta();
     ok(res, { modelId: entry.meta.modelId, model: entry.meta.model });
+  },
+
+  "GET /api/mcp": async (req, res) => {
+    ok(res, await readMcp({ agentDir: agentDir(), cwd: CWD }));
+  },
+
+  "POST /api/mcp": async (req, res) => {
+    const b = await body(req);
+    const ctx = { agentDir: agentDir(), cwd: CWD };
+    switch (b.op) {
+      case "toggle":
+        ok(res, await setEnabled({ ...ctx, name: b.name, enabled: !!b.enabled }));
+        break;
+      case "add":
+        ok(res, await addServer({ ...ctx, name: b.name, command: b.command, args: b.args, url: b.url, scope: b.scope, exposure: b.exposure }));
+        break;
+      case "remove":
+        ok(res, await removeServer({ ...ctx, name: b.name }));
+        break;
+      default:
+        fail(res, 400, `unknown op: ${b.op}`, { code: "E_MCP" });
+    }
   },
 
   "GET /api/fs": async (req, res) => {

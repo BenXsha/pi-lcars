@@ -249,6 +249,8 @@ export class Registry {
       running: s.meta.running,
       queued: s.meta.queued,
       items: s.items.length,
+      lastTs: s.items.length ? s.items[s.items.length - 1].ts : null,
+      pending: !!s.meta.pending,
       active: s.id === this.activeId,
     }));
   }

@@ -72,11 +72,13 @@ PLAN.md            milestone plan (M0..M8)
 | POST | `/api/thinking` | `off` / `low` / `medium` / `high` (reports `clamped`) |
 | GET | `/api/models` | available models for the active session |
 | GET | `/api/fs?path=` | directories only, for the workspace picker |
+| GET | `/api/mcp` | servers from `mcp.json` (global + project overrides) |
+| POST | `/api/mcp` | `{op: toggle\|add\|remove}` — writes with a `.bak` backup |
 
 ## Screens
 
-- `/` — the console: spine stations, shelf controls (workspace / model / thinking),
-  tab bar, live transcript, resources rail.
+- `/` — the console: left rail (session list + MCP / SKILLS / PROVIDERS / SETTINGS),
+  shelf controls (workspace / model / thinking), live transcript, pinned composer, resources rail.
 - `/?craft` — the primitive sheet (elbows, motion, icons, form language, themes),
   i.e. the visual contract on one page.
 
@@ -89,4 +91,6 @@ PLAN.md            milestone plan (M0..M8)
 - **Fork needs a transcript.** Forking a session with no turns returns `409 E_EMPTY`.
 - **Boot does not resume.** A fresh console starts a new session; resuming the newest one
   (which may be your CLI session, with its context and token history) is opt-in via `LCARS_RESUME=1`.
+- **MCP edits are written to disk**, not applied live: the next session picks them up. Every write keeps
+  a `.bak` next to the file.
 - **Binding is loopback only** and there is no auth — this process can run `bash` in `PI_CWD`.
