@@ -38,6 +38,27 @@ export function Elbow({ vw = 64, vh = 104, hw, hh, r = 22, class: cls }: ElbowPr
    chrome
    ============================================================ */
 
+/**
+ * Top cap: a solid block whose bottom-right corner is cut by a concave sweep,
+ * so the cap flows into the thin shelf bar next to it. Reproduces the canvas
+ * shape (block minus a circle centred on its bottom-right corner).
+ */
+export function TopCap(props: { w?: number; h?: number; bar?: number; r?: number; children?: ComponentChildren; class?: string }) {
+  const w = props.w ?? 320;
+  const h = props.h ?? 100;
+  const bar = props.bar ?? 44;
+  const r = props.r ?? Math.max(8, h - bar - 1);
+  const d = `M0,0 H${w} V${bar} Q${w},${h} ${w - r},${h} H0 Z`;
+  return (
+    <div class={`cap ${props.class ?? ""}`} style={{ width: `${w}px`, height: `${h}px`, flex: `0 0 ${h}px` }}>
+      <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden="true" style={{ position: "absolute", inset: 0 }}>
+        <path d={d} fill="currentColor" />
+      </svg>
+      {props.children}
+    </div>
+  );
+}
+
 export function Shelf(props: { brand: string; tag: string; children?: ComponentChildren }) {
   return (
     <header class="shelf">

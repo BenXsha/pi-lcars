@@ -17,6 +17,7 @@ import {
   Segmented,
   Shelf,
   Station,
+  TopCap,
   ToolStrip,
 } from "../components/ui";
 
@@ -88,7 +89,7 @@ export function Console() {
       <Sidenav sessions={s.sessions} activeId={s.activeId} view={view} onView={setView} />
 
       <div class="main">
-        <Shelf brand="PI AGENT CONSOLE" tag={view === "session" ? "MISSION LOG" : view.toUpperCase()}>
+        <Shelf brand="" tag={view === "session" ? "MISSION LOG" : view.toUpperCase()}>
           {meta ? (
             <>
               <ControlChip
@@ -203,24 +204,28 @@ function Sidenav({
   view,
   onView,
 }: {
-  sessions: { id: string; name?: string; items: number; running: boolean; queued: boolean; lastTs: number | null; pending: boolean; modelId: string }[];
+  sessions: { id: string; name?: string; items: number; running: boolean; queued: boolean; lastTs: number | null; pending: boolean; modelId: string; cwd: string }[];
   activeId: string | null;
   view: View;
   onView: (v: View) => void;
 }) {
   const sorted = [...sessions].sort((a, b) => (b.lastTs ?? 0) - (a.lastTs ?? 0));
+
   return (
     <aside class="sidenav">
+      <TopCap w={320} h={100} bar={44}>
+        <span class="cap-ttl">PI AGENT CONSOLE</span>
+        <span class="cap-sub">LCARS / SESSION CONSOLE</span>
+      </TopCap>
+
       <button type="button" class="lnew" onClick={() => { actions.newSession(); onView("session"); }}>
-        <span style={{ display: "flex", alignItems: "center", gap: "6px", font: "700 12px/1.2 var(--din)", letterSpacing: "0.12em" }}>
-          <Icon name="act-new" size={13} /> NEW SESSION
-        </span>
-        <span style={{ font: "400 9px/1.2 var(--din)", letterSpacing: "0.1em", opacity: 0.7 }}>ENTER A WORKSPACE FROM THE SHELF</span>
+        <Icon name="act-new" size={16} />
+        <span>NEW SESSION</span>
       </button>
 
       <div class="lsessions">
         {sorted.length === 0 ? <div class="lempty">no sessions</div> : null}
-        {sorted.map((s) => (
+        {sorted.map((s, i) => (
           <div
             key={s.id}
             class="sess"
@@ -228,7 +233,7 @@ function Sidenav({
             data-run={s.running ? "1" : "0"}
             role="button"
             tabIndex={0}
-            title={`${s.name ?? s.id}\n${s.id}`}
+            title={`${s.name ?? s.id}\n${s.cwd}`}
             onClick={() => {
               actions.activate(s.id);
               onView("session");
@@ -240,13 +245,13 @@ function Sidenav({
               }
             }}
           >
-            <span class="st" />
-            <span class="nm">
-              {s.name ?? s.id.slice(0, 12)}
-              <em>
-                {s.queued ? "queued" : s.running ? "running" : s.pending ? "held" : ago(s.lastTs)}
-                {s.items ? ` · ${s.items}` : ""}
-              </em>
+            <span class="l1">{s.name ?? `SESSION ${String(Number(s.id.match(/^s(\d+)/)?.[1] ?? i + 1)).padStart(2, "0")}`}</span>
+            <span class="l2">
+              {s.modelId.toUpperCase()} / {s.id.slice(0, 7).toUpperCase()}
+            </span>
+            <span class="rt">
+              {s.queued ? "QUEUED" : s.running ? "LIVE" : s.pending ? "HELD" : s.lastTs ? ago(s.lastTs) : "NEW"}
+              {s.items ? ` · ${s.items}` : ""}
             </span>
             <button
               type="button"
@@ -257,7 +262,7 @@ function Sidenav({
                 actions.remove(s.id);
               }}
             >
-              <Icon name="act-delete" size={12} />
+              <Icon name="act-delete" size={11} />
             </button>
           </div>
         ))}
@@ -265,17 +270,7 @@ function Sidenav({
 
       <div class="lnav">
         {NAV.map((n) => (
-          <Station
-            key={n.view}
-            num=""
-            label={n.label}
-            icon={n.icon}
-            tone={n.tone}
-            full
-            h={42}
-            active={view === n.view}
-            onClick={() => onView(n.view)}
-          />
+          <Station key={n.view} num="" label={n.label} icon={n.icon} tone={n.tone} full h={42} active={view === n.view} onClick={() => onView(n.view)} />
         ))}
       </div>
     </aside>
