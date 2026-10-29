@@ -1,4 +1,5 @@
 import { now, shortArgs, textOf, truncationOf } from "./format.mjs";
+import { diffFromResult, diffFromWrite } from "./diff.mjs";
 
 /**
  * pi session events → normalized UI items.
@@ -65,6 +66,7 @@ export function applyEvent(entry, ev) {
     }
 
     case "tool_execution_start":
+      entry.rawCalls?.set(ev.toolCallId, ev.args);
       entry.emit({
         kind: "tool",
         id: `t${ev.toolCallId}`,
@@ -88,11 +90,18 @@ export function applyEvent(entry, ev) {
     case "tool_execution_end": {
       const id = `t${ev.toolCallId}`;
       const out = textOf(ev.result?.content);
+      let diff = diffFromResult(ev.result?.details);
+      if (!diff && ev.toolName === "write" && !ev.isError) {
+        const args = entry.rawCalls?.get(ev.toolCallId);
+        diff = diffFromWrite(args?.content, args?.path);
+      }
+      entry.rawCalls?.delete(ev.toolCallId);
       entry.patch(id, {
         status: ev.isError ? "error" : "ok",
         output: out,
         ms: ev.durationMs,
         truncated: truncationOf(ev.result, out),
+        ...(diff ? { diff } : {}),
       });
       break;
     }

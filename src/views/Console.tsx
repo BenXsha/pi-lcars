@@ -372,6 +372,7 @@ function Transcript({ items }: { items: Item[] }) {
                 state={state}
                 ms={it.ms}
                 truncated={it.truncated}
+                diff={it.diff}
                 expanded={open[it.id] ?? false}
                 onToggle={() => setOpen((o) => ({ ...o, [it.id]: !o[it.id] }))}
               />

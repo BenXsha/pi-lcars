@@ -24,6 +24,7 @@ export type Item =
       errorText?: string;
       ms?: number;
       truncated?: boolean;
+      diff?: DiffData;
       ts: number;
     }
   | { kind: "notice"; id: string; tone?: "info" | "warn" | "error"; label: string; text: string; ts: number }
@@ -37,6 +38,14 @@ export type Item =
       decidedMs?: number;
       ts: number;
     };
+
+export type DiffLine = { t: "+" | "-" | " " | "\\"; o?: number; n?: number; text: string };
+export type DiffData = {
+  path?: string;
+  hunks: { hdr: string; oldNo: number; newNo: number; lines: DiffLine[] }[];
+  stat: { add: number; del: number };
+  truncated?: boolean;
+};
 
 export type SessionSummary = {
   id: string;

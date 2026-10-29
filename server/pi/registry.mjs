@@ -45,6 +45,7 @@ export class Registry {
       byId: new Map(),
       cur: null,
       n: 0,
+      rawCalls: new Map(), // callId -> args, for write→diff synthesis
       usage: { input: 0, output: 0, cost: 0, total: 0 },
       loaderSkills: 0,
       running: false, // raw agent state; meta.running is derived

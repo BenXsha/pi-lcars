@@ -1,6 +1,7 @@
 import type { ComponentChildren } from "preact";
 import { Icon, type IconName } from "./Icon";
 import { Markdown } from "./Markdown";
+import type { DiffData } from "../api";
 
 /* ============================================================
    geometry
@@ -205,6 +206,7 @@ export function ToolStrip(props: {
   ms?: number;
   count?: number;
   truncated?: boolean;
+  diff?: DiffData;
   expanded?: boolean;
   onToggle?: () => void;
 }) {
@@ -216,7 +218,10 @@ export function ToolStrip(props: {
   const hidden = lines.length - shown.length;
   // long commands wrap too; offer the toggle even when the output is short
   const argsLong = (props.args || "").length > 88;
-  const canToggle = !!props.onToggle && (hidden > 0 || argsLong);
+  const diffRows = props.diff ? flattenDiff(props.diff) : [];
+  const visibleDiff = props.expanded ? diffRows : diffRows.slice(0, 8);
+  const hiddenDiff = diffRows.length - visibleDiff.length;
+  const canToggle = !!props.onToggle && (hidden > 0 || hiddenDiff > 0 || argsLong);
 
   return (
     <div class="tool" data-state={state} data-expanded={props.expanded ? "1" : "0"} data-toggle={canToggle ? "1" : "0"}>
@@ -246,7 +251,11 @@ export function ToolStrip(props: {
       )}
       <div class="bd">
         <div class="args">{props.args}</div>
-        {shown.length ? <div class={state === "error" ? "err" : "out"}>{shown.join("\n")}</div> : null}
+        {props.diff ? (
+          <DiffView rows={visibleDiff} stat={props.diff.stat} truncated={props.diff.truncated} />
+        ) : shown.length ? (
+          <div class={state === "error" ? "err" : "out"}>{shown.join("\n")}</div>
+        ) : null}
         {canToggle ? (
           <button
             type="button"
@@ -254,7 +263,13 @@ export function ToolStrip(props: {
             aria-expanded={props.expanded ? "true" : "false"}
             onClick={props.onToggle}
           >
-            {props.expanded ? "− COLLAPSE" : hidden > 0 ? `+ ${hidden} MORE LINES` : "EXPAND"}
+            {props.expanded
+              ? "− COLLAPSE"
+              : hiddenDiff > 0
+                ? `+ ${hiddenDiff} MORE LINES`
+                : hidden > 0
+                  ? `+ ${hidden} MORE LINES`
+                  : "EXPAND"}
           </button>
         ) : null}
         {props.truncated ? <div class="warn">warning: output truncated</div> : null}
@@ -449,5 +464,53 @@ export function BarButton(props: {
       <b>{props.label}</b>
       {props.hint ? <em>{props.hint}</em> : null}
     </button>
+  );
+}
+
+/* ---------------------------------------------------------------- diff */
+type DiffRow =
+  | { kind: "hunk"; text: string }
+  | { kind: "add" | "del" | "ctx"; o?: number; n?: number; text: string };
+
+function flattenDiff(diff: DiffData): DiffRow[] {
+  const rows: DiffRow[] = [];
+  for (const h of diff.hunks) {
+    if (h.hdr) rows.push({ kind: "hunk", text: h.hdr });
+    for (const l of h.lines) {
+      if (l.t === "+") rows.push({ kind: "add", n: l.n, text: l.text });
+      else if (l.t === "-") rows.push({ kind: "del", o: l.o, text: l.text });
+      else if (l.t === "\\") continue;
+      else rows.push({ kind: "ctx", o: l.o, n: l.n, text: l.text });
+    }
+  }
+  return rows;
+}
+
+/** Hunk view: two line-number gutters, a sign column, then the text. */
+function DiffView({ rows, stat, truncated }: { rows: DiffRow[]; stat: { add: number; del: number }; truncated?: boolean }) {
+  return (
+    <div class="diff">
+      <div class="df-stat">
+        <span class="add">+{stat.add}</span>
+        <span class="del">−{stat.del}</span>
+        {truncated ? <span class="tr">truncated</span> : null}
+      </div>
+      <div class="df-rows">
+        {rows.map((r, i) =>
+          r.kind === "hunk" ? (
+            <div class="dl hunk" key={i}>
+              {r.text}
+            </div>
+          ) : (
+            <div class={`dl ${r.kind}`} key={i}>
+              <span class="o">{r.kind === "add" ? "" : r.o ?? ""}</span>
+              <span class="n">{r.kind === "del" ? "" : r.n ?? ""}</span>
+              <span class="s">{r.kind === "add" ? "+" : r.kind === "del" ? "−" : " "}</span>
+              <span class="t">{r.text || " "}</span>
+            </div>
+          ),
+        )}
+      </div>
+    </div>
   );
 }
