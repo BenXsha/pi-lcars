@@ -214,9 +214,21 @@ function Sidenav({
   onView: (v: View) => void;
 }) {
   const sorted = [...sessions].sort((a, b) => (b.lastTs ?? 0) - (a.lastTs ?? 0));
+  const listRef = useRef<HTMLDivElement>(null);
+  const [cramped, setCramped] = useState(false);
+
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    const check = () => setCramped(el.scrollHeight > el.clientHeight + 1);
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [sessions.length]);
 
   return (
-    <aside class="sidenav">
+    <aside class="sidenav" data-cramped={cramped ? "1" : "0"}>
       <TopCap w={375} h={100} bar={44}>
         <span class="cap-ttl">PI AGENT CONSOLE</span>
         <span class="cap-sub">LCARS / SESSION CONSOLE</span>
@@ -229,7 +241,7 @@ function Sidenav({
         <span class="lb">NEW SESSION</span>
       </button>
 
-      <div class="lsessions">
+      <div class="lsessions" ref={listRef}>
         {sorted.length === 0 ? <div class="lempty">no sessions</div> : null}
         {sorted.map((s, i) => (
           <div
@@ -275,6 +287,15 @@ function Sidenav({
             </button>
           </div>
         ))}
+      </div>
+
+      {/* LCARS filler: the left column never shows a void — leftover space is
+          taken by graduated bars ending in a vertical stem. */}
+      <div class="lfiller" aria-hidden="true">
+        <span class="stem" />
+        <span class="bar b1" />
+        <span class="bar b2" />
+        <span class="bar b3" />
       </div>
 
       <div class="lnav">

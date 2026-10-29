@@ -757,7 +757,7 @@ button { cursor: pointer; }
 }
 .lnew:hover { filter: brightness(1.1); }
 .lsessions {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-height: 0;
   overflow-y: auto;
   display: flex;
@@ -989,3 +989,46 @@ button.nm {
 button.nm:hover { filter: brightness(1.12); }
 button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 
+
+/* ============================================================
+   LCARS filler — the left column is never left as a void.
+   Leftover height is absorbed by a vertical stem plus three
+   graduated bars (wide → narrow), all on the 4px seam grid.
+   With enough sessions the block shrinks to zero and clips.
+   ============================================================ */
+.lsessions { position: relative; }
+.lfiller {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: flex-start;
+  gap: var(--gap);
+  overflow: hidden;
+  pointer-events: none;
+  padding-top: var(--gap);
+}
+.lfiller .stem {
+  flex: 1 1 auto;
+  min-height: 8px;
+  width: 8px;
+  margin-left: 0;
+  background: var(--g0);
+}
+.lfiller .bar {
+  height: 22px;
+  flex: 0 0 22px;
+  background: var(--g0);
+  border-radius: 0 var(--r-pill) var(--r-pill) 0;
+}
+.lfiller .b1 { width: 148px; }
+.lfiller .b2 { width: 112px; }
+.lfiller .b3 {
+  width: 76px;
+  background: color-mix(in srgb, var(--orange) 22%, #000);
+}
+
+/* when the list already scrolls there is no leftover space to compensate;
+   hide the filler so it cannot look like a clipped stub */
+.sidenav[data-cramped="1"] .lfiller { display: none; }

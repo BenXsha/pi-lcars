@@ -265,6 +265,20 @@ LCARS 原版用 `Swiss 911 Ultra Compressed`（压缩粗体）。**本项目不�
 | 底部 command | 输入框 + `RUN`（回车）· `PLAN`（plan mode）· `STOP`（中断） | keybindings |
 | 阻断层 | 工具审批：`tomato` 块 + `APPROVE / DENY / ALWAYS` | approvals |
 
+### 7.6b 空态补偿（LCARS filler）
+
+LCARS 的左轨**从不留纯黑空洞**：内容排不满时，剩余高度由一根竖脊 + 几条**渐窄的横条**吃掉，
+最末一条通常带强调色，整列最终收在底部的肘形/脚块上 —— 空白由结构占着，而不是留白。
+
+本地规则：
+
+- 条宽递减 `148 → 112 → 76`，条高 22，间距 4（与全站同一套黑缝），左对齐。
+- 最后一条用 `color-mix(--orange 22%)` 收尾，其余用 `--g0`，避免抢内容。
+- 竖脊 `8px` 宽、`flex:1`，吃掉剩余高度；整块 `pointer-events:none`、`aria-hidden`。
+- 列表本身 `flex: 0 1 auto`（不抢空间），补块 `flex: 1 1 auto`（吃剩余）；
+  当列表内容超过可用高度（要滚动了）就**整块隐藏** —— 否则会露出被裁一半的条。
+  用 `ResizeObserver` 判 `scrollHeight > clientHeight`，落到 `data-cramped`。
+
 ### 7.7 会话块（列表项）
 
 会话不是"小卡片"，是**实心块 + 双行读数**：
