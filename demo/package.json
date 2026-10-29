@@ -1,0 +1,11 @@
+{
+  "name": "lcars-agent-console",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "description": "LCARS-style web console for a pi agent session (in-process SDK + SSE)",
+  "scripts": {
+    "start": "node server.mjs",
+    "mock": "node server.mjs --mock"
+  }
+}
