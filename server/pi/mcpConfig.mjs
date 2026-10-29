@@ -141,3 +141,58 @@ export async function removeServer({ agentDir, cwd, name }) {
   if (!hits.length) throw Object.assign(new Error(`unknown server: ${name}`), { status: 404, code: "E_MCP" });
   return { removed: hits };
 }
+
+/**
+ * Config + live wiring, in one view.
+ *
+ * pi connects MCP servers when the session starts and registers their tools as
+ * `mcp__<server>__<tool>`. That naming is the only honest connection signal we
+ * have: a server is "connected" when at least one such tool exists in the
+ * session. Config alone would claim servers are up when they are not.
+ */
+export async function mcpStatus({ agentDir, cwd, session }) {
+  const base = await readMcp({ agentDir, cwd });
+  const active = new Set(session?.getActiveToolNames?.() ?? []);
+  const callable = new Set(session?.getCallableToolNames?.() ?? []);
+  const all = new Set([...active, ...callable]);
+  // descriptions come from the registered tool definitions, not from config
+  const infos = new Map();
+  try {
+    for (const t of session?.getAllTools?.() ?? []) infos.set(t.name, t);
+  } catch {
+    /* older session without getAllTools */
+  }
+
+  const servers = base.servers.map((s) => {
+    const prefix = `mcp__${s.name}__`;
+    const tools = [];
+    for (const full of all) {
+      if (!full.startsWith(prefix)) continue;
+      const info = infos.get(full);
+      tools.push({
+        name: full.slice(prefix.length),
+        exposure: active.has(full) ? "direct" : "deferred",
+        description: (info?.description ?? "").replace(/\s+/g, " ").trim(),
+      });
+    }
+    tools.sort((a, b) => a.name.localeCompare(b.name));
+    return {
+      ...s,
+      tools,
+      toolCount: tools.length,
+      connected: s.enabled && tools.length > 0,
+      pinned: s.toolExposure ? Object.entries(s.toolExposure ?? {}).map(([k, v]) => ({ name: k, exposure: v })) : [],
+    };
+  });
+
+  return {
+    ...base,
+    servers,
+    totals: {
+      servers: servers.length,
+      connected: servers.filter((s) => s.connected).length,
+      enabled: servers.filter((s) => s.enabled).length,
+      tools: servers.reduce((n, s) => n + s.toolCount, 0),
+    },
+  };
+}

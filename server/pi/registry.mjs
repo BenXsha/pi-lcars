@@ -14,7 +14,7 @@ const MAX_ITEMS = 4000;
  * queue flags — and fans it out to the single SSE channel.
  */
 export class Registry {
-  constructor({ sdk, agentDir, sink, approvals, queue, sessionDir, trustProject = true }) {
+  constructor({ sdk, agentDir, sink, approvals, queue, sessionDir, trustProject = true, mcp = true }) {
     this.sdk = sdk;
     this.agentDir = agentDir;
     this.sink = sink;
@@ -22,6 +22,7 @@ export class Registry {
     this.queue = queue;
     this.sessionDir = sessionDir;
     this.trustProject = trustProject;
+    this.mcp = mcp;
     /** @type {Map<string, any>} */
     this.sessions = new Map();
     this.activeId = null;
@@ -126,20 +127,23 @@ export class Registry {
   /* ----------------------------------------------------------- lifecycle */
 
   async #load(manager, cwd) {
-    const { createAgentSession, DefaultResourceLoader } = this.sdk;
+    const { createAgentSession, DefaultResourceLoader, createMcpExtension, createToolSearchExtension } = this.sdk;
     const entry = this.#entry({ manager, cwd });
 
     // The loader is created after the entry so the approval extension can
     // emit into the real transcript.
     if (DefaultResourceLoader) {
       try {
-        entry.loader = new DefaultResourceLoader({
-          cwd,
-          agentDir: this.agentDir,
-          extensionFactories: [
-            { name: "lcars-approval", factory: this.approvals.factoryFor(entry), hidden: true },
-          ],
-        });
+        const factories = [{ name: "lcars-approval", factory: this.approvals.factoryFor(entry), hidden: true }];
+        // SDK sessions do not load MCP by default; the console wants the real
+        // servers (and their tools) in the session it drives.
+        if (this.mcp && createMcpExtension) {
+          factories.push({ name: "lcars-mcp", factory: createMcpExtension(), hidden: true });
+          if (createToolSearchExtension) {
+            factories.push({ name: "lcars-tool-search", factory: createToolSearchExtension(), hidden: true });
+          }
+        }
+        entry.loader = new DefaultResourceLoader({ cwd, agentDir: this.agentDir, extensionFactories: factories });
         await entry.loader.reload({ resolveProjectTrust: async () => this.trustProject });
         entry.loaderSkills = (entry.loader.getSkills?.().skills ?? []).length;
       } catch (e) {
@@ -158,6 +162,13 @@ export class Registry {
     entry.session = session;
     entry.path = manager.getSessionFile?.() ?? entry.path;
     session.subscribe((ev) => applyEvent(entry, ev));
+
+    // extensions (notably MCP) connect their servers on session_start
+    try {
+      await session.bindExtensions?.({ mode: "print" });
+    } catch (e) {
+      console.warn(`[extensions] bind failed: ${e.message}`);
+    }
 
     this.sessions.set(entry.id, entry);
     this.activeId = entry.id;

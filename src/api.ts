@@ -117,6 +117,8 @@ export type ProviderRow = {
   models: number;
   keyMask: string | null;
   current: boolean;
+  custom: boolean;
+  baseUrl: string | null;
 };
 
 export type SkillRow = {
@@ -161,6 +163,8 @@ export type DirEntry = { name: string; path: string; items: number | null };
 export type TreeEntry = { name: string; path: string; rel: string; type: "dir" | "file" | "other"; size: number | null };
 export type TreeResult = { path: string; rel: string; parent: string | null; root: string; entries: TreeEntry[] };
 
+export type McpTool = { name: string; exposure: "direct" | "deferred"; description: string };
+
 export type McpServer = {
   name: string;
   transport: "stdio" | "http" | "unknown";
@@ -173,10 +177,15 @@ export type McpServer = {
   description: string;
   scope: "global" | "project";
   override?: string;
+  connected: boolean;
+  tools: McpTool[];
+  toolCount: number;
+  pinned: { name: string; exposure: string }[];
 };
 
 export type McpConfig = {
   servers: McpServer[];
+  totals: { servers: number; connected: number; enabled: number; tools: number };
   paths: { global: string; project: string };
   exists: { global: boolean; project: boolean };
 };
@@ -224,6 +233,10 @@ export const api = {
   providerModels: (provider: string) => post<ModelInfo[]>("/api/providers", { op: "models", provider }),
   providerDefault: (provider: string, model: string) => post<unknown>("/api/providers", { op: "default", provider, model }),
   providerKey: (provider: string, key: string) => post<{ keyMask: string }>("/api/providers", { op: "key", provider, key }),
+  providerAdd: (b: { id: string; name?: string; baseUrl: string; api?: string; apiKey?: string; models?: string }) =>
+    post<{ id: string; proxied: boolean }>("/api/providers", { op: "add", ...b }),
+  providerRemove: (id: string) => post<unknown>("/api/providers", { op: "remove", id }),
+  providerReload: () => post<{ reloaded: boolean }>("/api/providers", { op: "reload" }),
   mcp: () => call<McpConfig>("/api/mcp"),
   mcpToggle: (name: string, enabled: boolean) => post<unknown>("/api/mcp", { op: "toggle", name, enabled }),
   mcpAdd: (payload: { name: string; command?: string; args?: string; url?: string; scope?: string }) =>

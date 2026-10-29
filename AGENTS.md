@@ -332,6 +332,13 @@ LCARS 的左轨**从不留纯黑空洞**：内容排不满时，纵向剩余由*
   输入框是 `type=password`，placeholder 显示现有掩码。
 - `TEST` 调 `modelRuntime.checkAuth()`，结果写成一行 `READY · 142ms` / `INVALID · invalid_state`，
   不弹窗、不 toast。
+- **自定义 provider**：`ADD` 写 `models.json`（`baseUrl` + `api` + `apiKey` + `models[].id`），
+  写完立刻 `modelRuntime.refresh()`，不需要重启会话（实测新 provider 立即出现在列表里）。
+  `api` 只允许四个值：`openai-completions` / `openai-responses` / `anthropic-messages` / `google-generative-ai`；
+  其它协议要写 provider 扩展，面板不装作支持。
+- **只写 baseUrl 等于走代理**：id 与内置 provider 同名时只覆盖 `baseUrl`，模型清单与鉴权保持不变
+  （pi 文档定义的行为），面板文案要说清楚。
+- **内置 provider 不可删**：`remove` 只删 `models.json` 里用户定义的条目，内置 id 返回 `404 E_NOT_CUSTOM`。
 - 读取一律走**活着的 ModelRuntime**（`getProviders/getAllModels/hasConfiguredAuth`），
   不解析 models.json —— 保证界面和下一轮实际选择永远一致。
 

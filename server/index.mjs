@@ -17,11 +17,11 @@ import { Approvals } from "./pi/approval.mjs";
 import { createQueue } from "./pi/queue.mjs";
 import { Registry } from "./pi/registry.mjs";
 import { now, summaryOf } from "./pi/format.mjs";
-import { readMcp, setEnabled, addServer, removeServer } from "./pi/mcpConfig.mjs";
+import { mcpStatus, setEnabled, addServer, removeServer } from "./pi/mcpConfig.mjs";
 import { listTree, openPath } from "./pi/fs.mjs";
 import { listHistory, deleteHistoryFile, renameHistoryFile } from "./pi/history.mjs";
 import { listSkills, reloadSkills } from "./pi/skills.mjs";
-import { listProviders, listProviderModels, testProvider, setDefaultModel, setProviderKey } from "./pi/providers.mjs";
+import { listProviders, listProviderModels, testProvider, setDefaultModel, setProviderKey, addProvider, removeProvider, reloadProviders } from "./pi/providers.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, "..");
@@ -105,6 +105,7 @@ const registry = new Registry({
   queue,
   sessionDir: SESSION_DIR,
   trustProject: TRUST,
+  mcp: process.env.LCARS_MCP !== "0",
 });
 
 const payload = (entry) => ({
@@ -371,13 +372,32 @@ const routes = {
       case "key":
         ok(res, await setProviderKey({ agentDir: ctx.agentDir, provider: b.provider, key: b.key }));
         break;
+      case "add":
+        ok(res, await addProvider({
+          agentDir: ctx.agentDir,
+          id: b.id,
+          name: b.name,
+          baseUrl: b.baseUrl,
+          api: b.api,
+          apiKey: b.apiKey,
+          models: b.models,
+        }));
+        break;
+      case "remove":
+        ok(res, await removeProvider({ agentDir: ctx.agentDir, id: b.id }));
+        break;
+      case "reload":
+        ok(res, await reloadProviders({ session: ctx.session }));
+        break;
       default:
         fail(res, 400, `unknown op: ${b.op}`, { code: "E_PROVIDERS" });
     }
   },
 
   "GET /api/mcp": async (req, res) => {
-    ok(res, await readMcp({ agentDir: agentDir(), cwd: CWD }));
+    const url = new URL(req.url, "http://x");
+    const entry = registry.get(url.searchParams.get("session") || undefined);
+    ok(res, await mcpStatus({ agentDir: agentDir(), cwd: CWD, session: entry?.session }));
   },
 
   "POST /api/mcp": async (req, res) => {

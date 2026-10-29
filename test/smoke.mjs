@@ -99,6 +99,16 @@ try {
   const keyBad = await post("/api/providers", { op: "key", provider: "x", key: "" });
   check("key write rejects empty key", keyBad.status === 400);
 
+  // custom provider validation never writes on failure
+  const badId = await post("/api/providers", { op: "add", id: "BAD ID", baseUrl: "http://x" });
+  check("custom provider rejects bad id", badId.status === 400);
+  const badUrl = await post("/api/providers", { op: "add", id: "ok", baseUrl: "ftp://x" });
+  check("custom provider rejects non-http baseUrl", badUrl.status === 400);
+  const badApi = await post("/api/providers", { op: "add", id: "ok", baseUrl: "http://x", api: "nope" });
+  check("custom provider rejects unknown api", badApi.status === 400);
+  const removeBuiltin = await post("/api/providers", { op: "remove", id: "openai" });
+  check("built-in providers cannot be removed", removeBuiltin.status === 404);
+
   const models = await get("/api/models");
   check("GET /api/models", models.status === 200 && Array.isArray(models.body?.data?.models));
   check("models are not empty", (models.body?.data?.models ?? []).length > 0, `${models.body?.data?.models?.length ?? 0} models`);

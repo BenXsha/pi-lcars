@@ -727,8 +727,10 @@ function ThemeDeck({ current, onPick, onClose }: { current: ThemeId; onPick: (id
 
 /* ------------------------------------------------------------------ mcp */
 function McpPanel() {
-  const [data, setData] = useState<{ servers: McpServer[]; paths: { global: string; project: string }; exists: { global: boolean; project: boolean } } | null>(null);
+  const [data, setData] = useState<{ servers: McpServer[]; paths: { global: string; project: string }; exists: { global: boolean; project: boolean }; totals: { servers: number; connected: number; tools: number } } | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [open, setOpen] = useState<string | null>(null);
+  const [showTools, setShowTools] = useState<Record<string, boolean>>({});
   const [name, setName] = useState("");
   const [command, setCommand] = useState("");
   const [busy, setBusy] = useState(false);
@@ -737,7 +739,7 @@ function McpPanel() {
     api
       .mcp()
       .then((d) => {
-        setData(d);
+        setData(d as any);
         setErr(null);
       })
       .catch((e) => setErr(e.message));
@@ -758,15 +760,16 @@ function McpPanel() {
     }
   };
 
+  const totals = data?.totals;
+
   return (
     <div class="pv">
       <div class="pv-title">
-        MCP / {data?.servers.length ?? 0} SERVERS
+        {totals?.connected ?? 0} CONNECTED / {totals?.servers ?? 0} SERVERS · {totals?.tools ?? 0} TOOLS
       </div>
       <div class="pv-sub">
-        Read from <code>{shortPath(data?.paths.global ?? "~/.pi/agent/mcp.json")}</code>
-        {data?.exists.project ? ` with project overrides in ${shortPath(data.paths.project)}` : ""}. Changes are written with a{" "}
-        <code>.bak</code> backup and take effect on the next session.
+        Status is read from the live session: a server counts as connected when its
+        <code> mcp__&lt;name&gt;__&lt;tool&gt;</code> tools actually exist. Config edits take effect on the next session.
       </div>
 
       {err ? (
@@ -775,33 +778,62 @@ function McpPanel() {
         </div>
       ) : null}
 
-      {data?.servers.length === 0 ? <div class="pv-sub">No MCP servers configured.</div> : null}
+      {(data?.servers ?? []).map((m) => {
+        const expanded = open === m.name;
+        const allTools = showTools[m.name];
+        const tools = allTools ? m.tools : m.tools.slice(0, 6);
+        return (
+          <div class="mcp-card" key={m.name} data-off={m.enabled ? "0" : "1"} data-live={m.connected ? "1" : "0"}>
+            <div class="mcp-head">
+              <span class="st" />
+              <button type="button" class="mcp-name" onClick={() => setOpen(expanded ? null : m.name)}>
+                <Icon name={expanded ? "act-collapse" : "act-expand"} size={10} />
+                <b>{m.name}</b>
+              </button>
+              <span class="tr">{m.transport === "stdio" ? "STDIO" : "HTTP"}</span>
+              <span class="ex">{m.exposure}</span>
+              <span class="ct">{m.toolCount} TOOLS</span>
+              <span class="state">{m.connected ? "LIVE" : m.enabled ? "NO TOOLS" : "OFF"}</span>
+              <button
+                type="button"
+                class="tgl"
+                aria-pressed={m.enabled ? "true" : "false"}
+                disabled={busy}
+                onClick={() => run(() => api.mcpToggle(m.name, !m.enabled))}
+              >
+                {m.enabled ? "ON" : "OFF"}
+              </button>
+              <button type="button" class="tgl ghost" disabled={busy} title="Remove server" onClick={() => run(() => api.mcpRemove(m.name))}>
+                <Icon name="act-delete" size={11} />
+              </button>
+            </div>
 
-      {(data?.servers ?? []).map((m) => (
-        <div class="mcp-row" key={m.name} data-off={m.enabled ? "0" : "1"}>
-          <span class="st" />
-          <span class="ic">
-            <Icon name="station-mcp" size={14} />
-          </span>
-          <span class="nm">
-            {m.name}
-            <em>{m.transport === "stdio" ? `${m.command} ${m.args.join(" ")}` : m.url}</em>
-          </span>
-          <span class="mt">{m.exposure}{m.toolExposure ? ` · ${m.toolExposure} pinned` : ""}</span>
-          <button
-            type="button"
-            class="tgl"
-            aria-pressed={m.enabled ? "true" : "false"}
-            disabled={busy}
-            onClick={() => run(() => api.mcpToggle(m.name, !m.enabled))}
-          >
-            {m.enabled ? "ON" : "OFF"}
-          </button>
-          <button type="button" class="tgl ghost" disabled={busy} title="Remove server" onClick={() => run(() => api.mcpRemove(m.name))}>
-            <Icon name="act-delete" size={12} />
-          </button>
-        </div>
-      ))}
+            <div class="mcp-target">{m.transport === "stdio" ? `${m.command} ${m.args.join(" ")}` : m.url}</div>
+            {m.description ? <div class={`mcp-desc ${expanded ? "open" : ""}`}>{m.description}</div> : null}
+
+            {expanded ? (
+              <div class="mcp-tools">
+                {tools.length === 0 ? <div class="pv-note">no tools registered — check the server is reachable</div> : null}
+                {tools.map((t) => (
+                  <div class="mcp-tool" key={t.name}>
+                    <span class="nm">{t.name}</span>
+                    <span class="bd">{t.exposure}</span>
+                    <span class="ds" title={t.description}>{t.description || "—"}</span>
+                  </div>
+                ))}
+                {m.tools.length > 6 ? (
+                  <button type="button" class="pv-more" onClick={() => setShowTools((s) => ({ ...s, [m.name]: !allTools }))}>
+                    {allTools ? "− SHOW LESS" : `+ ${m.tools.length - 6} MORE TOOLS`}
+                  </button>
+                ) : null}
+                <div class="pv-note">
+                  {m.scope} config{m.override ? ` · overridden in ${shortPath(m.override)}` : ""} · {m.pinned.length ? `${m.pinned.length} pinned to direct` : "all deferred to the caller"}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        );
+      })}
 
       <div class="pv-title" style={{ fontSize: "13px", marginTop: "18px" }}>ADD SERVER</div>
       <div style={{ display: "flex", flexDirection: "column", gap: "var(--gap)", maxWidth: "820px" }}>
@@ -823,6 +855,9 @@ function McpPanel() {
             }
           />
           <BarButton tone="quiet" label="RELOAD" icon="act-reload" onClick={() => load()} />
+          <span style={{ font: "400 10px/2.4 var(--mono)", color: "var(--g2)" }}>
+            read from {shortPath(data?.paths.global ?? "~/.pi/agent/mcp.json")} · writes keep a .bak
+          </span>
         </div>
       </div>
     </div>
@@ -839,6 +874,8 @@ function ProvidersPanel({ meta }: { meta: ReturnType<typeof getState>["meta"] })
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [more, setMore] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState({ id: "", name: "", baseUrl: "", api: "openai-completions", apiKey: "", models: "" });
 
   const load = () =>
     api
@@ -910,6 +947,7 @@ function ProvidersPanel({ meta }: { meta: ReturnType<typeof getState>["meta"] })
           <span class="nm">{p.name}</span>
           <span class="at">{p.auth === "none" ? "no key" : p.auth === "oauth" ? "oauth" : p.keyMask ?? "api key"}</span>
           <span class="ct">{p.models} models</span>
+          {p.custom ? <span class="cur custom">CUSTOM</span> : null}
           {p.current ? <span class="cur">ACTIVE</span> : null}
           {p.auth !== "none" ? (
             <button
@@ -961,6 +999,27 @@ function ProvidersPanel({ meta }: { meta: ReturnType<typeof getState>["meta"] })
               </div>
             ))}
 
+            {p.baseUrl ? <div class="pv-note">baseUrl <code>{p.baseUrl}</code></div> : null}
+            {p.custom ? (
+              <div style={{ display: "flex", gap: "var(--gap)", marginTop: "4px" }}>
+                <button
+                  type="button"
+                  class="pv-btn ghost"
+                  onClick={async () => {
+                    try {
+                      await api.providerRemove(p.id);
+                      await api.providerReload();
+                      await load();
+                    } catch (e) {
+                      setErr((e as Error).message);
+                    }
+                  }}
+                >
+                  REMOVE PROVIDER
+                </button>
+                <span class="pv-note" style={{ alignSelf: "center" }}>defined in models.json</span>
+              </div>
+            ) : null}
             <div class="pv-key">
               <span class="lb">{p.auth === "none" ? "ADD API KEY" : "REPLACE KEY"}</span>
               <input
@@ -1008,6 +1067,83 @@ function ProvidersPanel({ meta }: { meta: ReturnType<typeof getState>["meta"] })
           {more ? others.map((p) => row(p, true)) : null}
         </>
       ) : null}
+
+      <div class="pv-title" style={{ fontSize: "13px", marginTop: "18px" }}>ADD CUSTOM PROVIDER</div>
+      <div class="pv-sub" style={{ marginBottom: "8px", maxWidth: "760px" }}>
+        Any OpenAI-, Anthropic- or Google-compatible endpoint can be added by base URL. Models are just ids — pi learns
+        capabilities when it first calls them. Setting only <code>baseUrl</code> for an id that already exists routes that
+        built-in provider through a proxy.
+      </div>
+      {!adding ? (
+        <BarButton tone="ok" label="NEW PROVIDER" icon="act-new" onClick={() => setAdding(true)} />
+      ) : (
+        <div class="pv-form">
+          <FieldRow label="ID" icon="station-provider" value={draft.id} placeholder="local-proxy" onInput={(v) => setDraft({ ...draft, id: v })} required />
+          <FieldRow label="NAME" icon="station-provider" value={draft.name} placeholder="Local Proxy" onInput={(v) => setDraft({ ...draft, name: v })} />
+          <FieldRow
+            label="BASE URL"
+            icon="fld-url"
+            value={draft.baseUrl}
+            placeholder="http://127.0.0.1:11434/v1"
+            onInput={(v) => setDraft({ ...draft, baseUrl: v })}
+            required
+            unit="V1"
+          />
+          <div class="pv-form-row">
+            <span class="lb">API</span>
+            {[
+              ["openai-completions", "CHAT"],
+              ["openai-responses", "RESPONSES"],
+              ["anthropic-messages", "ANTHROPIC"],
+              ["google-generative-ai", "GOOGLE"],
+            ].map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                class="pv-btn"
+                title={value}
+                data-on={draft.api === value ? "1" : "0"}
+                onClick={() => setDraft({ ...draft, api: value })}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <FieldRow label="API KEY" icon="fld-key" value={draft.apiKey} placeholder="sk-… or $ENV_VAR" onInput={(v) => setDraft({ ...draft, apiKey: v })} mask />
+          <FieldRow
+            label="MODELS"
+            icon="fld-model"
+            value={draft.models}
+            placeholder="qwen2.5-coder:7b, llama-3.3-70b"
+            onInput={(v) => setDraft({ ...draft, models: v })}
+          />
+          <div style={{ display: "flex", gap: "var(--gap)", alignItems: "center" }}>
+            <BarButton
+              tone="ok"
+              label="ADD"
+              icon="act-new"
+              disabled={busy === "add" || !draft.id || !draft.baseUrl}
+              onClick={async () => {
+                setBusy("add");
+                try {
+                  await api.providerAdd(draft);
+                  const r = await api.providerReload();
+                  await load();
+                  setAdding(false);
+                  setDraft({ id: "", name: "", baseUrl: "", api: "openai-completions", apiKey: "", models: "" });
+                  setErr(r.reloaded ? null : "saved, but the runtime did not reload — restart the session");
+                } catch (e) {
+                  setErr((e as Error).message);
+                } finally {
+                  setBusy(null);
+                }
+              }}
+            />
+            <BarButton tone="quiet" label="CANCEL" icon="act-close" onClick={() => setAdding(false)} />
+            <span class="pv-note">writes models.json with a .bak, then reloads the model runtime</span>
+          </div>
+        </div>
+      )}
 
       <div class="pv-note" style={{ marginTop: "12px" }}>
         Session model: <code>{meta?.model ?? "—"}</code> · keys are masked on read and never sent back from the server
