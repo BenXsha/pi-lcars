@@ -1005,8 +1005,10 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
   pointer-events: none;
 }
 .lfiller .stretch {
-  width: 96px;
-  flex: 0 0 96px;
+  /* full column width: the extension reads as the column itself, so its
+     right edge lines up with the session blocks and the nav below */
+  width: 100%;
+  flex: 1 1 auto;
   background: var(--g0);
   border-radius: 0 0 var(--r-1) 0;
 }
