@@ -219,8 +219,10 @@ function Sidenav({
       </TopCap>
 
       <button type="button" class="lnew" onClick={() => { actions.newSession(); onView("session"); }}>
-        <Icon name="act-new" size={16} />
-        <span>NEW SESSION</span>
+        <span class="ic">
+          <Icon name="act-new" size={15} />
+        </span>
+        <span class="lb">NEW SESSION</span>
       </button>
 
       <div class="lsessions">

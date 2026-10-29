@@ -829,26 +829,46 @@ button { cursor: pointer; }
   white-space: nowrap;
 }
 
-/* new session: dark tinted surface + 2px inset stroke + orange glyph */
+/* new session: neutral action strip (distinct from session blocks,
+   which are tinted; active session is the only solid orange block) */
 .lnew {
-  height: 52px;
-  flex: 0 0 52px;
+  height: 40px;
+  flex: 0 0 40px;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 0 16px;
-  background: color-mix(in srgb, var(--orange) 16%, #000);
+  gap: 0;
+  padding: 0 14px 0 10px;
+  background: var(--g1);
   color: var(--orange);
-  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--orange) 38%, transparent);
-  border-radius: 0 var(--r-1) var(--r-1) 0;
-  font: 700 12px/1 var(--din);
-  letter-spacing: 0.14em;
+  border-radius: 0 var(--r-pill) var(--r-pill) 0;
   text-align: left;
+  outline: none;
 }
-.lnew:hover {
-  background: color-mix(in srgb, var(--orange) 26%, #000);
-  box-shadow: inset 0 0 0 2px var(--orange);
+.lnew .ic {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 24px;
+  color: var(--orange);
 }
+.lnew .lb {
+  margin-left: 14px;
+  font: 700 11px/1 var(--din);
+  letter-spacing: 0.16em;
+  white-space: nowrap;
+}
+/* instant state change, no transition — AGENTS.md §5 */
+.lnew:hover,
+.lnew:focus-visible {
+  background: var(--orange);
+  color: #000;
+}
+.lnew:hover .ic,
+.lnew:focus-visible .ic { color: #000; }
+.lnew:active { background: var(--amber); color: #000; }
+.lnew:active .ic { color: #000; }
 
 /* session block: two lines, 52px, solid when active */
 .sess {
