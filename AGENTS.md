@@ -395,7 +395,23 @@ browser ──EventSource(/api/stream)──► server.mjs ──session.subscri
 | command bar 变生成态 | `agent_end` / `agent_settled` + running 标志 |
 | 上下文百分比 | assistant message 的 `usage.totalTokens ÷ model.contextWindow` |
 
+**server 端点（M0 落地的部分）**
+
+| method | path | 说明 |
+|---|---|---|
+| GET | `/api/bootstrap` | 会话列表 + active meta + policy + items |
+| GET | `/api/stream` | 单通道 SSE，事件带 `sessionId` |
+| POST | `/api/session` | `new / open / fork / activate / rename / delete` |
+| POST | `/api/prompt` | 目标会话在跑 → `steer()`；否则进全局队列 |
+| POST | `/api/abort` · `/api/approve` · `/api/policy` | 中断 / 审批 / 策略 |
+| POST | `/api/model` · `/api/thinking` | 热切换，下一轮生效 |
+| GET | `/api/models` · `/api/fs` | 模型清单 / 目录浏览（仅目录） |
+
 **踩过的坑（别再踩）**
+- **派生状态不能回写自身**：`meta.running` 由「agent 原始状态 OR 队列占用」派生，
+  早期版本把派生值写回同一个字段，于是 `running` 永远为 true（自己喂自己）。
+  现在原始状态存 `entry.running`，`meta.running` 只在 `refreshMeta()` 里算一次。
+- `node_get` 之外的「子节点坐标」是相对父层的：做布局审计必须先累加成绝对坐标（MasterGo 阶段踩过）。
 - `session.prompt()` 在已流式时会**直接 reject**，必须改用 `steer()` / `followUp()`。
 - 只有 tool call、没有文本的 assistant 消息**不能渲染空块**（模型经常这样）：
   `hasBody` 为空就整行不画；正在流式但还没出字时只画 caret 行。

@@ -5,7 +5,10 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "icons": "node scripts/build-icons.mjs"
+    "icons": "node scripts/build-icons.mjs",
+    "server": "node server/index.mjs",
+    "test": "node test/smoke.mjs",
+    "check:themes": "node scripts/check-themes.mjs"
   },
   "type": "module",
   "devDependencies": {
