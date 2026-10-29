@@ -1,7 +1,8 @@
 import type { ComponentChildren } from "preact";
 import { Icon, type IconName } from "./Icon";
 import { Markdown } from "./Markdown";
-import type { DiffData } from "../api";
+import type { AgentMeta, DiffData, SubCall } from "../api";
+import { highlight, langFromPath } from "../highlight";
 
 /* ============================================================
    geometry
@@ -207,6 +208,8 @@ export function ToolStrip(props: {
   count?: number;
   truncated?: boolean;
   diff?: DiffData;
+  children?: SubCall[];
+  agent?: AgentMeta;
   expanded?: boolean;
   onToggle?: () => void;
 }) {
@@ -221,7 +224,10 @@ export function ToolStrip(props: {
   const diffRows = props.diff ? flattenDiff(props.diff) : [];
   const visibleDiff = props.expanded ? diffRows : diffRows.slice(0, 8);
   const hiddenDiff = diffRows.length - visibleDiff.length;
-  const canToggle = !!props.onToggle && (hidden > 0 || hiddenDiff > 0 || argsLong);
+  const kids = props.children ?? [];
+  const visibleKids = props.expanded ? kids : kids.slice(0, 6);
+  const hiddenKids = kids.length - visibleKids.length;
+  const canToggle = !!props.onToggle && (hidden > 0 || hiddenDiff > 0 || hiddenKids > 0 || argsLong);
 
   return (
     <div class="tool" data-state={state} data-expanded={props.expanded ? "1" : "0"} data-toggle={canToggle ? "1" : "0"}>
@@ -254,7 +260,11 @@ export function ToolStrip(props: {
         {props.diff ? (
           <DiffView rows={visibleDiff} stat={props.diff.stat} truncated={props.diff.truncated} />
         ) : shown.length ? (
-          <div class={state === "error" ? "err" : "out"}>{shown.join("\n")}</div>
+          <OutputBlock
+            text={shown.join("\n")}
+            tone={state === "error" ? "err" : "out"}
+            lang={state === "error" ? "" : langFor(props.name, props.args)}
+          />
         ) : null}
         {canToggle ? (
           <button
@@ -273,9 +283,15 @@ export function ToolStrip(props: {
           </button>
         ) : null}
         {props.truncated ? <div class="warn">warning: output truncated</div> : null}
+        {kids.length ? <SubCalls rows={visibleKids} total={kids.length} /> : null}
+        {props.agent ? <AgentBay a={props.agent} /> : null}
       </div>
       <div class="mt">
-        {state === "run" ? (
+        {props.agent ? (
+          <span>{props.agent.tools} CALLS</span>
+        ) : kids.length ? (
+          <span>{kids.length} CALLS</span>
+        ) : state === "run" ? (
           <span class="scan">
             <i />
             <i />
@@ -472,6 +488,18 @@ type DiffRow =
   | { kind: "hunk"; text: string }
   | { kind: "add" | "del" | "ctx"; o?: number; n?: number; text: string };
 
+/** Only `read` output is a file body; bash output stays uncoloured. */
+function langFor(tool: string, args: string) {
+  if (tool !== "read") return "";
+  return langFromPath((args || "").split(" / ")[0]);
+}
+
+function OutputBlock({ text, tone, lang }: { text: string; tone: "out" | "err"; lang: string }) {
+  const html = lang ? highlight(text, lang) : null;
+  if (!html) return <div class={tone}>{text}</div>;
+  return <div class={`${tone} hljs`} dangerouslySetInnerHTML={{ __html: html }} />;
+}
+
 function flattenDiff(diff: DiffData): DiffRow[] {
   const rows: DiffRow[] = [];
   for (const h of diff.hunks) {
@@ -511,6 +539,61 @@ function DiffView({ rows, stat, truncated }: { rows: DiffRow[]; stat: { add: num
           ),
         )}
       </div>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------- subagents */
+/** A subagent's own tool calls, indented under the tool row that spawned it. */
+function SubCalls({ rows, total }: { rows: SubCall[]; total: number }) {
+  return (
+    <div class="subs">
+      {rows.map((c) => (
+        <div class="sub" key={c.id} data-state={c.status}>
+          <span class="st" />
+          <span class="nm">{c.name.toUpperCase()}</span>
+          <span class="ar">{c.args}</span>
+          <span class="ms">
+            {c.status === "run" ? (
+              <span class="scan">
+                <i />
+                <i />
+                <i />
+              </span>
+            ) : c.status === "error" ? (
+              "FAIL"
+            ) : c.ms != null ? (
+              c.ms < 1000 ? `${Math.round(c.ms)}ms` : `${(c.ms / 1000).toFixed(2)}s`
+            ) : (
+              "—"
+            )}
+          </span>
+        </div>
+      ))}
+      {total > rows.length ? <div class="subs-more">+{total - rows.length} more calls</div> : null}
+    </div>
+  );
+}
+
+/** Subagent summary: pi reports counts and cost, not per-call records. */
+function AgentBay({ a }: { a: AgentMeta }) {
+  const tok =
+    typeof a.tokens === "string" ? a.tokens.replace(/\s*tokens?$/i, "").toUpperCase() : a.tokens >= 1000 ? `${(a.tokens / 1000).toFixed(1)}K` : String(a.tokens);
+  const cost = typeof a.cost === "number" ? (a.cost ? `$${a.cost.toFixed(4)}` : "") : a.cost;
+  return (
+    <div class="agentbay">
+      <span class="ab-name">{a.name}</span>
+      <span class="ab-sep">/</span>
+      <span>{a.type || "agent"}</span>
+      {a.model ? <><span class="ab-sep">/</span><span>{a.model}</span></> : null}
+      <span class="ab-sep">/</span>
+      <span>{a.tools} tools</span>
+      <span class="ab-sep">/</span>
+      <span>{a.turns} turns</span>
+      <span class="ab-sep">/</span>
+      <span>{tok} tok</span>
+      {cost ? <><span class="ab-sep">/</span><span>{String(cost)}</span></> : null}
+      <span class={`ab-st ${a.status === "ok" || a.status === "completed" ? "ok" : ""}`}>{a.status.toUpperCase()}</span>
     </div>
   );
 }

@@ -58,6 +58,7 @@ const MANIFEST = {
   "act-test": "flashlight-fill",
   "act-open": "external-link-fill",
   "act-close": "close-fill",
+  "act-theme": "palette-fill",
   // config fields
   "fld-key": "key-2-fill",
   "fld-url": "links-fill",

@@ -46,6 +46,7 @@ export class Registry {
       cur: null,
       n: 0,
       rawCalls: new Map(), // callId -> args, for write→diff synthesis
+      childOwner: new Map(), // nested callId -> parent item id
       usage: { input: 0, output: 0, cost: 0, total: 0 },
       loaderSkills: 0,
       running: false, // raw agent state; meta.running is derived

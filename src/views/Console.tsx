@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { DirEntry, Item, McpServer, ModelInfo } from "../api";
 import { api } from "../api";
 import { actions, connect, getState, subscribe } from "../store";
+import { THEMES, appliedTheme, applyTheme, type ThemeId } from "../theme";
 import { Icon, type IconName } from "../components/Icon";
 import {
   ApprovalDeck,
@@ -77,7 +78,8 @@ function useStore() {
 export function Console() {
   const s = useStore();
   const [view, setView] = useState<View>("session");
-  const [deck, setDeck] = useState<null | "cwd" | "model" | "think">(null);
+  const [deck, setDeck] = useState<null | "cwd" | "model" | "think" | "theme">(null);
+  const [theme, setTheme] = useState<ThemeId>(appliedTheme());
 
   useEffect(() => connect(), []);
 
@@ -115,6 +117,14 @@ export function Console() {
                 onClick={() => setDeck(deck === "think" ? null : "think")}
               />
               <ControlChip icon="station-context" label="CTX" value={`${meta.contextPct}%`} />
+              <ControlChip
+                icon="act-theme"
+                label="THEME"
+                value={THEMES.find((t) => t.id === theme)?.short ?? "TNG"}
+                open={deck === "theme"}
+                title="Switch palette"
+                onClick={() => setDeck(deck === "theme" ? null : "theme")}
+              />
             </>
           ) : (
             <span style={{ font: "700 11px/1 var(--din)", letterSpacing: "0.14em" }}>CONNECTING…</span>
@@ -124,6 +134,9 @@ export function Console() {
         {deck === "cwd" ? <CwdDeck meta={meta} onClose={() => setDeck(null)} /> : null}
         {deck === "model" ? <ModelDeck current={meta?.modelId} onClose={() => setDeck(null)} /> : null}
         {deck === "think" ? <ThinkDeck current={meta?.thinking} onClose={() => setDeck(null)} /> : null}
+        {deck === "theme" ? (
+          <ThemeDeck current={theme} onPick={(id) => { applyTheme(id); setTheme(id); }} onClose={() => setDeck(null)} />
+        ) : null}
 
         <div class="body">
           <main class="center">
@@ -373,6 +386,8 @@ function Transcript({ items }: { items: Item[] }) {
                 ms={it.ms}
                 truncated={it.truncated}
                 diff={it.diff}
+                children={it.children}
+                agent={it.agent}
                 expanded={open[it.id] ?? false}
                 onToggle={() => setOpen((o) => ({ ...o, [it.id]: !o[it.id] }))}
               />
@@ -660,6 +675,32 @@ function ThinkDeck({ current, onClose }: { current?: string; onClose: () => void
       <div style={{ font: "400 11px/1.6 var(--mono)", color: note ? "var(--amber)" : "var(--g2)", padding: "4px 2px 0" }}>
         {note ?? "off → THINKING rows disappear from the stream. switching mid-run applies to the next turn."}
       </div>
+    </Deck>
+  );
+}
+
+/* ----------------------------------------------------------------- theme */
+function ThemeDeck({ current, onPick, onClose }: { current: ThemeId; onPick: (id: ThemeId) => void; onClose: () => void }) {
+  return (
+    <Deck label="PALETTE" sub="INSTANT, PERSISTED" actions={<BarButton tone="quiet" label="CLOSE" icon="act-close" onClick={onClose} />}>
+      {THEMES.map((t) => (
+        <button
+          type="button"
+          class="theme-opt"
+          key={t.id}
+          aria-selected={t.id === current ? "true" : "false"}
+          onClick={() => onPick(t.id)}
+        >
+          <span class="sw">
+            {t.swatch.map((c) => (
+              <i key={c} style={{ background: c }} />
+            ))}
+          </span>
+          <span class="nm">{t.name}</span>
+          <span class="nt">{t.note}</span>
+          <span class="ck">{t.id === current ? <Icon name="status-ok" size={13} /> : null}</span>
+        </button>
+      ))}
     </Deck>
   );
 }

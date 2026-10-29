@@ -1,5 +1,6 @@
 import { useMemo } from "preact/hooks";
 import { Marked } from "marked";
+import { highlight } from "../highlight";
 
 /**
  * Markdown → LCARS HTML for assistant output.
@@ -16,13 +17,14 @@ md.use({
     html: () => "",
     code({ text, lang }) {
       const language = (lang || "").split(/\s+/)[0] || "text";
-      const escaped = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      const highlighted = highlight(text, language);
+      const body = highlighted ?? text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
       return `<div class="codeblk" data-lang="${language}">
   <div class="cb-hd">
     <span class="cb-lang">${language.toUpperCase()}</span>
     <button type="button" class="cb-copy" data-copy>COPY</button>
   </div>
-  <pre class="cb-bd"><code>${escaped}</code></pre>
+  <pre class="cb-bd"><code class="hljs">${body}</code></pre>
 </div>`;
     },
     link({ href, title, text }) {

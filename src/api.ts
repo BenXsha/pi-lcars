@@ -25,6 +25,8 @@ export type Item =
       ms?: number;
       truncated?: boolean;
       diff?: DiffData;
+      children?: SubCall[];
+      agent?: AgentMeta;
       ts: number;
     }
   | { kind: "notice"; id: string; tone?: "info" | "warn" | "error"; label: string; text: string; ts: number }
@@ -40,12 +42,27 @@ export type Item =
     };
 
 export type DiffLine = { t: "+" | "-" | " " | "\\"; o?: number; n?: number; text: string };
+export type AgentMeta = {
+  name: string;
+  type: string;
+  model: string;
+  tools: number;
+  /** the SDK reports a preformatted string here, e.g. "16.0k token" */
+  tokens: string | number;
+  cost: number | string;
+  turns: number;
+  status: string;
+  agentId: string;
+};
+
 export type DiffData = {
   path?: string;
   hunks: { hdr: string; oldNo: number; newNo: number; lines: DiffLine[] }[];
   stat: { add: number; del: number };
   truncated?: boolean;
 };
+
+export type SubCall = { id: string; name: string; args: string; status: "run" | "ok" | "error"; ms?: number; ts: number };
 
 export type SessionSummary = {
   id: string;

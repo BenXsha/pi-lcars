@@ -8,6 +8,52 @@ import { diffFromResult, diffFromWrite } from "./diff.mjs";
  *   user | assistant | tool | notice | approval
  * Everything is keyed by a stable id so the client can patch in place.
  */
+const MAX_CHILDREN = 80;
+
+/** The subagent tool reports a compact summary instead of nested calls. */
+function agentMeta(details) {
+  if (!details || typeof details !== "object") return null;
+  if (details.subagentType === undefined && details.toolUses === undefined) return null;
+  return {
+    name: details.displayName ?? details.subagentType ?? "agent",
+    type: details.subagentType ?? "",
+    model: details.modelName ?? "",
+    tools: details.toolUses ?? 0,
+    tokens: details.tokens ?? 0,
+    cost: details.cost ?? 0,
+    turns: details.turnCount ?? 0,
+    status: details.status ?? "ok",
+    agentId: details.agentId ?? "",
+  };
+}
+
+/** ToolResultMessage.nestedCalls → children[] (used when the subagent runs its
+ *  own loop and does not emit parentToolCallId events into this session). */
+function nestedChildren(nested) {
+  const calls = nested?.calls;
+  if (!Array.isArray(calls) || !calls.length) return null;
+  return calls.slice(0, MAX_CHILDREN).map((c) => ({
+    id: c.id,
+    name: c.name,
+    args: shortArgs(c.name, c.arguments),
+    status: c.status === "error" ? "error" : c.status === "ok" ? "ok" : "run",
+    ms: c.durationMs,
+    ts: now(),
+  }));
+}
+
+/** Attach a subagent's tool call to the item that spawned it. */
+function childPatch(entry, parentId, childId, fields) {
+  const parent = entry.byId.get(parentId);
+  if (!parent) return false;
+  const kids = parent.children ?? [];
+  const i = kids.findIndex((c) => c.id === childId);
+  if (i === -1) return false;
+  kids[i] = { ...kids[i], ...fields };
+  entry.patch(parentId, { children: kids.slice() });
+  return true;
+}
+
 export function applyEvent(entry, ev) {
   if (process.env.LCARS_TRACE) console.log("[ev]", ev.type, ev.type === "message_update" ? ev.assistantMessageEvent?.type : "");
   switch (ev.type) {
@@ -31,6 +77,11 @@ export function applyEvent(entry, ev) {
 
     case "message_end": {
       const msg = ev.message;
+      if (msg?.role === "toolResult") {
+        const kids = nestedChildren(msg.nestedCalls);
+        if (kids) entry.patch(`t${msg.toolCallId}`, { children: kids });
+        break;
+      }
       if (msg?.role !== "assistant" || !entry.cur) break;
       const id = entry.cur;
       const content = msg.content || [];
@@ -65,8 +116,25 @@ export function applyEvent(entry, ev) {
       break;
     }
 
-    case "tool_execution_start":
+    case "tool_execution_start": {
       entry.rawCalls?.set(ev.toolCallId, ev.args);
+      if (ev.parentToolCallId) {
+        const parentId = `t${ev.parentToolCallId}`;
+        const parent = entry.byId.get(parentId);
+        if (parent) {
+          const kids = (parent.children ?? []).slice(0, MAX_CHILDREN);
+          kids.push({
+            id: ev.toolCallId,
+            name: ev.toolName,
+            args: shortArgs(ev.toolName, ev.args),
+            status: "run",
+            ts: now(),
+          });
+          entry.childOwner?.set(ev.toolCallId, parentId);
+          entry.patch(parentId, { children: kids });
+          break;
+        }
+      }
       entry.emit({
         kind: "tool",
         id: `t${ev.toolCallId}`,
@@ -78,9 +146,11 @@ export function applyEvent(entry, ev) {
         ts: now(),
       });
       break;
+    }
 
     case "tool_execution_update": {
       const id = `t${ev.toolCallId}`;
+      if (entry.childOwner?.has(ev.toolCallId)) break; // children show status only
       if (!entry.byId.has(id)) break;
       const out = textOf(ev.partialResult?.content);
       if (out && out.length > (entry.byId.get(id).output?.length || 0)) entry.patch(id, { output: out });
@@ -89,7 +159,18 @@ export function applyEvent(entry, ev) {
 
     case "tool_execution_end": {
       const id = `t${ev.toolCallId}`;
+      const owner = entry.childOwner?.get(ev.toolCallId);
+      if (owner) {
+        childPatch(entry, owner, ev.toolCallId, {
+          status: ev.isError ? "error" : "ok",
+          ms: ev.durationMs,
+        });
+        entry.childOwner.delete(ev.toolCallId);
+        break;
+      }
       const out = textOf(ev.result?.content);
+      const nestedKids = nestedChildren(ev.result?.details?.nestedCalls);
+      const agent = agentMeta(ev.result?.details);
       let diff = diffFromResult(ev.result?.details);
       if (!diff && ev.toolName === "write" && !ev.isError) {
         const args = entry.rawCalls?.get(ev.toolCallId);
@@ -102,6 +183,8 @@ export function applyEvent(entry, ev) {
         ms: ev.durationMs,
         truncated: truncationOf(ev.result, out),
         ...(diff ? { diff } : {}),
+        ...(nestedKids ? { children: nestedKids } : {}),
+        ...(agent ? { agent } : {}),
       });
       break;
     }

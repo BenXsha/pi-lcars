@@ -1162,3 +1162,99 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
   font-size: 10.5px;
   border-radius: 0 var(--r-1) var(--r-1) 0;
 }
+
+/* ============================================================
+   syntax highlighting — highlight.js tokens mapped onto the palette
+   (roles, not a borrowed theme: keyword=violet, string=cyan,
+   number=amber, function=orange, comment=dim)
+   ============================================================ */
+.hljs { color: var(--w); }
+.hljs-comment, .hljs-quote { color: var(--g2); font-style: normal; }
+.hljs-keyword, .hljs-selector-tag, .hljs-doctag, .hljs-built_in, .hljs-type { color: var(--lav); }
+.hljs-string, .hljs-regexp, .hljs-addition, .hljs-attribute { color: var(--cyan); }
+.hljs-number, .hljs-literal, .hljs-boolean, .hljs-symbol { color: var(--amber); }
+.hljs-title, .hljs-title.class_, .hljs-title.function_, .hljs-section { color: var(--orange); }
+.hljs-variable, .hljs-template-variable, .hljs-params, .hljs-subst { color: var(--w); }
+.hljs-attr, .hljs-property, .hljs-selector-attr, .hljs-meta .hljs-string { color: var(--ice); }
+.hljs-tag, .hljs-name, .hljs-selector-id, .hljs-selector-class { color: var(--lilac); }
+.hljs-meta, .hljs-preprocessor { color: var(--moon); }
+.hljs-deletion { color: var(--tomato); }
+.hljs-bullet, .hljs-link { color: var(--ice); }
+.hljs-emphasis { font-style: normal; color: var(--amber); }
+.hljs-strong { font-weight: 700; }
+.hljs-function, .hljs-operator, .hljs-punctuation, .hljs-char, .hljs-params { color: var(--w); }
+.hljs-selector-pseudo, .hljs-selector-tag { color: var(--lav); }
+
+/* ============================================================
+   subagent bay — nested tool calls under the row that spawned them
+   ============================================================ */
+.subs {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 4px 0 0 6px;
+  padding-left: 10px;
+  box-shadow: inset 2px 0 0 var(--g1); /* the guide line, not a border */
+}
+.sub {
+  display: grid;
+  grid-template-columns: 3px 66px minmax(0, 1fr) 54px;
+  gap: 6px;
+  align-items: center;
+  min-height: 20px;
+  font: 400 11px/1.4 var(--mono);
+}
+.sub .st { background: var(--cyan); border-radius: var(--r-pill); align-self: stretch; margin: 3px 0; }
+.sub .nm {
+  font: 700 9.5px/1.2 var(--din);
+  letter-spacing: 0.1em;
+  color: var(--g3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sub .ar { color: var(--g3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sub .ms { text-align: right; font: 400 10px/1.2 var(--din); color: var(--g2); font-variant-numeric: tabular-nums; }
+.sub[data-state="run"] .st { background: var(--tang); }
+.sub[data-state="run"] .nm { color: var(--tang); }
+.sub[data-state="error"] .st { background: var(--tomato); }
+.sub[data-state="error"] .ms { color: var(--tomato); }
+.subs-more { font: 700 9.5px/1.4 var(--din); letter-spacing: 0.12em; color: var(--g2); padding-top: 1px; }
+
+/* subagent summary strip */
+.agentbay {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 4px 0 0 10px;
+  box-shadow: inset 2px 0 0 var(--lav);
+  font: 400 10.5px/1.5 var(--din);
+  letter-spacing: 0.06em;
+  color: var(--g3);
+}
+.agentbay .ab-name { color: var(--lav); font-weight: 700; letter-spacing: 0.1em; }
+.agentbay .ab-sep { color: var(--g1); }
+.agentbay .ab-st { margin-left: auto; font-weight: 700; color: var(--g2); }
+.agentbay .ab-st.ok { color: var(--cyan); }
+
+/* theme picker inside the shelf deck */
+.theme-opt {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) 150px 18px;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  min-height: 34px;
+  padding: 4px 8px;
+  text-align: left;
+  border-radius: 0 var(--r-1) var(--r-1) 0;
+}
+.theme-opt:hover { background: var(--g0); }
+.theme-opt[aria-selected="true"] { background: var(--g1); box-shadow: inset 4px 0 0 var(--orange); }
+.theme-opt .sw { display: flex; gap: 2px; height: 20px; }
+.theme-opt .sw i { flex: 1 1 0; border-radius: 2px; }
+.theme-opt .nm { font: 700 11px/1.3 var(--din); letter-spacing: 0.12em; color: var(--w); }
+.theme-opt .nt { font: 400 10px/1.3 var(--mono); color: var(--g3); }
+.theme-opt .ck { color: var(--orange); display: flex; justify-content: flex-end; }
