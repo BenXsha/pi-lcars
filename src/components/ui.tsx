@@ -48,7 +48,10 @@ export function TopCap(props: { w?: number; h?: number; bar?: number; r?: number
   const h = props.h ?? 100;
   const bar = props.bar ?? 44;
   const r = props.r ?? Math.max(8, h - bar - 1);
-  const d = `M0,0 H${w} V${bar} Q${w},${h} ${w - r},${h} H0 Z`;
+  // convex vs concave: the control point must sit on the INNER corner of the
+  // scoop box (w-r, bar). Putting it on the outer corner (w, h) rounds the
+  // corner off instead of cutting it out.
+  const d = `M0,0 H${w} V${bar} Q${w - r},${bar} ${w - r},${h} H0 Z`;
   return (
     <div class={`cap ${props.class ?? ""}`} style={{ width: `${w}px`, height: `${h}px`, flex: `0 0 ${h}px` }}>
       <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden="true" style={{ position: "absolute", inset: 0 }}>
