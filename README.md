@@ -33,6 +33,7 @@ Production: `npm run build && npm run server` → everything on http://127.0.0.1
 | `LCARS_SESSIONS` | `~/.pi/agent/sessions` | where transcripts are written |
 | `LCARS_POLICY` | `off` | approval gate: `off` / `risky` / `all` |
 | `LCARS_TRUST_PROJECT` | `1` | load project `.pi/` extensions |
+| `LCARS_RESUME` | `0` | `1` = resume the newest session in the workspace on boot |
 | `PI_SDK` | auto-resolved | explicit path to the pi SDK |
 
 ## Layout
@@ -72,6 +73,13 @@ PLAN.md            milestone plan (M0..M8)
 | GET | `/api/models` | available models for the active session |
 | GET | `/api/fs?path=` | directories only, for the workspace picker |
 
+## Screens
+
+- `/` — the console: spine stations, shelf controls (workspace / model / thinking),
+  tab bar, live transcript, resources rail.
+- `/?craft` — the primitive sheet (elbows, motion, icons, form language, themes),
+  i.e. the visual contract on one page.
+
 ## Non-obvious behaviour
 
 - **One run at a time.** A second prompt queues and starts when the slot frees. Prompts aimed at the
@@ -79,4 +87,6 @@ PLAN.md            milestone plan (M0..M8)
 - **The approval gate is a pi extension**, not a transport hack: it awaits the operator inside the
   `tool_call` hook, so a denial surfaces to the model as a normal tool error.
 - **Fork needs a transcript.** Forking a session with no turns returns `409 E_EMPTY`.
+- **Boot does not resume.** A fresh console starts a new session; resuming the newest one
+  (which may be your CLI session, with its context and token history) is opt-in via `LCARS_RESUME=1`.
 - **Binding is loopback only** and there is no auth — this process can run `bash` in `PI_CWD`.

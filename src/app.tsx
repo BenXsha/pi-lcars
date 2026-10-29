@@ -1,10 +1,8 @@
 import { Craft } from "./views/Craft";
+import { Console } from "./views/Console";
 
-/**
- * Router placeholder. M0 replaces this with the station router
- * (session / tools / agents / context / skills / system / providers / mcp / history).
- * For now the craft layer is the only screen.
- */
+/** `?craft` renders the primitive sheet; everything else is the console. */
 export function App() {
-  return <Craft />;
+  const craft = new URLSearchParams(location.search).has("craft");
+  return craft ? <Craft /> : <Console />;
 }

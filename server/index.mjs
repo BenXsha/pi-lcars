@@ -25,6 +25,7 @@ const PORT = Number(process.env.PORT || 4173);
 const CWD = resolve(process.env.PI_CWD || process.cwd());
 const SESSION_DIR = process.env.LCARS_SESSIONS || undefined;
 const TRUST = process.env.LCARS_TRUST_PROJECT !== "0";
+const RESUME = process.env.LCARS_RESUME === "1";
 
 /* --------------------------------------------------------------- plumbing */
 const clients = new Set();
@@ -181,9 +182,9 @@ const routes = {
     if (!entry) return fail(res, 404, "no session");
     const text = String(b.text || "").trim();
     if (!text) return fail(res, 400, "empty prompt");
-    if (entry.meta.running) return fail(res, 409, "session is already running");
-
     const steerable = queue.runningId === entry.id;
+    // running but not the queue's current job (settling / aborting) → reject
+    if (entry.meta.running && !steerable) return fail(res, 409, "session is busy, try again in a moment");
     entry.emit({
       kind: "user",
       id: `u${++registry.counter}-${Math.random().toString(36).slice(2, 5)}`,
@@ -372,7 +373,7 @@ server.listen(PORT, "127.0.0.1", async () => {
   console.log(`  sessions: ${SESSION_DIR || "~/.pi/agent/sessions"}`);
   console.log(`  approval policy: ${approvals.policy}${TRUST ? " · project trusted" : ""}\n`);
   bootPromise = registry
-    .boot(CWD)
+    .boot(CWD, { resume: RESUME })
     .then((entry) => {
       console.log(`[pi] session ready · ${entry.meta.model} · ${entry.id}`);
       return entry;

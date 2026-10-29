@@ -161,7 +161,10 @@ export class Registry {
     return entry;
   }
 
-  async boot(cwd) {
+  async boot(cwd, { resume = false } = {}) {
+    // Resuming by default would adopt whatever session the pi CLI wrote last in
+    // this workspace — wrong context and a surprising token bill. Opt in only.
+    if (!resume) return this.create({ cwd });
     try {
       const list = await this.sdk.SessionManager.list(cwd, this.sessionDir);
       const recent = [...list].sort((a, b) => new Date(b.modified) - new Date(a.modified))[0];
