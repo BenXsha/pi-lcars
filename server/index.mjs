@@ -18,6 +18,7 @@ import { createQueue } from "./pi/queue.mjs";
 import { Registry } from "./pi/registry.mjs";
 import { now, summaryOf } from "./pi/format.mjs";
 import { readMcp, setEnabled, addServer, removeServer } from "./pi/mcpConfig.mjs";
+import { listTree, openPath } from "./pi/fs.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, "..");
@@ -324,6 +325,22 @@ const routes = {
       default:
         fail(res, 400, `unknown op: ${b.op}`, { code: "E_MCP" });
     }
+  },
+
+  "GET /api/tree": async (req, res) => {
+    const url = new URL(req.url, "http://x");
+    ok(res, await listTree({
+      cwd: CWD,
+      target: url.searchParams.get("path") || "",
+      showHidden: url.searchParams.get("hidden") === "1",
+    }));
+  },
+
+  "POST /api/open": async (req, res) => {
+    const b = await body(req);
+    const mode = ["editor", "reveal", "default"].includes(b.mode) ? b.mode : "editor";
+    const r = await openPath({ cwd: CWD, target: b.path, mode });
+    ok(res, r);
   },
 
   "GET /api/fs": async (req, res) => {

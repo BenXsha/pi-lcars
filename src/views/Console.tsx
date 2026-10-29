@@ -4,6 +4,7 @@ import { api } from "../api";
 import { actions, connect, getState, subscribe } from "../store";
 import { THEMES, appliedTheme, applyTheme, type ThemeId } from "../theme";
 import { Icon, type IconName } from "../components/Icon";
+import { FileTree } from "../components/FileTree";
 import {
   ApprovalDeck,
   BarButton,
@@ -88,7 +89,7 @@ export function Console() {
 
   return (
     <div class="app">
-      <Sidenav sessions={s.sessions} activeId={s.activeId} view={view} onView={setView} />
+      <Sidenav sessions={s.sessions} activeId={s.activeId} view={view} onView={setView} cwd={meta?.cwd ?? ""} />
 
       <div class="main">
         <Shelf brand="" tag={view === "session" ? "MISSION LOG" : view.toUpperCase()}>
@@ -220,15 +221,18 @@ function Sidenav({
   activeId,
   view,
   onView,
+  cwd,
 }: {
   sessions: { id: string; name?: string; title?: string | null; items: number; running: boolean; queued: boolean; lastTs: number | null; pending: boolean; modelId: string; cwd: string }[];
   activeId: string | null;
   view: View;
   onView: (v: View) => void;
+  cwd: string;
 }) {
   const sorted = [...sessions].sort((a, b) => (b.lastTs ?? 0) - (a.lastTs ?? 0));
   const listRef = useRef<HTMLDivElement>(null);
   const [cramped, setCramped] = useState(false);
+  const [mode, setMode] = useState<"sessions" | "files">("sessions");
 
   useEffect(() => {
     const el = listRef.current;
@@ -247,14 +251,30 @@ function Sidenav({
         <span class="cap-sub">LCARS / SESSION CONSOLE</span>
       </TopCap>
 
-      <button type="button" class="lnew" onClick={() => { actions.newSession(); onView("session"); }}>
+      <div class="lseg" role="tablist">
+        <button type="button" aria-selected={mode === "sessions" ? "true" : "false"} onClick={() => setMode("sessions")}>
+          SESSIONS
+        </button>
+        <button type="button" aria-selected={mode === "files" ? "true" : "false"} onClick={() => setMode("files")}>
+          FILES
+        </button>
+      </div>
+
+      {mode === "files" ? <FileTree root={cwd} /> : null}
+
+      <button
+        type="button"
+        class="lnew"
+        style={mode === "files" ? { display: "none" } : undefined}
+        onClick={() => { actions.newSession(); onView("session"); }}
+      >
         <span class="ic">
           <Icon name="act-new" size={15} />
         </span>
         <span class="lb">NEW SESSION</span>
       </button>
 
-      <div class="lsessions" ref={listRef}>
+      <div class="lsessions" ref={listRef} style={mode === "files" ? { display: "none" } : undefined}>
         {sorted.length === 0 ? <div class="lempty">no sessions</div> : null}
         {sorted.map((s, i) => (
           <div
@@ -305,7 +325,7 @@ function Sidenav({
       {/* LCARS filler: one elastic block extends the column instead of
           leaving a void. It grows with the leftover height and disappears
           once the list itself scrolls. */}
-      <div class="lfiller" aria-hidden="true">
+      <div class="lfiller" aria-hidden="true" style={mode === "files" ? { display: "none" } : undefined}>
         <span class="stretch" />
       </div>
 

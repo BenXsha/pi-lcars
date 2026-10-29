@@ -120,6 +120,9 @@ export type ModelInfo = {
 
 export type DirEntry = { name: string; path: string; items: number | null };
 
+export type TreeEntry = { name: string; path: string; rel: string; type: "dir" | "file" | "other"; size: number | null };
+export type TreeResult = { path: string; rel: string; parent: string | null; root: string; entries: TreeEntry[] };
+
 export type McpServer = {
   name: string;
   transport: "stdio" | "http" | "unknown";
@@ -180,6 +183,9 @@ export const api = {
   mcpAdd: (payload: { name: string; command?: string; args?: string; url?: string; scope?: string }) =>
     post<unknown>("/api/mcp", { op: "add", ...payload }),
   mcpRemove: (name: string) => post<unknown>("/api/mcp", { op: "remove", name }),
+  tree: (path?: string) => call<TreeResult>(`/api/tree${path ? `?path=${encodeURIComponent(path)}` : ""}`),
+  openPath: (path: string, mode: "editor" | "reveal" | "default" = "editor") =>
+    post<{ cmd: string; args: string[] }>("/api/open", { path, mode }),
   fs: (path?: string) =>
     call<{ path: string; parent: string | null; dirs: DirEntry[] }>(`/api/fs${path ? `?path=${encodeURIComponent(path)}` : ""}`),
 };

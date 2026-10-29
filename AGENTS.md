@@ -308,6 +308,20 @@ LCARS 的左轨**从不留纯黑空洞**：内容排不满时，纵向剩余由*
   一旦列表要滚动（`scrollHeight > clientHeight`，由 `ResizeObserver` 判定 → `data-cramped`）
   就**整块隐藏**，避免露出被裁一半的条。
 
+### 7.6c 工作区文件树（侧栏 FILES 模式）
+
+侧栏在会话列表上方有一个 `SESSIONS / FILES` 二段开关，切到 FILES 就是工作区目录树 ——
+**同一个位置复用**，不开新面板、不加第三个滚动区。
+
+- 行高 23px，`[11px 图标][名字 mono 11px][大小 9px][hover 出三个动作]`，缩进 `6 + depth×12`。
+- **懒加载**：文件夹首次展开才请求 `/api/tree?path=`；折叠不清缓存，再次展开不重复请求。
+- 动作条只在 hover 时出现（不占静态宽度）：`COPY`（相对路径）/ `OPEN`（编辑器）/ `REVEAL`（文件管理器）。
+- **越界保护在服务端**：`guardPath()` 把路径 `realpath` 后必须落在工作区内，否则 `403 E_OUTSIDE`；
+  客户端不自己判断。`openPath()` 按 `code -g` → `open -a "Visual Studio Code"` → `open` 顺序降级，
+  并且**在 `spawn` 事件上 resolve**，不是 spawn 完就返回（否则 ENOENT 会被当成成功）。
+- 默认隐藏 `.git` / `node_modules` / `dist`；文件名本身以 `.` 开头的也隐藏（可加 `?hidden=1`）。
+- 切到 FILES 时，会话列表、NEW SESSION、弹性延伸块一起隐藏，树独占该区域。
+
 ### 7.7 会话块（列表项）
 
 会话不是"小卡片"，是**实心块 + 双行读数**：

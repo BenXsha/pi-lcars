@@ -77,6 +77,12 @@ try {
   const names = (fs1.body?.data?.dirs ?? []).map((d) => d.name);
   check("fs lists src + server", names.includes("src") && names.includes("server"), names.join(","));
 
+  const tree = await get("/api/tree?path=src");
+  check("GET /api/tree", tree.status === 200 && Array.isArray(tree.body?.data?.entries), `${tree.body?.data?.entries?.length ?? 0} entries`);
+  check("tree lists dirs first", tree.body?.data?.entries?.[0]?.type === "dir");
+  const outside = await post("/api/open", { path: "../../etc/hosts" });
+  check("open refuses paths outside the workspace", outside.status === 403 && outside.body?.code === "E_OUTSIDE");
+
   const models = await get("/api/models");
   check("GET /api/models", models.status === 200 && Array.isArray(models.body?.data?.models));
   check("models are not empty", (models.body?.data?.models ?? []).length > 0, `${models.body?.data?.models?.length ?? 0} models`);
