@@ -13,7 +13,7 @@
   --seam: 8px;
   --row: 40px;
   --chip: 84px;
-  --name: 88px;
+  --name: 104px; /* tool name + icon */
   --meta: 88px;
 
   /* radius: half-height on the OUTER side only. never four-corner. */

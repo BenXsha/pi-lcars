@@ -217,12 +217,12 @@ export function ToolStrip(props: {
   return (
     <div class="tool" data-state={state}>
       <div class="st" />
-      <div class="ic">
-        <Icon name={props.icon} size={14} />
-      </div>
       <div class="nm">
-        <span>{props.name.toUpperCase()}</span>
-        {props.count && props.count > 1 ? <small>x{props.count}</small> : null}
+        <Icon name={props.icon} size={12} />
+        <span class="lb">
+          {props.name.toUpperCase()}
+          {props.count && props.count > 1 ? <small>x{props.count}</small> : null}
+        </span>
       </div>
       <div class="bd">
         <div class="args">{props.args}</div>

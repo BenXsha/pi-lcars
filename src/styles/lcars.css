@@ -184,26 +184,28 @@ button { cursor: pointer; }
    ============================================================ */
 .tool {
   display: grid;
-  grid-template-columns: 4px 26px var(--name) minmax(0, 1fr) var(--meta);
+  grid-template-columns: 4px var(--name) minmax(0, 1fr) var(--meta);
   gap: var(--gap);
   align-items: stretch;
   min-height: 38px;
 }
 .tool > .st { background: var(--cyan); border-radius: var(--r-pill) 0 0 var(--r-pill); }
-.tool > .ic { display: flex; align-items: center; justify-content: center; color: var(--cyan); }
+/* the icon lives inside the name block so the coloured strip stays unbroken */
+.tool > .nm .icon { color: #000; opacity: 0.85; }
+.tool > .nm > .lb { display: flex; flex-direction: column; align-items: center; gap: 1px; }
 .tool > .nm {
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1px;
+  gap: 6px;
   background: var(--tang);
   color: #000;
-  font: 700 12px/1.1 var(--din);
-  letter-spacing: 0.1em;
+  font: 700 11px/1.15 var(--din);
+  letter-spacing: 0.08em;
   border-radius: 0 var(--r-1) var(--r-1) 0;
+  overflow: hidden;
 }
-.tool > .nm small { font-size: 9px; letter-spacing: 0.04em; opacity: 0.75; }
+.tool > .nm small { font-size: 8.5px; letter-spacing: 0.04em; opacity: 0.7; }
 .tool > .bd { display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 6px 12px; min-width: 0; }
 .tool > .bd .args { font: 400 13px/1.4 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
 .tool > .bd .out { font: 400 11px/1.4 var(--mono); color: var(--g3); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 2.8em; overflow: hidden; }
@@ -221,13 +223,13 @@ button { cursor: pointer; }
 }
 
 .tool[data-state="run"] > .st { background: var(--tang); }
-.tool[data-state="run"] > .ic { color: var(--tang); }
+
 .tool[data-state="error"] > .st { background: var(--tomato); }
-.tool[data-state="error"] > .ic { color: var(--tomato); }
+
 .tool[data-state="error"] > .nm { background: var(--tomato); }
 .tool[data-state="error"] > .mt { background: var(--tomato); color: #000; font-weight: 700; font-size: 10px; letter-spacing: 0.08em; }
 .tool[data-state="warn"] > .st { background: var(--amber); }
-.tool[data-state="warn"] > .ic { color: var(--amber); }
+
 
 .scan { display: inline-flex; gap: 3px; }
 .scan i { width: 3px; height: 14px; background: var(--g2); }
