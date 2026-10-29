@@ -1,0 +1,47 @@
+/* ============================================================
+   LCARS tokens — the only place raw values live
+   ============================================================ */
+:root {
+  /* palette (semantic, see AGENTS.md §2) */
+  --orange: #ff9c00;
+  --amber: #ffce9c;
+  --tang: #ff9966;
+  --tomato: #cc6666;
+  --lilac: #cc99cc;
+  --lav: #9999ff;
+  --ice: #99ccff;
+  --moon: #cccc99;
+  --cyan: #99cccc;
+
+  --w: #ffffff;
+  --g3: #999999;
+  --g2: #666666;
+  --g1: #333333;
+  --g0: #1a1a1a;
+  --bg: #000000;
+
+  /* type */
+  --din: "DIN Alternate", "DIN Condensed", "Helvetica Neue", Arial, sans-serif;
+  --text: "MiSans", "PingFang SC", "Source Han Sans SC", "Noto Sans SC", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* grid — 4px base */
+  --gap: 4px;
+  --seam: 8px;
+  --row: 40px;
+  --chip: 84px;
+  --name: 88px;
+  --meta: 88px;
+
+  /* radius: half-height on the OUTER side only. never four-corner. */
+  --r-1: 6px;
+  --r-2: 14px;
+  --r-pill: 999px;
+
+  /* motion — linear only. no bounce, no blur (AGENTS.md §5) */
+  --t-1: 90ms;
+  --t-2: 140ms;
+  --t-3: 240ms;
+  --t-4: 900ms;
+  --ease: linear;
+}
