@@ -979,3 +979,13 @@ button { cursor: pointer; }
 .tool > .bd .more:hover { color: var(--w); }
 .tool > .bd .more:focus-visible { color: var(--w); outline: 1px solid var(--ice); outline-offset: 2px; }
 .tool[data-toggle="1"] > .bd { cursor: pointer; }
+/* the name block doubles as the expand handle */
+button.nm {
+  border: 0;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+button.nm:hover { filter: brightness(1.12); }
+button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
+

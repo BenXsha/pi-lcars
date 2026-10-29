@@ -311,6 +311,8 @@ LCARS 原版用 `Swiss 911 Ultra Compressed`（压缩粗体）。**本项目不�
 9. **折叠必须真的解开**：展开靠 `data-expanded="1"` 解除 `max-height`，不能只改渲染行数 ——
    只切数据而 CSS 仍钳着 `max-height: 2.8em` 时，按钮会"点了没反应"。展开后给 `52vh` 上限 + 内部滚动，
    否则 45 行输出会把整条 transcript 顶下去 700px。
+   **展开手柄 = 工具名字块本身**（它已经是一个实色块，天然是最好的点击目标）：`<button class="nm">`
+   带 `aria-expanded`，键盘 Enter/Space 可用；行尾的 `+ N MORE LINES` 只是同一动作的副入口。
 10. **滚动窗从中间开始**：顶部放 `↑ 18 EARLIER MESSAGES` 灰条。
    会话永远不会刚好从第一句开始，也不会刚好排满。
 

@@ -220,13 +220,29 @@ export function ToolStrip(props: {
   return (
     <div class="tool" data-state={state} data-expanded={props.expanded ? "1" : "0"} data-toggle={canToggle ? "1" : "0"}>
       <div class="st" />
-      <div class="nm">
-        <Icon name={props.icon} size={12} />
-        <span class="lb">
-          {props.name.toUpperCase()}
-          {props.count && props.count > 1 ? <small>x{props.count}</small> : null}
-        </span>
-      </div>
+      {canToggle ? (
+        <button
+          type="button"
+          class="nm"
+          aria-expanded={props.expanded ? "true" : "false"}
+          title={props.expanded ? "Collapse output" : "Expand output"}
+          onClick={props.onToggle}
+        >
+          <Icon name={props.icon} size={12} />
+          <span class="lb">
+            {props.name.toUpperCase()}
+            {props.count && props.count > 1 ? <small>x{props.count}</small> : null}
+          </span>
+        </button>
+      ) : (
+        <div class="nm">
+          <Icon name={props.icon} size={12} />
+          <span class="lb">
+            {props.name.toUpperCase()}
+            {props.count && props.count > 1 ? <small>x{props.count}</small> : null}
+          </span>
+        </div>
+      )}
       <div class="bd">
         <div class="args">{props.args}</div>
         {shown.length ? <div class={state === "error" ? "err" : "out"}>{shown.join("\n")}</div> : null}
