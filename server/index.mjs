@@ -19,6 +19,7 @@ import { Registry } from "./pi/registry.mjs";
 import { now, summaryOf } from "./pi/format.mjs";
 import { readMcp, setEnabled, addServer, removeServer } from "./pi/mcpConfig.mjs";
 import { listTree, openPath } from "./pi/fs.mjs";
+import { listProviders, listProviderModels, testProvider, setDefaultModel, setProviderKey } from "./pi/providers.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, "..");
@@ -303,6 +304,34 @@ const routes = {
     await entry.session.setModel(model);
     entry.pushMeta();
     ok(res, { modelId: entry.meta.modelId, model: entry.meta.model });
+  },
+
+  "GET /api/providers": async (req, res) => {
+    const url = new URL(req.url, "http://x");
+    const entry = registry.get(url.searchParams.get("session") || undefined);
+    ok(res, await listProviders({ session: entry?.session, agentDir: agentDir() }));
+  },
+
+  "POST /api/providers": async (req, res) => {
+    const b = await body(req);
+    const entry = registry.get(b.session);
+    const ctx = { session: entry?.session, agentDir: agentDir() };
+    switch (b.op) {
+      case "test":
+        ok(res, await testProvider({ ...ctx, providerId: b.provider }));
+        break;
+      case "models":
+        ok(res, await listProviderModels({ ...ctx, providerId: b.provider }));
+        break;
+      case "default":
+        ok(res, await setDefaultModel({ agentDir: ctx.agentDir, provider: b.provider, model: b.model }));
+        break;
+      case "key":
+        ok(res, await setProviderKey({ agentDir: ctx.agentDir, provider: b.provider, key: b.key }));
+        break;
+      default:
+        fail(res, 400, `unknown op: ${b.op}`, { code: "E_PROVIDERS" });
+    }
   },
 
   "GET /api/mcp": async (req, res) => {

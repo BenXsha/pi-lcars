@@ -1328,3 +1328,73 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 }
 .ft-note { background: var(--g1); color: var(--cyan); }
 .ft-err { background: var(--tomato); color: #000; }
+
+/* ============================================================
+   provider cards — head row + expandable model list
+   ============================================================ */
+.pv-card { display: flex; flex-direction: column; gap: 3px; margin-bottom: 4px; }
+.pv-head {
+  display: grid;
+  grid-template-columns: 4px 18px minmax(0, 1fr) 150px 80px auto auto;
+  gap: 8px;
+  align-items: center;
+  min-height: 38px;
+  padding: 0 8px 0 0;
+  border-radius: 0 var(--r-1) var(--r-1) 0;
+  cursor: pointer;
+}
+.pv-head:hover { background: var(--g0); }
+.pv-head .st { align-self: stretch; margin: 6px 0; background: var(--g1); border-radius: var(--r-pill); }
+.pv-head .st[data-auth="api_key"] { background: var(--cyan); }
+.pv-head .st[data-auth="oauth"] { background: var(--lav); }
+.pv-head .nm { font: 700 12px/1.3 var(--din); letter-spacing: 0.06em; color: var(--w); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pv-head .at { font: 400 10px/1.3 var(--mono); color: var(--g3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pv-head .ct { font: 400 10px/1.3 var(--din); color: var(--g2); text-align: right; }
+.pv-head .cur { font: 700 9px/1 var(--din); letter-spacing: 0.12em; color: #000; background: var(--orange); padding: 3px 6px; border-radius: var(--r-1); }
+.pv-card[data-dim="1"] .pv-head .nm { color: var(--g3); }
+.pv-btn {
+  font: 700 9px/1 var(--din);
+  letter-spacing: 0.12em;
+  padding: 6px 8px;
+  background: var(--g1);
+  color: var(--g3);
+  border-radius: var(--r-1);
+}
+.pv-btn:hover:not(:disabled) { background: var(--orange); color: #000; }
+.pv-btn:disabled { opacity: 0.4; }
+.pv-btn.ghost { background: transparent; color: var(--g2); }
+.pv-btn.ghost:hover { background: var(--g1); color: var(--w); }
+.pv-test { font: 400 10px/1.4 var(--mono); color: var(--tomato); padding: 2px 8px 2px 30px; }
+.pv-test.ok { color: var(--cyan); }
+.pv-body { display: flex; flex-direction: column; gap: 2px; padding: 2px 8px 8px 26px; }
+.pv-model {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 56px auto auto;
+  gap: 6px;
+  align-items: center;
+  min-height: 26px;
+}
+.pv-model .nm { font: 400 11px/1.3 var(--mono); color: var(--w); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pv-model .cx { font: 400 9.5px/1.3 var(--din); color: var(--g2); text-align: right; }
+.pv-key { display: grid; grid-template-columns: 90px minmax(0, 1fr) auto; gap: 6px; align-items: center; margin-top: 6px; }
+.pv-key .lb { font: 700 9px/1.2 var(--din); letter-spacing: 0.12em; color: var(--g3); }
+.pv-key input {
+  background: var(--g0);
+  border: 0;
+  border-bottom: 2px solid var(--g1);
+  padding: 5px 8px;
+  font: 400 11px/1.3 var(--mono);
+  color: var(--w);
+}
+.pv-key input:focus { outline: none; border-bottom-color: var(--orange); }
+.pv-note { font: 400 10px/1.6 var(--mono); color: var(--g2); }
+.pv-note code { color: var(--ice); }
+.pv-more {
+  align-self: flex-start;
+  margin: 6px 0;
+  font: 700 10px/1 var(--din);
+  letter-spacing: 0.12em;
+  color: var(--ice);
+  padding: 4px 0;
+}
+.pv-more:hover { color: var(--w); }

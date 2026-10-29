@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import type { DirEntry, Item, McpServer, ModelInfo } from "../api";
+import type { DirEntry, Item, McpServer, ModelInfo, ProviderRow, ProvidersResult } from "../api";
 import { api } from "../api";
 import { actions, connect, getState, subscribe } from "../store";
 import { THEMES, appliedTheme, applyTheme, type ThemeId } from "../theme";
@@ -831,48 +831,187 @@ function McpPanel() {
 
 /* ------------------------------------------------------------ providers */
 function ProvidersPanel({ meta }: { meta: ReturnType<typeof getState>["meta"] }) {
-  const [models, setModels] = useState<ModelInfo[]>([]);
+  const [data, setData] = useState<ProvidersResult | null>(null);
+  const [open, setOpen] = useState<string | null>(null);
+  const [models, setModels] = useState<Record<string, ModelInfo[]>>({});
+  const [tests, setTests] = useState<Record<string, string>>({});
+  const [keys, setKeys] = useState<Record<string, string>>({});
   const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [more, setMore] = useState(false);
+
+  const load = () =>
+    api
+      .providers()
+      .then((d) => {
+        setData(d);
+        setErr(null);
+      })
+      .catch((e) => setErr(e.message));
 
   useEffect(() => {
-    api
-      .models()
-      .then((r) => setModels(r.models))
-      .catch((e) => setErr(e.message));
+    load();
   }, []);
 
-  const byProvider = models.reduce<Record<string, ModelInfo[]>>((acc, m) => {
-    (acc[m.provider] ||= []).push(m);
-    return acc;
-  }, {});
+  const configured = (data?.providers ?? []).filter((p) => p.auth !== "none");
+  const others = (data?.providers ?? []).filter((p) => p.auth === "none");
+
+  const toggle = async (id: string) => {
+    const next = open === id ? null : id;
+    setOpen(next);
+    if (next && !models[id]) {
+      setBusy(id);
+      try {
+        setModels((m) => ({ ...m, [id]: [] }));
+        const list = await api.providerModels(id);
+        setModels((m) => ({ ...m, [id]: list }));
+      } catch (e) {
+        setErr((e as Error).message);
+      } finally {
+        setBusy(null);
+      }
+    }
+  };
+
+  const test = async (id: string) => {
+    setBusy(`t:${id}`);
+    try {
+      const r = await api.providerTest(id);
+      setTests((t) => ({ ...t, [id]: `${r.status.toUpperCase()} · ${r.ms}ms${r.reason ? ` · ${r.reason}` : ""}` }));
+    } catch (e) {
+      setTests((t) => ({ ...t, [id]: `ERROR · ${(e as Error).message}` }));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const saveKey = async (id: string) => {
+    const key = (keys[id] ?? "").trim();
+    if (!key) return;
+    setBusy(`k:${id}`);
+    try {
+      await api.providerKey(id, key);
+      setKeys((k) => ({ ...k, [id]: "" }));
+      await load();
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const row = (p: ProviderRow, dim = false) => {
+    const expanded = open === p.id;
+    return (
+      <div class="pv-card" key={p.id} data-dim={dim ? "1" : "0"}>
+        <div class="pv-head" role="button" tabIndex={0} onClick={() => toggle(p.id)} onKeyDown={(e) => e.key === "Enter" && toggle(p.id)}>
+          <span class="st" data-auth={p.auth} />
+          <Icon name="station-provider" size={12} />
+          <span class="nm">{p.name}</span>
+          <span class="at">{p.auth === "none" ? "no key" : p.auth === "oauth" ? "oauth" : p.keyMask ?? "api key"}</span>
+          <span class="ct">{p.models} models</span>
+          {p.current ? <span class="cur">ACTIVE</span> : null}
+          {p.auth !== "none" ? (
+            <button
+              type="button"
+              class="pv-btn"
+              disabled={busy === `t:${p.id}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                test(p.id);
+              }}
+            >
+              TEST
+            </button>
+          ) : null}
+        </div>
+        {tests[p.id] ? <div class={`pv-test ${tests[p.id].startsWith("READY") ? "ok" : ""}`}>{tests[p.id]}</div> : null}
+
+        {expanded ? (
+          <div class="pv-body">
+            {busy === p.id ? <div class="pv-note">loading models…</div> : null}
+            {(models[p.id] ?? []).slice(0, 24).map((m) => (
+              <div class="pv-model" key={m.id}>
+                <span class="nm">{m.id}</span>
+                <span class="cx">{m.contextWindow ? fmtTok(m.contextWindow) : "—"}</span>
+                <button
+                  type="button"
+                  class="pv-btn"
+                  onClick={async () => {
+                    await actions.setModel(m.provider, m.id);
+                    load();
+                  }}
+                >
+                  USE
+                </button>
+                <button
+                  type="button"
+                  class="pv-btn ghost"
+                  onClick={async () => {
+                    try {
+                      await api.providerDefault(m.provider, m.id);
+                      await load();
+                    } catch (e) {
+                      setErr((e as Error).message);
+                    }
+                  }}
+                >
+                  DEFAULT
+                </button>
+              </div>
+            ))}
+
+            <div class="pv-key">
+              <span class="lb">{p.auth === "none" ? "ADD API KEY" : "REPLACE KEY"}</span>
+              <input
+                type="password"
+                value={keys[p.id] ?? ""}
+                placeholder={p.keyMask ?? "sk-…"}
+                onInput={(e) => setKeys((k) => ({ ...k, [p.id]: (e.target as HTMLInputElement).value }))}
+                onKeyDown={(e) => e.key === "Enter" && saveKey(p.id)}
+              />
+              <button type="button" class="pv-btn" disabled={busy === `k:${p.id}` || !(keys[p.id] ?? "").trim()} onClick={() => saveKey(p.id)}>
+                SAVE
+              </button>
+            </div>
+            <div class="pv-note">
+              written to <code>{data?.files.auth ? shortPath(data.files.auth) : "~/.pi/agent/auth.json"}</code> with a .bak
+            </div>
+          </div>
+        ) : null}
+      </div>
+    );
+  };
 
   return (
     <div class="pv">
-      <div class="pv-title">{Object.keys(byProvider).length} PROVIDERS</div>
-      <div class="pv-sub">
-        Providers come from your pi configuration and stored credentials. Editing keys and adding providers lands in M1 — for now you can switch the model, which takes effect next turn.
+      <div class="pv-title">
+        {configured.length} CONFIGURED / {(data?.providers ?? []).length} KNOWN
       </div>
-      {err ? <div class="errbar" style={{ margin: "0 0 8px" }}>{err}</div> : null}
-      {Object.entries(byProvider).map(([provider, list]) => (
-        <div key={provider} style={{ display: "flex", flexDirection: "column", gap: "var(--gap)", marginBottom: "10px" }}>
-          <div class="pv-row">
-            <div class="st" style={{ background: "var(--cyan)" }} />
-            <div class="k">{provider.toUpperCase()}</div>
-            <div class="v">{list.length} models</div>
-            <div class="n">{meta?.modelId && list.some((m) => m.id === meta.modelId) ? "ACTIVE" : ""}</div>
-          </div>
-          {list.map((m) => (
-            <div class="pv-row" key={m.id} style={{ minHeight: "38px" }}>
-              <div class="st" />
-              <div class="k" style={{ background: "transparent", color: "var(--g3)" }}>{m.id === meta?.modelId ? "●" : ""}</div>
-              <div class="v">{m.id}</div>
-              <div class="n" style={{ font: "400 11px/1.4 var(--mono)", color: "var(--g3)" }}>
-                {m.contextWindow ? fmtTok(m.contextWindow) : "—"}
-              </div>
-            </div>
-          ))}
+      <div class="pv-sub">
+        Default for new sessions: <code>{data?.defaultProvider ?? "—"} / {data?.defaultModel ?? "—"}</code>. A model switched here applies to
+        the next turn; DEFAULT writes it to <code>settings.json</code>.
+      </div>
+      {err ? (
+        <div class="errbar" style={{ margin: "0 0 8px" }}>
+          <Icon name="status-fail" size={13} /> {err}
         </div>
-      ))}
+      ) : null}
+
+      {configured.map((p) => row(p))}
+
+      {others.length ? (
+        <>
+          <button type="button" class="pv-more" onClick={() => setMore(!more)}>
+            {more ? "− HIDE" : "+ SHOW"} {others.length} PROVIDERS WITHOUT A KEY
+          </button>
+          {more ? others.map((p) => row(p, true)) : null}
+        </>
+      ) : null}
+
+      <div class="pv-note" style={{ marginTop: "12px" }}>
+        Session model: <code>{meta?.model ?? "—"}</code> · keys are masked on read and never sent back from the server
+      </div>
     </div>
   );
 }

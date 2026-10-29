@@ -83,6 +83,17 @@ try {
   const outside = await post("/api/open", { path: "../../etc/hosts" });
   check("open refuses paths outside the workspace", outside.status === 403 && outside.body?.code === "E_OUTSIDE");
 
+  const prov = await get("/api/providers");
+  check("GET /api/providers", prov.status === 200 && Array.isArray(prov.body?.data?.providers), `${prov.body?.data?.providers?.length ?? 0} providers`);
+  check("providers expose auth state", (prov.body?.data?.providers ?? []).every((p) => ["oauth", "api_key", "none"].includes(p.auth)));
+  check("provider keys are masked", (prov.body?.data?.providers ?? []).filter((p) => p.keyMask).every((p) => p.keyMask.includes("…")));
+  const provTest = await post("/api/providers", { op: "test", provider: "definitely-not-a-provider" });
+  check("provider test answers even for unknown ids", provTest.status === 200 && !!provTest.body?.data?.status);
+  const provBad = await post("/api/providers", { op: "default", provider: "", model: "" });
+  check("default model rejects empty args", provBad.status === 400);
+  const keyBad = await post("/api/providers", { op: "key", provider: "x", key: "" });
+  check("key write rejects empty key", keyBad.status === 400);
+
   const models = await get("/api/models");
   check("GET /api/models", models.status === 200 && Array.isArray(models.body?.data?.models));
   check("models are not empty", (models.body?.data?.models ?? []).length > 0, `${models.body?.data?.models?.length ?? 0} models`);

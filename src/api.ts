@@ -110,6 +110,23 @@ export type Bootstrap = {
   queue?: { running: string | null; waiting: string[] };
 };
 
+export type ProviderRow = {
+  id: string;
+  name: string;
+  auth: "oauth" | "api_key" | "none";
+  models: number;
+  keyMask: string | null;
+  current: boolean;
+};
+
+export type ProvidersResult = {
+  providers: ProviderRow[];
+  current: { provider: string; model: string; name: string } | null;
+  defaultProvider: string | null;
+  defaultModel: string | null;
+  files: { auth: string; settings: string };
+};
+
 export type ModelInfo = {
   provider: string;
   id: string;
@@ -178,6 +195,12 @@ export const api = {
     post<{ thinking: string; requested: string; clamped: boolean }>("/api/thinking", { level }),
   setModel: (provider: string, model: string) => post<{ modelId: string }>("/api/model", { provider, model }),
   models: () => call<{ current: string; models: ModelInfo[] }>("/api/models"),
+  providers: () => call<ProvidersResult>("/api/providers"),
+  providerTest: (provider: string) =>
+    post<{ provider: string; ms: number; status: string; reason: string | null; authType: string | null }>("/api/providers", { op: "test", provider }),
+  providerModels: (provider: string) => post<ModelInfo[]>("/api/providers", { op: "models", provider }),
+  providerDefault: (provider: string, model: string) => post<unknown>("/api/providers", { op: "default", provider, model }),
+  providerKey: (provider: string, key: string) => post<{ keyMask: string }>("/api/providers", { op: "key", provider, key }),
   mcp: () => call<McpConfig>("/api/mcp"),
   mcpToggle: (name: string, enabled: boolean) => post<unknown>("/api/mcp", { op: "toggle", name, enabled }),
   mcpAdd: (payload: { name: string; command?: string; args?: string; url?: string; scope?: string }) =>

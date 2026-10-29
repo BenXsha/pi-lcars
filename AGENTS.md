@@ -322,6 +322,19 @@ LCARS 的左轨**从不留纯黑空洞**：内容排不满时，纵向剩余由*
 - 默认隐藏 `.git` / `node_modules` / `dist`；文件名本身以 `.` 开头的也隐藏（可加 `?hidden=1`）。
 - 切到 FILES 时，会话列表、NEW SESSION、弹性延伸块一起隐藏，树独占该区域。
 
+### 7.6d Provider 面板（PROVIDERS 站）
+
+- **只列已配置的**（有 key / 有 oauth），其余 43 个折叠成 `+ SHOW N PROVIDERS WITHOUT A KEY` ——
+  一屏 45 行没人会读。已配置的排前面，不排序、不搜索。
+- 每行：`4px 状态条`（无 key=g1 / api_key=cyan / oauth=lav）+ 名字 + 掩码 key + 模型数 + `ACTIVE`。
+- 展开才拉模型列表（`op:"models"`）；模型行给 `USE`（下一轮生效）与 `DEFAULT`（写 `settings.json`，影响新会话）。
+- **key 永远不回传**：服务端只返回 `sk-e…sZhU` 掩码；写入走 `auth.json` 原子替换 + `.bak`，
+  输入框是 `type=password`，placeholder 显示现有掩码。
+- `TEST` 调 `modelRuntime.checkAuth()`，结果写成一行 `READY · 142ms` / `INVALID · invalid_state`，
+  不弹窗、不 toast。
+- 读取一律走**活着的 ModelRuntime**（`getProviders/getAllModels/hasConfiguredAuth`），
+  不解析 models.json —— 保证界面和下一轮实际选择永远一致。
+
 ### 7.7 会话块（列表项）
 
 会话不是"小卡片"，是**实心块 + 双行读数**：
