@@ -335,6 +335,21 @@ LCARS 的左轨**从不留纯黑空洞**：内容排不满时，纵向剩余由*
 - 读取一律走**活着的 ModelRuntime**（`getProviders/getAllModels/hasConfiguredAuth`），
   不解析 models.json —— 保证界面和下一轮实际选择永远一致。
 
+### 7.6e Skills 面板（SKILLS 站）
+
+技能不是工具，pi 只在**判断适用时**把技能正文注入 system prompt —— 所以面板必须回答三个问题：
+
+| 问题 | 呈现 |
+|---|---|
+| 加载了什么 | 名字 + 首个小标题（`# Heading`，跳过 frontmatter）+ 文件体积 |
+| 有什么用 | **完整 description**，默认 3 行截断、点击展开（因为 description 往往就是一句使用说明） |
+| 怎么触发 | 行内徽标 `AUTO · description` 或 `MANUAL /name`；页面底部固定一段「HOW A SKILL FIRES」解释两种机制 |
+
+- 数据只从活的 `resourceLoader.getSkills()` 读（`Skill{name, description, filePath, baseDir, disableModelInvocation}`），不扫目录。
+- `RELOAD` 直接调 `loader.reload()`：重读 SKILL.md，不重启进程；耗时写进按钮旁（实测 1.5s）。
+- 每行 hover 出 `COPY`（路径）与 `OPEN`（编辑器），复用文件树那套动作。
+- 扩展（extensions）与 prompt 模板分开计数，不混在技能列表里 —— 它们的注册方式不同。
+
 ### 7.7 会话块（列表项）
 
 会话不是"小卡片"，是**实心块 + 双行读数**：

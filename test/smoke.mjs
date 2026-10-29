@@ -83,6 +83,11 @@ try {
   const outside = await post("/api/open", { path: "../../etc/hosts" });
   check("open refuses paths outside the workspace", outside.status === 403 && outside.body?.code === "E_OUTSIDE");
 
+  const skills = await get("/api/skills");
+  check("GET /api/skills", skills.status === 200 && skills.body?.data?.available === true, `${skills.body?.data?.skills?.length ?? 0} skills`);
+  check("skills carry a description (the trigger)", (skills.body?.data?.skills ?? []).every((s) => typeof s.description === "string"));
+  check("skills report how they fire", (skills.body?.data?.skills ?? []).every((s) => ["manual", "description"].includes(s.trigger)));
+
   const prov = await get("/api/providers");
   check("GET /api/providers", prov.status === 200 && Array.isArray(prov.body?.data?.providers), `${prov.body?.data?.providers?.length ?? 0} providers`);
   check("providers expose auth state", (prov.body?.data?.providers ?? []).every((p) => ["oauth", "api_key", "none"].includes(p.auth)));

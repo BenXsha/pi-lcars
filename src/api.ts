@@ -119,6 +119,27 @@ export type ProviderRow = {
   current: boolean;
 };
 
+export type SkillRow = {
+  name: string;
+  description: string;
+  heading: string | null;
+  path: string;
+  dir: string;
+  manualOnly: boolean;
+  trigger: "manual" | "description";
+  bytes: number | null;
+};
+
+export type SkillsResult = {
+  available: boolean;
+  skills: SkillRow[];
+  prompts: { name: string; path: string }[];
+  extensions: { name: string; path: string }[];
+  diagnostics: { level: string; message: string }[];
+  error?: string;
+  ms?: number;
+};
+
 export type ProvidersResult = {
   providers: ProviderRow[];
   current: { provider: string; model: string; name: string } | null;
@@ -195,6 +216,8 @@ export const api = {
     post<{ thinking: string; requested: string; clamped: boolean }>("/api/thinking", { level }),
   setModel: (provider: string, model: string) => post<{ modelId: string }>("/api/model", { provider, model }),
   models: () => call<{ current: string; models: ModelInfo[] }>("/api/models"),
+  skills: () => call<SkillsResult>("/api/skills"),
+  reloadSkills: () => post<SkillsResult>("/api/skills", { op: "reload" }),
   providers: () => call<ProvidersResult>("/api/providers"),
   providerTest: (provider: string) =>
     post<{ provider: string; ms: number; status: string; reason: string | null; authType: string | null }>("/api/providers", { op: "test", provider }),

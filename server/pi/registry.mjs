@@ -194,7 +194,17 @@ export class Registry {
     return this.#load(manager, manager.getCwd());
   }
 
-  async fork(id) {
+  async fork(id, pathArg) {
+    if (pathArg) {
+      // forking straight from history: no open session needed
+      try {
+        const cwd = this.sdk.SessionManager.open(pathArg).getCwd();
+        const manager = this.sdk.SessionManager.forkFrom(pathArg, cwd, this.sessionDir);
+        return await this.#load(manager, cwd);
+      } catch (e) {
+        throw httpError(409, "E_EMPTY", e.message);
+      }
+    }
     const src = this.get(id);
     if (!src?.path) throw httpError(409, "E_EMPTY", "this session has no transcript yet — send a message first");
     let manager;

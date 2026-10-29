@@ -19,6 +19,8 @@ import { Registry } from "./pi/registry.mjs";
 import { now, summaryOf } from "./pi/format.mjs";
 import { readMcp, setEnabled, addServer, removeServer } from "./pi/mcpConfig.mjs";
 import { listTree, openPath } from "./pi/fs.mjs";
+import { listHistory, deleteHistoryFile, renameHistoryFile } from "./pi/history.mjs";
+import { listSkills, reloadSkills } from "./pi/skills.mjs";
 import { listProviders, listProviderModels, testProvider, setDefaultModel, setProviderKey } from "./pi/providers.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -159,7 +161,7 @@ const routes = {
         entry = await registry.open(b.path);
         break;
       case "fork":
-        entry = await registry.fork(b.id);
+        entry = await registry.fork(b.id, b.path);
         break;
       case "activate":
         entry = registry.setActive(b.id);
@@ -304,6 +306,46 @@ const routes = {
     await entry.session.setModel(model);
     entry.pushMeta();
     ok(res, { modelId: entry.meta.modelId, model: entry.meta.model });
+  },
+
+  "GET /api/skills": async (req, res) => {
+    const url = new URL(req.url, "http://x");
+    const entry = registry.get(url.searchParams.get("session") || undefined);
+    ok(res, await listSkills({ entry }));
+  },
+
+  "POST /api/skills": async (req, res) => {
+    const b = await body(req);
+    const entry = registry.get(b.session);
+    if (b.op === "reload") return ok(res, await reloadSkills({ entry }));
+    fail(res, 400, `unknown op: ${b.op}`, { code: "E_SKILLS" });
+  },
+
+  "GET /api/history": async (req, res) => {
+    const url = new URL(req.url, "http://x");
+    ok(res, await listHistory({
+      sdk: await loadSdk(),
+      sessionDir: SESSION_DIR,
+      query: url.searchParams.get("q") || "",
+      limit: url.searchParams.get("limit") || 80,
+    }));
+  },
+
+  "POST /api/history": async (req, res) => {
+    const b = await body(req);
+    const sdk = await loadSdk();
+    if (b.op === "delete") {
+      const open = [...registry.sessions.values()].find((s) => s.path === b.path);
+      if (open) await registry.remove(open.id);
+      else await deleteHistoryFile(b.path);
+      return ok(res, { ok: true });
+    }
+    if (b.op === "rename") {
+      const open = [...registry.sessions.values()].find((s) => s.path === b.path);
+      if (open) return ok(res, await registry.rename(open.id, b.name));
+      return ok(res, await renameHistoryFile({ sdk, path: b.path, name: b.name }));
+    }
+    fail(res, 400, `unknown op: ${b.op}`, { code: "E_HISTORY" });
   },
 
   "GET /api/providers": async (req, res) => {
