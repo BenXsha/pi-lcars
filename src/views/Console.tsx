@@ -177,8 +177,12 @@ export function Console() {
 
 const countTools = (items: Item[]) => items.filter((i) => i.kind === "tool").length;
 
-function titleOf(active: { name?: string; id: string } | undefined, meta: { modelId: string } | null) {
-  if (active?.name) return active.name;
+function titleOf(
+  active: { name?: string; title?: string | null; id: string } | undefined,
+  meta: { modelId: string; title?: string | null } | null,
+) {
+  const t = meta?.title ?? active?.title ?? active?.name;
+  if (t) return t;
   if (meta) return `${meta.modelId} / ${active?.id?.slice(0, 8) ?? "SESSION"}`;
   return "STANDING BY";
 }
@@ -204,7 +208,7 @@ function Sidenav({
   view,
   onView,
 }: {
-  sessions: { id: string; name?: string; items: number; running: boolean; queued: boolean; lastTs: number | null; pending: boolean; modelId: string; cwd: string }[];
+  sessions: { id: string; name?: string; title?: string | null; items: number; running: boolean; queued: boolean; lastTs: number | null; pending: boolean; modelId: string; cwd: string }[];
   activeId: string | null;
   view: View;
   onView: (v: View) => void;
@@ -247,7 +251,10 @@ function Sidenav({
               }
             }}
           >
-            <span class="l1">{s.name ?? `SESSION ${String(Number(s.id.match(/^s(\d+)/)?.[1] ?? i + 1)).padStart(2, "0")}`}</span>
+            <span class="num">{String(Number(s.id.match(/^s(\d+)/)?.[1] ?? i + 1)).padStart(2, "0")}</span>
+            <span class="l1" data-empty={s.title ? "0" : "1"}>
+              {s.title ?? "UNTITLED SESSION"}
+            </span>
             <span class="l2">
               {s.modelId.toUpperCase()} / {s.id.slice(0, 7).toUpperCase()}
             </span>

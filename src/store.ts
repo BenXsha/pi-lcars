@@ -127,6 +127,8 @@ function applyEvent(ev: StreamEvent) {
         s.queued = ev.meta.queued;
         s.modelId = ev.meta.modelId;
         s.thinking = ev.meta.thinking;
+        // the first prompt becomes the session title
+        if (ev.meta.title !== undefined) s.title = ev.meta.title;
       }
       emit();
       break;

@@ -41,6 +41,7 @@ export type Item =
 export type SessionSummary = {
   id: string;
   name?: string;
+  title?: string | null;
   path?: string;
   cwd: string;
   modelId: string;
@@ -55,6 +56,7 @@ export type SessionSummary = {
 
 export type Meta = {
   name?: string;
+  title?: string | null;
   path?: string | null;
   cwd: string;
   model: string;

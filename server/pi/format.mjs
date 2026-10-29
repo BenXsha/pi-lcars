@@ -36,3 +36,12 @@ export function fmtMs(ms) {
 }
 
 export const now = () => Date.now();
+
+/** First-sentence summary of an operator prompt, used as the session title. */
+export function summaryOf(text, max = 56) {
+  const t = String(text || "").replace(/\s+/g, " ").trim();
+  if (!t) return "";
+  const clause = t.split(/(?<=[。．.!?！？])\s*/)[0] || t;
+  const base = clause.length >= 8 && clause.length <= max ? clause : t;
+  return base.length > max ? `${base.slice(0, max - 1).trimEnd()}…` : base;
+}

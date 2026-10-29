@@ -40,6 +40,7 @@ export class Registry {
       loader: null,
       path: manager.getSessionFile?.() ?? null,
       name: manager.getSessionName?.() ?? undefined,
+      title: "",
       items: [],
       byId: new Map(),
       cur: null,
@@ -102,6 +103,7 @@ export class Registry {
       name: entry.name,
       path: entry.path,
       cwd: entry.cwd,
+      title: entry.name ?? (entry.title || null),
       model: m ? `${m.provider}/${m.id}` : "—",
       modelId: m?.id ?? "—",
       thinking: String(s?.thinkingLevel ?? "off"),
@@ -242,6 +244,7 @@ export class Registry {
     return [...this.sessions.values()].map((s) => ({
       id: s.id,
       name: s.name,
+      title: s.name ?? (s.title || null),
       path: s.path,
       cwd: s.cwd,
       modelId: s.meta.modelId,

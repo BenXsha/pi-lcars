@@ -16,7 +16,7 @@ import { loadSdk, agentDir } from "./pi/sdk.mjs";
 import { Approvals } from "./pi/approval.mjs";
 import { createQueue } from "./pi/queue.mjs";
 import { Registry } from "./pi/registry.mjs";
-import { now } from "./pi/format.mjs";
+import { now, summaryOf } from "./pi/format.mjs";
 import { readMcp, setEnabled, addServer, removeServer } from "./pi/mcpConfig.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -194,6 +194,11 @@ const routes = {
       queued: !steerable && (queue.depth > 0 || queue.runningId !== null),
       ts: now(),
     });
+
+    if (!entry.title) {
+      entry.title = summaryOf(text);
+      entry.pushMeta();
+    }
 
     if (steerable) {
       entry.session.steer(text).catch((e) => {
