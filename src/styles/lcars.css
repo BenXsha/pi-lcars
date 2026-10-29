@@ -208,6 +208,7 @@ button { cursor: pointer; }
 .tool > .nm small { font-size: 8.5px; letter-spacing: 0.04em; opacity: 0.7; }
 .tool > .bd { display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 6px 12px; min-width: 0; }
 .tool > .bd .args { font: 400 13px/1.4 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+.tool > .bd .args { max-height: 2.8em; overflow: hidden; }
 .tool > .bd .out { font: 400 11px/1.4 var(--mono); color: var(--g3); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 2.8em; overflow: hidden; }
 .tool > .bd .err { font: 400 11px/1.4 var(--mono); color: var(--tang); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 4.2em; overflow: hidden; }
 .tool > .bd .warn { font: 400 11px/1.4 var(--mono); color: var(--amber); }
@@ -951,3 +952,30 @@ button { cursor: pointer; }
 .sess[data-active="1"] .del { color: #000; }
 .sess[data-run="1"] .rt { color: var(--tang); }
 .sess[data-active="1"][data-run="1"] .rt { color: #000; }
+
+/* expanded state: the clamp must actually lift (data-expanded was missing
+   for a while, which left the button clicking against a fixed max-height) */
+.tool[data-expanded="1"] > .bd .args { max-height: none; }
+/* expanded output can be long: cap it and scroll inside instead of pushing
+   the whole transcript down by 700px */
+.tool[data-expanded="1"] > .bd .out,
+.tool[data-expanded="1"] > .bd .err {
+  max-height: 52vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--g1) transparent;
+}
+
+.tool > .bd .more {
+  align-self: flex-start;
+  margin-top: 1px;
+  padding: 2px 0 0;
+  background: transparent;
+  font: 700 9.5px/1.3 var(--din);
+  letter-spacing: 0.14em;
+  color: var(--ice);
+  text-align: left;
+}
+.tool > .bd .more:hover { color: var(--w); }
+.tool > .bd .more:focus-visible { color: var(--w); outline: 1px solid var(--ice); outline-offset: 2px; }
+.tool[data-toggle="1"] > .bd { cursor: pointer; }

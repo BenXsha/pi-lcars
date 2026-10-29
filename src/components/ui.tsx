@@ -213,9 +213,12 @@ export function ToolStrip(props: {
   const visible = state === "error" ? 3 : 2;
   const shown = props.expanded ? lines : lines.slice(0, visible);
   const hidden = lines.length - shown.length;
+  // long commands wrap too; offer the toggle even when the output is short
+  const argsLong = (props.args || "").length > 88;
+  const canToggle = !!props.onToggle && (hidden > 0 || argsLong);
 
   return (
-    <div class="tool" data-state={state}>
+    <div class="tool" data-state={state} data-expanded={props.expanded ? "1" : "0"} data-toggle={canToggle ? "1" : "0"}>
       <div class="st" />
       <div class="nm">
         <Icon name={props.icon} size={12} />
@@ -226,12 +229,15 @@ export function ToolStrip(props: {
       </div>
       <div class="bd">
         <div class="args">{props.args}</div>
-        {shown.length ? (
-          <div class={state === "error" ? "err" : "out"}>{shown.join("\n")}</div>
-        ) : null}
-        {hidden > 0 && props.onToggle ? (
-          <button type="button" class="more" onClick={props.onToggle}>
-            + {hidden} LINES
+        {shown.length ? <div class={state === "error" ? "err" : "out"}>{shown.join("\n")}</div> : null}
+        {canToggle ? (
+          <button
+            type="button"
+            class="more"
+            aria-expanded={props.expanded ? "true" : "false"}
+            onClick={props.onToggle}
+          >
+            {props.expanded ? "− COLLAPSE" : hidden > 0 ? `+ ${hidden} MORE LINES` : "EXPAND"}
           </button>
         ) : null}
         {props.truncated ? <div class="warn">warning: output truncated</div> : null}
