@@ -1,5 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { Icon, type IconName } from "./Icon";
+import { Markdown } from "./Markdown";
 
 /* ============================================================
    geometry
@@ -330,7 +331,9 @@ export function MessageRow(props: {
             <span class="tb">{props.thinking}</span>
           </div>
         ) : null}
-        {props.text ? <div class="txt">{props.text}</div> : null}
+        {props.text ? (
+          props.role === "assistant" ? <Markdown text={props.text} /> : <div class="txt">{props.text}</div>
+        ) : null}
         {props.streaming ? (
           <div class="stream">
             <span class="caret" />
