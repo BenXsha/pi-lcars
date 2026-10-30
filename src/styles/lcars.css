@@ -1677,12 +1677,18 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 
 .set-tools { display: flex; flex-wrap: wrap; gap: 4px; max-width: 900px; }
 .set-tool {
-  font: 400 10px/1.3 var(--mono);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font: 400 11px/1.3 var(--mono);
   color: var(--g3);
   background: var(--g0);
   padding: 3px 7px;
   border-radius: var(--r-1);
 }
+.set-tool[data-used="1"] { color: var(--w); background: var(--g1); }
+.set-tool em { font: 400 11px/1.3 var(--mono); font-style: normal; color: var(--cyan); }
+.set-tool em[data-err="1"] { color: var(--tomato); }
 
 /* ============================================================
    hover hints — a small LCARS strip, not an OS tooltip
@@ -1787,7 +1793,7 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
   justify-content: center;
   min-width: 42px;
   height: 24px;
-  font: 700 10px/1 var(--din);
+  font: 700 11px/1 var(--din);
   letter-spacing: 0.1em;
   background: var(--g1);
   color: var(--g3);

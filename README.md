@@ -52,7 +52,7 @@ platform-correct install command instead of failing with a stack trace.
 npm install
 npm run dev      # client at :5173, proxies /api → :4173
 npm run server   # in another shell: real pi session, SSE on :4173
-npm test         # pi-env (18) + endpoints (48) + launcher (28) checks
+npm test         # pi-env (18) + endpoints (50) + launcher (28) + ui (61) checks
 
 SMOKE_MODEL=1 npm test   # also does one real turn + fork (costs a model call)
 ```
@@ -113,8 +113,9 @@ PLAN.md            milestone plan (M0..M9) (repo only, not published)
 
 ## Screens
 
-- `/` — the console: left rail (session list + MCP / SKILLS / PROVIDERS / SETTINGS),
-  shelf controls (workspace / model / thinking), live transcript, pinned composer, resources rail.
+- `/` — the console: left rail (session list + MCP / SKILLS / PROVIDERS / HISTORY / SYSTEM / ABOUT),
+  shelf controls (model / thinking), live transcript, pinned composer, resources rail.
+  Stations are hash-addressable: `/#about`, `/#providers`, …
 - `/?craft` — the primitive sheet (elbows, motion, icons, form language, themes),
   i.e. the visual contract on one page.
 
@@ -122,10 +123,12 @@ PLAN.md            milestone plan (M0..M9) (repo only, not published)
 
 | keys | action |
 |---|---|
+| `⌥1` – `⌥6` (`Alt 1` – `Alt 6`) | jump to a station — the numbers on the rail are the combos |
+| `⌥0` (`Alt 0`) | back to the mission log |
 | `⌘K` / `Ctrl K` | focus the composer |
 | `Enter` | send (steers while a run is active) |
 | `Shift+Enter` | newline |
-| `Esc` | stop the current run |
+| `Esc` | close a deck / tree / viewer, else stop the current run |
 | `⌘B` | collapse / expand the left rail (64px icon rail when collapsed) |
 | `⌘⇧B` | collapse / expand the resources rail |
 

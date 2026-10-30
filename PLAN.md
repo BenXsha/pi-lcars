@@ -43,22 +43,23 @@
 不弹小窗 —— LCARS 里没有浮层小卡片。
 ```
 
-**屏幕清单**（每块单独验收）
+**屏幕清单**（每块单独验收；状态列以代码为准，2026-10-30 对账）
 
-| # | 屏幕 | 内容 |
-|---|---|---|
-| S1 | Transcript | 消息流、工具条、代码、diff、子 agent 舱、审批、通知 |
-| S2 | Sessions | 标签页 + 左侧会话列表（当前/最近/按项目分组） |
-| S3 | History | 全量会话表：名称、cwd、首句、消息数、修改时间、fork 谱系 |
-| S4 | Provider | provider 列表 + 详情表单 + 模型清单 + 测试 |
-| S5 | MCP | 服务器表 + 传输配置 + 探测 + 工具 exposure |
-| S6 | Skills | 清单 + model-invocation 开关 + 重载 + 文件定位 |
-| S7 | Context | 分段条 + token/费用 + compaction 记录 |
-| S8 | Policy | off / risky / all + 超时 + always 清单 |
-| S9 | Tools | loadout 表 + 每工具调用统计 |
-| S10 | 工作区选择 | 新建 / 切会话时选 cwd：路径面包屑 + 目录列表 + 最近使用 |
-| S11 | 模型选择 | 按 provider 分组的模型表：id、context window、cost、当前标记 |
-| S12 | 思考开关 | OFF / LOW / MED / HIGH 四段控件（shelf 上直接循环，deck 里展开选择） |
+| # | 屏幕 | 内容 | 状态 |
+|---|---|---|---|
+| S1 | Transcript | 消息流、工具条、代码、diff、子 agent 舱、审批、通知 | ✅ `views/Console.tsx` · 行语言 + 查看器 |
+| S2 | Sessions | 会话列表（当前/最近/按项目分组） | ✅ 改为**左轨列表**，未做标签页（见 §9） |
+| S3 | History | 全量会话表：名称、cwd、首句、消息数、修改时间、fork 谱系 | ✅ `views/Console.tsx` HISTORY 站 + `server/pi/history.mjs` |
+| S4 | Provider | provider 列表 + 详情表单 + 模型清单 + 测试 | ✅ PROVIDERS 站 |
+| S5 | MCP | 服务器表 + 传输配置 + 探测 + 工具 exposure | ✅ MCP 站（connect 轮询到工具出现） |
+| S6 | Skills | 清单 + 重载 + 文件定位 | ⚠️ model-invocation **开关未做**（只读展示 `disableModelInvocation`） |
+| S7 | Context | 分段条 + token/费用 + compaction 记录 | ✅ 站点**已砍**，内容并入右栏 RESOURCES + compaction summary |
+| S8 | Policy | off / risky / all + 超时 + always 清单 | ✅ 并入 SETTINGS 站（`set.policy` 三段按钮） |
+| S9 | Tools | loadout 表 + 每工具调用统计 | ✅ 并入 SYSTEM 站：loadout 徽标带「本次会话 N× · 平均耗时 · 错误数」，右栏另有调用/失败列表 |
+| S10 | 工作区选择 | 新建 / 切会话时选 cwd：面包屑 + 目录列表 + 最近使用 | ✅ workspace deck（预览 → 提交） |
+| S11 | 模型选择 | 按 provider 分组的模型表：id、context window、cost、当前标记 | ✅ shelf `MODEL` chip → ModelDeck |
+| S12 | 思考开关 | OFF / LOW / MED / HIGH 四段控件 | ✅ shelf `THINK` chip → ThinkDeck |
+| S13 | About | 版本、运行时、依赖与许可证、LCARS 归属、字体、网络姿态 | ✅ ABOUT 站（`#about`），依赖清单由 vite 构建期注入 |
 
 **三条会话级控件的落位（都属于 M0，不是配置页）**
 - 工作区：只影响**新会话**。已开会话的 cwd 不可改（pi 的 context/工具作用域绑定 cwd），
@@ -210,18 +211,18 @@ user | assistant | tool | approval | notice | subagent | diff
 
 ## 5. 里程碑
 
-| # | 内容 | 交付 | 验收 |
-|---|---|---|---|
-| **M0** | 会话注册表 + 落盘 + 每会话 SSE + 标签栏 + **shelf 控件（cwd/模型/思考）** | registry、queue、`/api/session`、`/api/model`、`/api/thinking`、`/api/fs`、TabBar、Shelf | 刷新不丢会话；切标签各自上下文；fork 各自续写；新建时能选目录；切模型下一轮生效；思考关掉后 THINKING 行消失 |
-| **M1** | Provider 配置 + 模型选择 + 测试 | S4 屏幕、`/api/providers` | 新建 provider → 测试拿到模型清单 → 切默认模型 → 下一次对话生效 |
-| **M2** | MCP 配置与管理 | S5 屏幕、`/api/mcp` | 加一个 stdio server → 测试连通 → 工具出现在 02 TOOLS → 关闭后消失 |
-| **M3** | Skills 管理 | S6 屏幕、`/api/skills` | 开关 model-invocation 后下一轮 system prompt 生效；reload 不重启进程 |
-| **M4** | 历史 | S3 屏幕 | 列表按项目分组；搜索命中首句/全文；打开与 fork 正确 |
-| **M5** | Markdown + 代码高亮 + 复制 | stream v2 第一半 | 三种语言高亮正确；长代码折叠；复制到剪贴板 |
-| **M6** | Diff 视图 | stream v2 第二半 | edit 工具产生 hunk 视图；write 显示全新增；行号双列正确 |
-| **M7** | 子 agent 舱 | stream v2 第三半 | 触发 Agent 后舱内出现嵌套工具条；结束后折叠为摘要 |
-| **M8** | 按需出稿（不是固定里程碑） | MasterGo 帧、AGENTS.md §13 | 只在「需要视觉沟通 / 要人工拍板」时出稿：预期是配置表单语言、Diff 块、子 agent 舱这三处 |
-| **M9** | **启动器**：`pi-lcars` 一条命令起全套（pi 后台 + UI + 浏览器）＋ **pi 环境检查** | `bin/pi-lcars.mjs`、`server/pi/sdk.mjs`（后端探测）、`package.json` 的 `bin`/`files`/`prepack`、`test/launch.mjs`、`test/pi-env.mjs` | 全新 clone 一句 `npx pi-lcars` 即可用；全局装后任意目录 `pi-lcars` 直接起；未装 pi 时给安装引导而不是栈；多 release 时自动选可用版本；端口冲突自动偏移；`status` / `stop` / `doctor` 可用（详见 §8） |
+| # | 内容 | 交付 | 验收 | 状态 |
+|---|---|---|---|---|
+| **M0** | 会话注册表 + 落盘 + 每会话 SSE + 标签栏 + **shelf 控件（cwd/模型/思考）** | registry、queue、`/api/session`、`/api/model`、`/api/thinking`、`/api/fs`、Shelf | 刷新不丢会话；切会话各自上下文；fork 各自续写；新建时能选目录；切模型下一轮生效；思考关掉后 THINKING 行消失 | ✅ 标签栏改为左轨列表 |
+| **M1** | Provider 配置 + 模型选择 + 测试 | S4 屏幕、`/api/providers` | 新建 provider → 测试拿到模型清单 → 切默认模型 → 下一次对话生效 | ✅ |
+| **M2** | MCP 配置与管理 | S5 屏幕、`/api/mcp` | 加一个 stdio server → 测试连通 → 工具出现在工具清单 → 关闭后消失 | ✅ 工具清单看 SYSTEM 站（无独立 TOOLS 站） |
+| **M3** | Skills 管理 | S6 屏幕、`/api/skills` | 开关 model-invocation 后下一轮 system prompt 生效；reload 不重启进程 | ⚠️ RELOAD 已做，**开关未做**（pi 侧无写入接口） |
+| **M4** | 历史 | S3 屏幕 | 列表按项目分组；搜索命中首句/全文；打开与 fork 正确 | ✅ 后台扫描 + 缓存 |
+| **M5** | Markdown + 代码高亮 + 复制 | stream v2 第一半 | 三种语言高亮正确；长代码折叠；复制到剪贴板 | ✅ 12 种语言 · hljs |
+| **M6** | Diff 视图 | stream v2 第二半 | edit 工具产生 hunk 视图；write 显示全新增；行号双列正确 | ✅ 双行号 + 整屏 viewer |
+| **M7** | 子 agent 舱 | stream v2 第三半 | 触发 Agent 后舱内出现嵌套工具条；结束后折叠为摘要 | ✅ `nestedCalls → children` |
+| **M8** | 按需出稿（不是固定里程碑） | MasterGo 帧、AGENTS.md §13 | 只在「需要视觉沟通 / 要人工拍板」时出稿 | ⛔ 未做：`boards/` 仍是 web 壳之前的 v1/v2，见 §9 |
+| **M9** | **启动器**：`pi-lcars` 一条命令起全套 ＋ **pi 环境检查** | `bin/pi-lcars.mjs`、`server/pi/sdk.mjs`、`package.json` 的 `bin`/`files`/`prepack`、`test/launch.mjs`、`test/pi-env.mjs` | 全新 clone 一句 `npx pi-lcars` 即可用；未装 pi 给安装引导；多 release 自动选可用版本；端口冲突自动偏移；`status`/`stop`/`doctor` | ✅ 已发 npm `pi-lcars@0.3.0` |
 
 依赖：M0 → (M1,M2,M3,M4 并行) → M5 → M6 → M7 → M9 → M8。
 
@@ -388,3 +389,34 @@ user | assistant | tool | approval | notice | subagent | diff
 - 装两个 release、新版缺 API → 选旧版，doctor 明写 `missing …`。
 - 只有旧版本 → 能启动 + 版本告警。
 - `doctor --json` 单行可解析（`node` / `platform` / `nodeOk` / `selected` / `candidates`）。
+
+---
+
+## 9. 交付对账（2026-10-30）
+
+### 9.1 与计划不同、但已定案
+
+| 项 | 计划 | 实际 | 定案理由 |
+|---|---|---|---|
+| 标签页 | 多标签 TabBar | 左轨会话列表 + `LIVE / QUEUED / HELD` | 一屏看清全部会话状态，标签在 1600 宽下会挤掉主区 |
+| S7 CONTEXT 站 | 独立站 | 砍掉，内容并入右栏 RESOURCES | 上下文是常驻读数，不该"切过去看" |
+| S8 Policy 屏 | 独立屏 | 并入 SETTINGS 的 `set.policy` | 低频设置不值得单独一站 |
+| S9 TOOLS 屏 | 独立屏 | SYSTEM 的 loadout + 本次调用统计 | 新增一站只为一屏统计，收益低于成本 |
+| 子 agent | 独立舱 | 工具行内嵌 children | 少一层容器，层级更平 |
+
+### 9.2 欠账清单（本轮结清）
+
+| # | 欠账 | 状态 |
+|---|---|---|
+| D1 | Skills 的 model-invocation 开关 | **不做**：由 `SKILL.md` frontmatter 决定，写回等于改用户资产。站内保留只读 `AUTO / MANUAL` 徽标 + `OPEN` |
+| D2 | 左轨编号 `01–06` + 数字快捷键（AGENTS §3 R9） | ✅ 补：编号显示 + `1`–`6` 切站、`0` 回日志；输入框内不触发；折叠轨隐藏编号且无溢出 |
+| D3 | `test/ui.mjs`（UI 回归门禁，PLAN §6 风险 4） | ✅ 补：CDP 驱动 61 检查（站切换 + hash、深链、双栏折叠、deck/Esc、主题、composer、序号快捷键、无未捕获异常），并入 `npm test` |
+| D4 | M8 画板与实现脱节 | 待定：只在需要视觉沟通时出「配置表单语言 + Diff 块」局部稿，不再整屏重画 |
+
+### 9.3 本轮修掉的真 bug（不是文档）
+
+- **Composer 渲染崩溃**：`meta.queue` 一处给数字、一处给文本数组，`...(... ?? [])` 抛异常导致整页不再重渲染（表现就是"点哪都没反应"）。服务端统一成数组，客户端 `textList()` 兜底。
+- **Escape 关不掉 deck / 分支树**：只有文件查看器处理 Esc。现在 deck → tree → viewer 依次关闭。
+- **NEW SESSION 布局被旧 CSS 拖成竖排**：`.lnew` 两条同名规则，新规则没重置 `flex-direction: column`，图标在上、标签被挤到底边。
+- **低于 11px 底线的字号**：`10px`（`.tgl`、`.set-tool`、MCP 内联说明）与 `10.5px`（`.set-section`）整体上调到 11px。
+- **`unknown/unknown` 模型**：见 commit `d93b41c`。

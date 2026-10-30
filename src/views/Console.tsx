@@ -222,6 +222,32 @@ export function Console() {
     }
   }, [panes.left, panes.right]);
 
+  // ⌥1–⌥6 (Alt+digit) jump to a station, ⌥0 returns to the mission log.
+  // Plain digits stay free for typing, and the combos are not browser- or
+  // OS-reserved (⌘1–⌘9 are tabs, ⌘⇧3 is a screenshot). e.code is used because
+  // Option+digit yields "¡"-style keys on macOS.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!e.altKey || e.ctrlKey || e.metaKey) return;
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return;
+      const m = /^(?:Digit|Numpad)([0-9])$/.exec(e.code ?? "");
+      if (!m) return;
+      const n = Number(m[1]);
+      if (n === 0) {
+        e.preventDefault();
+        setView("session");
+        return;
+      }
+      if (n >= 1 && n <= NAV.length) {
+        e.preventDefault();
+        setView(NAV[n - 1].view);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       // works while composing too: the composer has no Ctrl/Cmd+B binding
@@ -634,10 +660,10 @@ function Sidenav({
       </div>
 
       <div class="lnav">
-        {NAV.map((n) => (
+        {NAV.map((n, i) => (
           <Station
             key={n.view}
-            num=""
+            num={collapsed ? "" : String(i + 1).padStart(2, "0")}
             label={collapsed ? "" : t(n.key)}
             icon={n.icon}
             tone={n.tone}
@@ -2319,6 +2345,8 @@ function SkillsPanel({ meta, policy }: { meta: ReturnType<typeof getState>["meta
 
 /* ------------------------------------------------------------- settings */
 const SHORTCUTS: [string, string][] = [
+  ["⌥1 – ⌥6  /  Alt 1 – Alt 6", "switch station (the numbers on the rail)"],
+  ["⌥0  /  Alt 0", "back to the mission log"],
   ["⌘K / Ctrl K", "focus the composer"],
   ["ENTER", "send (steer while running)"],
   ["SHIFT+ENTER", "newline"],
@@ -2349,6 +2377,20 @@ function SettingsPanel({
   useEffect(() => {
     api.system().then(setSys).catch(() => {});
   }, []);
+
+  // per-tool call stats for the loadout chips (S9: usage without a new station)
+  const toolStats = useMemo(() => {
+    const acc = new Map<string, { n: number; ms: number; err: number }>();
+    for (const it of items) {
+      if (it.kind !== "tool") continue;
+      const cur = acc.get(it.name) ?? { n: 0, ms: 0, err: 0 };
+      cur.n += 1;
+      if (typeof it.ms === "number") cur.ms += it.ms;
+      if (it.status === "error") cur.err += 1;
+      acc.set(it.name, cur);
+    }
+    return acc;
+  }, [items]);
 
   const flash = (m: string) => {
     setNote(m);
@@ -2477,10 +2519,26 @@ function SettingsPanel({
 
       <div class="set-section">{t("set.tools")} / {meta?.tools.length ?? 0}</div>
       <div class="set-tools">
-        {(meta?.tools ?? []).map((n) => (
-          <span class="set-tool" key={n}>{n}</span>
-        ))}
+        {(meta?.tools ?? []).map((n) => {
+          const st = toolStats.get(n);
+          return (
+            <span class="set-tool" key={n} data-used={st ? "1" : "0"}>
+              {n}
+              {st ? (
+                <em data-err={st.err ? "1" : "0"}>
+                  {st.n}× · {st.ms ? `${Math.round(st.ms / st.n)}ms` : "—"}
+                  {st.err ? ` · ${st.err} err` : ""}
+                </em>
+              ) : null}
+            </span>
+          );
+        })}
       </div>
+      <span class="pv-note">
+        {toolStats.size} of {(meta?.tools ?? []).length} tools used this session ·{" "}
+        {[...toolStats.values()].reduce((n, v) => n + v.n, 0)} calls ·{" "}
+        {[...toolStats.values()].reduce((n, v) => n + v.err, 0)} errors
+      </span>
 
       {note ? <div class="ft-note" style={{ marginTop: "10px" }}>{note}</div> : null}
     </div>

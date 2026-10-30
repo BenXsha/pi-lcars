@@ -216,6 +216,34 @@ try {
     check(`nav ${st.view}: transcript replaced`, !(await inTranscript()));
   }
 
+  /* ------------------------------------------- 4b. station numbering */
+  const nums = await evaluate(`[...document.querySelectorAll('.lnav .station .num')].map((el) => el.textContent)`);
+  check("rail numbers the stations", JSON.stringify(nums) === JSON.stringify(["01", "02", "03", "04", "05", "06"]), JSON.stringify(nums));
+
+  const combo = (n) =>
+    `new KeyboardEvent('keydown', { key: '${n}', code: 'Digit${n}', altKey: true, bubbles: true, cancelable: true })`;
+
+  await evaluate(`window.dispatchEvent(${combo(3)})`);
+  await sleep(300);
+  check("⌥3 jumps to providers", (await h1()) === "PROVIDERS", await h1());
+  check("station shortcut moves the hash", (await hash()) === "#providers", await hash());
+
+  await evaluate(`window.dispatchEvent(${combo(0)})`);
+  await sleep(300);
+  check("⌥0 returns to the mission log", await inTranscript(), await h1());
+
+  // a bare digit must not navigate, and must not be swallowed either
+  const bare = await evaluate(
+    `(() => { const e = new KeyboardEvent('keydown', { key: '3', code: 'Digit3', bubbles: true, cancelable: true }); window.dispatchEvent(e); return e.defaultPrevented; })()`,
+  );
+  await sleep(250);
+  check("bare digits are not station shortcuts", (await inTranscript()) && bare === false);
+
+  // inside a field the combo is left alone (macOS Option+digit types characters)
+  await evaluate(`(() => { const t = document.querySelector('textarea'); t.focus(); t.dispatchEvent(${combo(2)}); })()`);
+  await sleep(250);
+  check("station combo is inert while typing", await inTranscript(), await h1());
+
   /* -------------------------------- 5. back to the session list (bug) */
   const backBySession = await click(".lsessions .sess");
   await sleep(300);
@@ -248,6 +276,15 @@ try {
   await sleep(200);
   check("left pane expands again", (await attr(".app", "data-left")) === leftBefore);
 
+  await click(".pane-foot:not(.is-right)");
+  await sleep(250);
+  const miniNums = await evaluate(`[...document.querySelectorAll('.lnav .station .num')].map((el) => el.textContent.trim())`);
+  check("collapsed rail drops the numbers", miniNums.every((n) => n === ""), JSON.stringify(miniNums));
+  const overflow = await evaluate(`[...document.querySelectorAll('.lnav .station')].some((el) => el.scrollWidth > el.clientWidth + 1)`);
+  check("collapsed stations do not overflow", overflow === false);
+  await click(".pane-foot:not(.is-right)");
+  await sleep(250);
+
   const rightBefore = await attr(".app", "data-right");
   await click(".pane-foot.is-right");
   await sleep(200);
@@ -269,6 +306,9 @@ try {
   /* ----------------------------------------------------- 8. themes */
   await click(".lnav .station:nth-child(5)"); // system
   await sleep(300);
+  const toolNote = await evaluate(`[...document.querySelectorAll('.pv-note')].map((el) => el.textContent).find((t) => t.includes('tools used')) ?? ''`);
+  check("tool loadout reports this-session usage", /tools used this session/.test(toolNote), toolNote.slice(0, 60));
+
   const themeOpts = await evaluate(`[...document.querySelectorAll('.theme-opt')].map((el) => el.textContent.trim())`);
   check("settings lists the themes", Array.isArray(themeOpts) && themeOpts.length >= 4, JSON.stringify(themeOpts));
   const clickedVoy = await evaluate(

@@ -302,6 +302,12 @@ LCARS 原版用 `Swiss 911 Ultra Compressed`（压缩粗体）。**本项目不�
 | 右栏 resource | context 分段条（system/tools/history/free）· tokens · 费用 · 延迟 | usage |
 | 底部 command | 输入框 + `RUN`（回车）· `PLAN`（plan mode）· `STOP`（中断） | keybindings |
 | 阻断层 | 工具审批：`tomato` 块 + `APPROVE / DENY / ALWAYS` | approvals |
+| 左轨 `07 ABOUT` | 版本 · 依赖与许可证 · LCARS 归属 · 字体 · 网络姿态 | package.json + vite `define` + `api/system` |
+
+> ⚠️ 上表的 `02 TOOLS / 03 AGENTS / 04 CONTEXT` 是**最初计划**。实际落地是
+> `01 SESSION` 为默认视图（会话行即入口），导航为 `MCP / SKILLS / PROVIDERS / HISTORY / SYSTEM / ABOUT`，
+> 依次对应 `⌥1`–`⌥6`，`⌥0` 回 mission log；CONTEXT 并入右栏，TOOLS 的 loadout + 调用统计并入 SYSTEM。
+> 以 `src/views/Console.tsx` 的 `NAV` 为准（见 §9 交付对账）。
 
 ### 7.6b 空态补偿（LCARS filler）
 
@@ -543,6 +549,22 @@ composer 上方出现 `QUEUED n` 条带，逐条显示待投递文本 + `deliver
 双列读数说清楚 LINK / INPUT / STREAM / SCOPE，键用 `--amber` 等宽，值用 `--g3` 等宽。
 文案保持"仪表陈述句"，不用营销口吻，也不描述不存在的能力。
 
+### 7.6q ABOUT 站（归属与致谢）
+
+站点存在的原因：说清楚"这东西是谁的、用了谁的代码、致敬了谁"，同时不打断会话。
+
+- **入口**：左轨最后一站 `ABOUT`（第七个），也是 `#about` 深链目标；`Esc`/点会话行返回 mission log。
+- **运行时事实**来自 `GET /api/system`（node、pi SDK 版本、platform、workspace、port、policy），
+  **构建期事实**来自 `vite.config.ts` 的 `define: __APP_INFO__`（版本、许可证、仓库地址、依赖清单）。
+  依赖清单不是手写常量：构建时读每个包的 `package.json` 取 `version` + `license`，所以不会漂移。
+- **归属文案**必须写死三件事：LCARS 出自 TNG(1987)、Michael Okuda 与 Rick Sternbach；三处刻意偏离
+  （一色一义 / 放弃压缩字体 / 编号只放真实数据）；Star Trek 与 LCARS 是 Paramount/CBS 商标、
+  本项目为非官方爱好者作品、不复用原版素材。
+- **字体段**说明字体栈偏好的 MiSans（小米，免费商用）/ D-DIN / IBM Plex Mono（后两者 SIL OFL），
+  并明确"不随包分发字体文件"。
+- **网络段**必须与实现一致：无遥测、默认只绑 `127.0.0.1`、对外流量仅来自 pi 本身。
+- 正文走 `i18n`（中英），包名/许可证/商标声明保持原文，不翻译专有名词。
+
 ### 7.7 会话块（列表项）
 
 会话不是"小卡片"，是**实心块 + 双行读数**：
@@ -689,6 +711,11 @@ composer 上方出现 `QUEUED n` 条带，逐条显示待投递文本 + `deliver
 | 2026-xx-xx | 交付形态定为**一条命令**：`pi-lcars`（bin）= pi 后台 + UI + 浏览器；`dist` 随包发布，构建只在源码检出发生 | `opencode web` 式启动是产品级预期；全局安装不带 vite，不能要求用户先 build | PLAN.md §8（M9）、`bin/pi-lcars.mjs`、`package.json` 的 `bin`/`files`/`prepack` |
 | 2026-xx-xx | 启动前做 **pi 环境检查**：候选按“能 import + 具备所需 API”逐个探测，新版缺 API 就自动退到旧版；没装 pi 就打印平台对应安装命令（不打栈） | 用户机器上 pi 的版本/路径不可预测；“报错但不说怎么办”是启动器的最大摩擦 | `server/pi/sdk.mjs`、`bin/pi-lcars.mjs` 的 `doctor`、`test/pi-env.mjs`；PLAN §8.8 |
 | 2026-xx-xx | 路径一律 `node:os.homedir()` + `node:path`，支持 `PI_CODING_AGENT_DIR` / `PI_PACKAGE_DIR` | 旧代码读 `process.env.HOME`，在 Windows 上为空；pi 官方也提供这两个 env 覆盖 | `server/pi/sdk.mjs`、`server/index.mjs` |
+| 2026-xx-xx | 新增 `07 ABOUT` 站：版本 / 运行时 / 依赖许可 / LCARS 归属 / 字体 / 网络姿态；依赖清单由构建期注入而非手写 | 归因与许可证是可分发项目的基本义务；手写清单必然与 `package.json` 漂移 | `src/views/About.tsx`、`src/appInfo.ts`、`vite.config.ts`、AGENTS §7.6q |
+| 2026-xx-xx | 站点**组合键直连**：`⌥1`–`⌥6`（Alt+数字）切站、`⌥0` 回日志，左轨显示 `01`–`06` | §3 R9「编号即快捷键」此前只写了没接线。不用裸数字（会抢输入），不用 `⌘1–⌘9`（浏览器标签页）与 `⌘⇧3`（macOS 截图）；`⌥` 组合在两端都空闲，靠 `e.code` 取值以避开 macOS `⌥3=£` 的字符化 | `src/views/Console.tsx`、`src/styles/lcars.css` |
+| 2026-xx-xx | 动作条统一为一条语言：40px 中性底 + 4px 橙脊 + 34px 图标格 + 11px 标签，图标格与编号列同轴、标签与标题同轴（50px） | `.lnew` 被两条同名规则叠成竖排（新规则没重置 `flex-direction`），且与 `.sess` 网格对不齐 | `src/styles/lcars.css`（`.lnew`、`.add-row`、`.form-actions`、`.form-note`、`.pv-h`） |
+| 2026-xx-xx | `meta.queue` 只允许文本数组，客户端 `textList()` 兜底 | 服务端一处发数字、一处发数组，`...(... ?? [])` 抛异常后整页停止重渲染（表现为"点什么都没反应"） | `server/pi/registry.mjs`、`src/views/Console.tsx` |
+| 2026-xx-xx | `Esc` 统一关闭覆盖层：deck → 分支树 → 查看器 → 否则中断运行 | 只有查看器响应 Esc，deck/树关不掉，与"覆盖层可 Esc 关闭"的直觉冲突 | `src/views/Console.tsx` |
 | 2026-xx-xx | 新会话在 `#load()` 里补齐默认模型与思考档：`createAgentSession()` 不传 model 时 pi 会停在 `unknown/unknown`，导致 shelf 与 `pi-lcars status` 显示假值 | “unknown/unknown” 违反 §7.6 数字自洽；同时它让 pi-lens 把 situational 工具当默认激活，工具清单虚高 | `server/pi/registry.mjs`、`test/smoke.mjs` |
 
 ---
