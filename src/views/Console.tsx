@@ -95,6 +95,26 @@ function useLayoutWidths() {
   return dims;
 }
 
+/** One exchange = one user message plus everything the agent did for it. */
+type Turn = { id: string; n: number; text: string; ts: number; tools: number; tokens: number; items: number };
+
+function buildTurns(items: Item[]): Turn[] {
+  const turns: Turn[] = [];
+  let cur: Turn | null = null;
+  for (const it of items) {
+    if (it.kind === "user") {
+      cur = { id: it.id, n: turns.length + 1, text: it.text, ts: it.ts, tools: 0, tokens: 0, items: 0 };
+      turns.push(cur);
+      continue;
+    }
+    if (!cur) continue;
+    cur.items++;
+    if (it.kind === "tool") cur.tools++;
+    if (it.kind === "assistant" && it.usage) cur.tokens += it.usage.output || 0;
+  }
+  return turns;
+}
+
 function useStore() {
   const [, force] = useState(0);
   useEffect(() => subscribe(() => force((n) => n + 1)), []);
@@ -109,7 +129,7 @@ export function Console() {
   const [sideMode, setSideMode] = useState<"sessions" | "files">("sessions");
   const [previewCwd, setPreviewCwd] = useState<string | null>(null);
   const [viewer, setViewer] = useState<{ path: string; diff?: DiffData } | null>(null);
-  const [activePrompt, setActivePrompt] = useState<string | null>(null);
+  const [activeTurn, setActiveTurn] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
   const [panes, setPanes] = useState(() => {
     const read = (k: string) => {
@@ -124,6 +144,31 @@ export function Console() {
   const [theme, setTheme] = useState<ThemeId>(appliedTheme());
 
   useEffect(() => connect(), []);
+
+  // which exchange is under the reading position — drives the outline marker
+  useEffect(() => {
+    const sc = document.getElementById("scroll");
+    if (!sc) return;
+    let raf = 0;
+    const onScroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        const rows = [...sc.querySelectorAll<HTMLElement>('[data-turn="1"]')];
+        if (!rows.length) return setActiveTurn(null);
+        const line = sc.getBoundingClientRect().top + 80;
+        let current = rows[0].dataset.id ?? null;
+        for (const r of rows) if (r.getBoundingClientRect().top <= line) current = r.dataset.id ?? current;
+        setActiveTurn(current);
+      });
+    };
+    sc.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => {
+      sc.removeEventListener("scroll", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [viewer, view, s.activeId]);
 
   // locale / scale / motion live in a module store; the shell re-renders on change
   const [, bumpSettings] = useState(0);
@@ -284,15 +329,22 @@ export function Console() {
                 meta={meta}
                 queue={s.queue}
                 width={rail}
-                prompts={s.items.filter((i): i is Extract<Item, { kind: "user" }> => i.kind === "user")}
+                turns={buildTurns(s.items)}
                 onJump={(id) => {
                   setViewer(null);
-                  setActivePrompt(id);
                   requestAnimationFrame(() => {
-                    document.querySelector(`#scroll [data-id="${id}"]`)?.scrollIntoView({ block: "center" });
+                    document.querySelector(`#scroll [data-id="${id}"]`)?.scrollIntoView({ block: "start" });
+                    setActiveTurn(id);
                   });
                 }}
-                activePrompt={activePrompt}
+                onLatest={() => {
+                  setViewer(null);
+                  requestAnimationFrame(() => {
+                    const sc = document.getElementById("scroll");
+                    if (sc) sc.scrollTop = sc.scrollHeight;
+                  });
+                }}
+                activeTurn={activeTurn}
                 onToggle={() => setPanes((p) => ({ ...p, right: !p.right }))}
               />
             ) : (
@@ -576,7 +628,7 @@ function Transcript({
 
         if (it.kind === "user") {
           return (
-            <div class={cls} key={it.id} data-id={it.id}>
+            <div class={cls} key={it.id} data-id={it.id} data-turn="1">
               <MessageRow role="user" time={`T+${mmss(it.ts - t0)}`} text={it.text} />
               {it.steer || it.queued ? (
                 <div style={{ marginLeft: "88px", marginTop: "2px", font: "700 10px/1.4 var(--din)", letterSpacing: "0.14em", color: it.steer ? "var(--orange)" : "var(--moon)" }}>
@@ -736,22 +788,23 @@ function Rail({
   meta,
   queue,
   width,
-  prompts,
-  activePrompt,
+  turns,
+  activeTurn,
   onJump,
+  onLatest,
   onToggle,
 }: {
   items: Item[];
   meta: ReturnType<typeof getState>["meta"];
   queue: { waiting: string[] };
   width: number;
-  prompts: Extract<Item, { kind: "user" }>[];
-  activePrompt: string | null;
+  turns: Turn[];
+  activeTurn: string | null;
   onJump: (id: string) => void;
+  onLatest: () => void;
   onToggle: () => void;
 }) {
-  const [allPrompts, setAllPrompts] = useState(false);
-  const shownPrompts = allPrompts ? prompts : prompts.slice(-6);
+
   const stats = useMemo(() => {
     const out: Record<string, { calls: number; fails: number; trunc: number }> = {};
     for (const it of items) {
@@ -765,6 +818,16 @@ function Rail({
   }, [items]);
 
   const fails = items.filter((i) => i.kind === "tool" && i.status === "error") as Extract<Item, { kind: "tool" }>[];
+  const listRef = useRef<HTMLDivElement>(null);
+
+  // keep the active exchange visible inside the outline's own scroller
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list || !activeTurn) return;
+    const row = list.querySelector<HTMLElement>(`[data-tid="${activeTurn}"]`);
+    if (!row) return;
+    list.scrollTop = Math.max(0, row.offsetTop - list.clientHeight / 2 + row.clientHeight / 2);
+  }, [activeTurn]);
   const usage = meta?.usage ?? { input: 0, output: 0, cost: 0, total: 0 };
   const pct = meta?.contextPct ?? 0;
   const win = meta?.contextWindow ?? 200000;
@@ -772,40 +835,6 @@ function Rail({
   return (
     <aside class="rail" style={{ width: `${width}px`, flex: `0 0 ${width}px` }}>
       <div class="rail-body">
-      <div class="phead lav">{t("rail.prompts")} / {prompts.length}</div>
-      <div class="panel">
-        {prompts.length === 0 ? <div class="pv-note">nothing sent yet in this session</div> : null}
-        {prompts.length > 6 && !allPrompts ? (
-          <button type="button" class="pv-more" onClick={() => setAllPrompts(true)}>
-            + {prompts.length - 6} EARLIER
-          </button>
-        ) : null}
-        <div class="plist">
-          {shownPrompts.map((p) => {
-            const n = prompts.indexOf(p) + 1;
-            return (
-              <button
-                type="button"
-                key={p.id}
-                class="prow"
-                data-active={p.id === activePrompt ? "1" : "0"}
-                title={p.text}
-                onClick={() => onJump(p.id)}
-              >
-                <span class="pn">{String(n).padStart(2, "0")}</span>
-                <span class="pt">{p.text.replace(/\s+/g, " ")}</span>
-                <span class="pw">{new Date(p.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
-              </button>
-            );
-          })}
-        </div>
-        {allPrompts && prompts.length > 6 ? (
-          <button type="button" class="pv-more" onClick={() => setAllPrompts(false)}>
-            − COLLAPSE
-          </button>
-        ) : null}
-      </div>
-
       <div class="phead">RESOURCES</div>
       <div class="panel">
         <div class="ctx-top">
@@ -853,6 +882,39 @@ function Rail({
           </div>
         </>
       ) : null}
+
+      <div class="phead lav">
+        <span>{t("rail.chats")} / {turns.length}</span>
+        <button type="button" class="phead-act" onClick={onLatest}>
+          LATEST
+        </button>
+      </div>
+      <div class="panel">
+        {turns.length === 0 ? <div class="pv-note">no exchanges yet</div> : null}
+        <div class="tlist" ref={listRef}>
+          {turns.map((tn) => (
+            <button
+              type="button"
+              key={tn.id}
+              class="trow"
+              data-tid={tn.id}
+              data-active={tn.id === activeTurn ? "1" : "0"}
+              title={tn.text}
+              onClick={() => onJump(tn.id)}
+            >
+              <span class="tn">{String(tn.n).padStart(2, "0")}</span>
+              <span class="tbody">
+                <span class="tt">{tn.text.replace(/\s+/g, " ")}</span>
+                <span class="tm">
+                  {tn.tools ? `${tn.tools} tool${tn.tools > 1 ? "s" : ""}` : "no tools"}
+                  {tn.tokens ? ` · ${tn.tokens >= 1000 ? `${(tn.tokens / 1000).toFixed(1)}K` : tn.tokens} tok` : ""}
+                  {` · ${new Date(tn.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`}
+                </span>
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
 
       <div class="phead cyan">SYSTEM</div>
       <div class="panel">

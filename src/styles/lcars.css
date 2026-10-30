@@ -1984,40 +1984,62 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 }
 
 /* ============================================================
-   prompt index — jump back to anything you sent
+   turn outline — a map of the conversation, not a list of prompts
    ============================================================ */
-.plist { display: flex; flex-direction: column; gap: 1px; }
-.prow {
+.phead { justify-content: space-between; }
+.phead-act {
+  font: 700 9px/1 var(--din);
+  letter-spacing: 0.12em;
+  color: #000;
+  opacity: 0.55;
+  padding: 2px 0 2px 8px;
+}
+.phead-act:hover { opacity: 1; }
+
+.tlist {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: 208px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--g1) transparent;
+  padding-right: 2px;
+}
+.trow {
   display: grid;
-  grid-template-columns: 26px minmax(0, 1fr) auto;
+  grid-template-columns: 24px minmax(0, 1fr);
   gap: 8px;
-  align-items: baseline;
-  min-height: 26px;
-  padding: 2px 4px 2px 0;
+  align-items: start;
+  padding: 4px 6px 4px 0;
   text-align: left;
   border-radius: 0 var(--r-1) var(--r-1) 0;
   box-shadow: inset 2px 0 0 transparent;
 }
-.prow:hover { background: var(--g0); box-shadow: inset 2px 0 0 var(--g1); }
-.prow[data-active="1"] { background: var(--g1); box-shadow: inset 2px 0 0 var(--orange); }
-.prow .pn {
-  font: 700 9.5px/1.5 var(--din);
-  letter-spacing: 0.06em;
+.trow:hover { background: var(--g0); box-shadow: inset 2px 0 0 var(--g1); }
+.trow[data-active="1"] { background: var(--g1); box-shadow: inset 2px 0 0 var(--orange); }
+.trow .tn {
+  font: 700 9.5px/1.6 var(--din);
+  letter-spacing: 0.04em;
   color: var(--orange);
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
-.prow .pt {
-  font: 400 11px/1.5 var(--text);
+.tbody { display: flex; flex-direction: column; gap: 0; min-width: 0; }
+.tbody .tt {
+  font: 400 11.5px/1.45 var(--text);
   color: var(--g3);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.prow[data-active="1"] .pt { color: var(--w); }
-.prow .pw {
-  font: 400 9px/1.5 var(--din);
+.trow[data-active="1"] .tt { color: var(--w); }
+.tbody .tm {
+  font: 400 9px/1.4 var(--din);
   letter-spacing: 0.06em;
   color: var(--g2);
   font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

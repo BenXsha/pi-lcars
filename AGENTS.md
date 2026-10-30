@@ -414,12 +414,15 @@ Codex 的做法是：**工作区在你开 session 时就定了，之后不可变
 - 左侧 2px `--g1` 竖脊 + `--g0` 悬停底，整块是 `<button aria-expanded>`，键盘可用。
 - 不显示 token 数（SDK 不给 reasoning token），只给词数，避免编数字。
 
-**提示词索引**（右栏顶部，`PROMPTS / N`）：
+**往来索引**（右栏倒数第二块，`CHATS / N`，在 RESOURCES / TOOL CALLS / FAILURES 之后）：
 
-- 只列 `kind === "user"` 的条目，编号 01…N 与顺序一致，右侧是本地时间。
-- 单击 → 关掉查看器（如果在开）→ 用 `data-id` 把对应行 `scrollIntoView({block:"center"})`，并高亮该行
-  （`inset 2px --orange`）。这是唯一的跳转方式：不改筛选、不重排。
-- 默认显示最近 6 条，更多折叠成 `+N EARLIER`；每条单行省略，`title` 存全文。
+- 单位是**一次往来**（user 消息 + 它引发的全部 assistant/tool 条），不是"我发过的 prompt 列表"。
+  每行两段：`01 用户首句（单行省略）` + `3 tools · 12.4K tok · 10:31`，让"这一轮干了多少事"可扫。
+- **位置随阅读走**：`#scroll` 上监听滚动，取视口上方 80px 处之上最后一个 `[data-turn]`，
+  该行 `inset 2px --orange` 高亮，并在列表自己的滚动区里居中（不带动整页）。
+- 单击 → 关查看器（如果在开）→ `scrollIntoView({block:"start"})`；标题栏 `LATEST` 直接回到底部。
+- 列表自身 `max-height: 208px` 内部滚动 —— 长会话靠滚动而不是"+N EARLIER"分页，索引才有"地图"感。
+- 空态写明 `no exchanges yet`；不做筛选、不重排，索引只负责定位。
 
 ### 7.6h 内置查看器（文件 / 差异）
 
