@@ -104,7 +104,7 @@ function useStore() {
 export function Console() {
   const s = useStore();
   const [view, setView] = useState<View>("session");
-  const [deck, setDeck] = useState<null | "cwd" | "model" | "think">(null);
+  const [deck, setDeck] = useState<null | "new" | "model" | "think">(null);
   const [sideMode, setSideMode] = useState<"sessions" | "files">("sessions");
   const [previewCwd, setPreviewCwd] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
@@ -166,7 +166,12 @@ export function Console() {
         onMode={setSideMode}
         previewCwd={previewCwd}
         flash={flash}
-        onPickWorkspace={() => previewCwd && setDeck("cwd")}
+        onNewSession={() => {
+          setDeck("new");
+          setSideMode("files");
+          setPreviewCwd(null);
+        }}
+        onPickWorkspace={() => previewCwd && setDeck("new")}
       />
 
       <div class="main">
@@ -176,18 +181,6 @@ export function Console() {
         >
           {meta ? (
             <>
-              <ControlChip
-                icon="fld-path"
-                label="WORKSPACE"
-                value={shortPath(meta.cwd)}
-                open={deck === "cwd"}
-                onClick={() => {
-                  const next = deck === "cwd" ? null : "cwd";
-                  setDeck(next);
-                  setSideMode(next ? "files" : sideMode);
-                  setPreviewCwd(next ? meta?.cwd ?? null : null);
-                }}
-              />
               <ControlChip
                 icon="fld-model"
                 label="MODEL"
@@ -210,10 +203,9 @@ export function Console() {
           <span class="shelf-tag">{view === "session" ? "MISSION LOG" : view.toUpperCase()}</span>
         </Shelf>
 
-        {deck === "cwd" ? (
-          <CwdDeck
+        {deck === "new" ? (
+          <NewSessionDeck
             currentCwd={meta?.cwd ?? ""}
-            preview={previewCwd ?? meta?.cwd ?? ""}
             onPreview={setPreviewCwd}
             recents={[...new Set(s.sessions.map((x) => x.cwd))].filter(Boolean).slice(0, 4)}
             onUse={async (path) => {
@@ -221,7 +213,7 @@ export function Console() {
               setDeck(null);
               setPreviewCwd(null);
               setSideMode("files");
-              setFlash(`workspace → ${shortPath(path)} · new session`);
+              setFlash(`new session in ${shortPath(path)}`);
               setTimeout(() => setFlash(null), 3200);
             }}
             onClose={() => {
@@ -348,6 +340,7 @@ function Sidenav({
   onMode,
   previewCwd,
   flash,
+  onNewSession,
   onPickWorkspace,
 }: {
   sessions: { id: string; name?: string; title?: string | null; items: number; running: boolean; queued: boolean; lastTs: number | null; pending: boolean; modelId: string; cwd: string }[];
@@ -362,6 +355,7 @@ function Sidenav({
   onMode: (m: "sessions" | "files") => void;
   previewCwd: string | null;
   flash: string | null;
+  onNewSession: () => void;
   onPickWorkspace: () => void;
 }) {
   const sorted = [...sessions].sort((a, b) => (b.lastTs ?? 0) - (a.lastTs ?? 0));
@@ -405,9 +399,9 @@ function Sidenav({
 
       {mode === "files" && !collapsed ? (
         <FileTree
-          root={previewCwd ?? cwd}
-          preview={!!previewCwd && previewCwd !== cwd}
-          notice={flash}
+          root={previewCwd && previewCwd.startsWith(cwd) ? previewCwd : cwd}
+          preview={!!previewCwd && previewCwd.startsWith(cwd) && previewCwd !== cwd}
+          notice={previewCwd && !previewCwd.startsWith(cwd) ? "preview limited to the current workspace — the choice still applies to the new session" : flash}
           onPickWorkspace={onPickWorkspace}
         />
       ) : null}
@@ -418,7 +412,7 @@ function Sidenav({
         style={mode === "files" ? { display: "none" } : undefined}
         data-tip={t("side.new")}
         aria-label={t("side.new")}
-        onClick={() => { actions.newSession(); onView("session"); }}
+        onClick={onNewSession}
       >
         <span class="ic">
           <Icon name="act-new" size={15} />
@@ -815,25 +809,28 @@ function Rail({
 }
 
 /* ----------------------------------------------------------------- decks */
-function CwdDeck({
+/**
+ * New session chooser. A session's workspace is fixed once it exists, so this
+ * is the only place a directory is chosen — and it browses the *filesystem*
+ * (home / root / volumes), not the current session's cwd.
+ */
+function NewSessionDeck({
   currentCwd,
-  preview,
   onPreview,
   recents,
   onUse,
   onClose,
 }: {
   currentCwd: string;
-  preview: string;
-  onPreview: (path: string) => void;
+  onPreview: (path: string | null) => void;
   recents: string[];
   onUse: (path: string) => void;
   onClose: () => void;
 }) {
-  const [data, setData] = useState<{ path: string; parent: string | null; dirs: DirEntry[] } | null>(null);
+  const [data, setData] = useState<{ path: string; parent: string | null; dirs: DirEntry[]; home: string; roots: { label: string; path: string }[] } | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
-  const load = (path: string) =>
+  const load = (path?: string) =>
     api
       .fs(path)
       .then((d) => {
@@ -844,50 +841,63 @@ function CwdDeck({
       .catch((e) => setErr(e.message));
 
   useEffect(() => {
-    load(preview || currentCwd);
-  }, [currentCwd]);
+    // start from the filesystem home, not the session's cwd
+    load("");
+  }, []);
 
-  const same = data?.path === currentCwd;
+  const chosen = data?.path ?? "";
+
+  const crumbs = chosen.split("/").filter(Boolean);
+  const crumbPath = (i: number) => "/" + crumbs.slice(0, i + 1).join("/");
 
   return (
     <Deck
-      label="WORKSPACE"
-      sub={same ? "CURRENT SESSION" : "NEW SESSION ONLY"}
+      label="NEW SESSION"
+      sub="CHOOSE A WORKSPACE"
       actions={
         <>
           <BarButton tone="quiet" label="UP" icon="act-expand" disabled={!data?.parent} onClick={() => data?.parent && load(data.parent)} />
           <BarButton tone="quiet" label="CANCEL" icon="act-close" onClick={onClose} />
-          <BarButton tone="ok" label={same ? "CURRENT" : "START SESSION HERE"} icon="act-new" disabled={!data || same} onClick={() => data && onUse(data.path)} />
+          <BarButton tone="ok" label="START SESSION" icon="act-new" disabled={!chosen} onClick={() => chosen && onUse(chosen)} />
         </>
       }
     >
-      <div class="ws-path">
-        {shortPath(data?.path ?? preview ?? currentCwd)}
-        <span>{same ? "· this session's workspace (fixed)" : "· the file tree follows this preview"}</span>
+      <div class="ws-crumbs">
+        <button type="button" class="ws-crumb" onClick={() => load("/")}>
+          /
+        </button>
+        {crumbs.map((c, i) => (
+          <button type="button" class="ws-crumb" key={crumbPath(i)} onClick={() => load(crumbPath(i))}>
+            {c}
+          </button>
+        ))}
       </div>
+
+      <div class="ws-recent">
+        <span class="lb">GO TO</span>
+        {(data?.roots ?? []).map((r) => (
+          <button type="button" key={r.path} class="ws-chip" onClick={() => load(r.path)}>
+            {r.label}
+          </button>
+        ))}
+        {recents.length ? <span class="lb">RECENT</span> : null}
+        {recents.map((c) => (
+          <button type="button" key={c} class="ws-chip" data-current={c === currentCwd ? "1" : "0"} onClick={() => load(c)}>
+            {shortPath(c).split("/").slice(-2).join("/")}
+          </button>
+        ))}
+      </div>
+
       {err ? <div style={{ font: "400 11px/1.5 var(--mono)", color: "var(--tomato)" }}>{err}</div> : null}
 
-      {(recents ?? []).length ? (
-        <div class="ws-recent">
-          <span class="lb">RECENT</span>
-          {recents.map((c) => (
-            <button type="button" key={c} class="ws-chip" data-current={c === currentCwd ? "1" : "0"} onClick={() => load(c)}>
-              {shortPath(c).split("/").slice(-2).join("/")}
-            </button>
-          ))}
-        </div>
-      ) : null}
-
-      {(data?.dirs ?? []).slice(0, 7).map((d) => (
-        <PickRow
-          key={d.path}
-          icon="fld-path"
-          name={d.name}
-          meta={`${d.items != null ? `${d.items} items` : ""}${d.path === currentCwd ? " · current" : ""}`}
-          selected={d.path === currentCwd}
-          onClick={() => load(d.path)}
-        />
+      {(data?.dirs ?? []).slice(0, 8).map((d) => (
+        <PickRow key={d.path} icon="fld-path" name={d.name} meta={d.items != null ? `${d.items} items` : ""} onClick={() => load(d.path)} />
       ))}
+
+      <div class="ws-path">
+        {shortPath(chosen)}
+        <span>{chosen === currentCwd ? "· same as the current session" : "· this becomes the session workspace"}</span>
+      </div>
     </Deck>
   );
 }

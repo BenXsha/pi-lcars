@@ -261,7 +261,9 @@ export const api = {
   openPath: (path: string, mode: "editor" | "reveal" | "default" = "editor") =>
     post<{ cmd: string; args: string[] }>("/api/open", { path, mode }),
   fs: (path?: string) =>
-    call<{ path: string; parent: string | null; dirs: DirEntry[] }>(`/api/fs${path ? `?path=${encodeURIComponent(path)}` : ""}`),
+    call<{ path: string; parent: string | null; dirs: DirEntry[]; home: string; roots: { label: string; path: string }[] }>(
+      `/api/fs${path ? `?path=${encodeURIComponent(path)}` : ""}`,
+    ),
 };
 
 export type StreamEvent =

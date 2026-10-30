@@ -1855,3 +1855,15 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 }
 .ws-chip:hover { color: var(--w); background: var(--g1); }
 .ws-chip[data-current="1"] { color: var(--orange); box-shadow: inset 0 0 0 1px var(--orange); }
+
+/* workspace breadcrumb */
+.ws-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; padding: 2px 0 4px; }
+.ws-crumb {
+  font: 400 11px/1.3 var(--mono);
+  color: var(--g3);
+  padding: 2px 4px;
+  border-radius: var(--r-1);
+}
+.ws-crumb + .ws-crumb::before { content: "/"; color: var(--g2); margin-right: 4px; }
+.ws-crumb:hover { color: var(--w); background: var(--g0); }
+.ws-crumb:last-child { color: var(--w); }

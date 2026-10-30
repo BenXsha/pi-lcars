@@ -485,7 +485,8 @@ const routes = {
 
   "GET /api/fs": async (req, res) => {
     const url = new URL(req.url, "http://x");
-    const target = resolve(url.searchParams.get("path") || CWD);
+    // no path → start at the filesystem home: this is a picker, not a cwd viewer
+    const target = resolve(url.searchParams.get("path") || (process.env.HOME || "/"));
     try {
       const entries = await readdir(target, { withFileTypes: true });
       const dirs = [];
@@ -503,10 +504,28 @@ const routes = {
       }
       dirs.sort((a, b) => a.name.localeCompare(b.name));
       const info = await stat(target);
+      const home = process.env.HOME || "/";
+      const roots = [
+        { label: "HOME", path: home },
+        { label: "ROOT", path: "/" },
+        { label: "PROJECTS", path: join(home, "Projects") },
+      ].filter((r) => r.path);
+      if (process.platform === "darwin") {
+        try {
+          for (const v of await readdir("/Volumes")) {
+            if (v === "Macintosh HD") continue;
+            roots.push({ label: `VOL ${v}`, path: join("/Volumes", v) });
+          }
+        } catch {
+          /* no volumes */
+        }
+      }
       ok(res, {
         path: target,
         parent: dirname(target) === target ? null : dirname(target),
         dirs,
+        home,
+        roots,
         readable: info.isDirectory(),
       });
     } catch (e) {

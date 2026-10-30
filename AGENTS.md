@@ -323,8 +323,13 @@ Codex 的做法是：**工作区在你开 session 时就定了，之后不可变
 换工作区 = 开新 session，并且会显式告诉你"这是新会话"。本地照此实现：
 
 - **cwd 是会话属性**，运行中不可改（pi 的 context 与工具作用域都绑在 cwd 上）。UI 上明确标注 `this session's workspace (fixed)`。
-- **两段式：预览 → 提交**。打开 WORKSPACE deck 即切到 FILES 模式；浏览目录 = 文件树同步跟着走（`PREVIEW` 徽标 + 头部路径变 amber），
-  但**不会**动当前会话。确认了才点 `START SESSION HERE` 建新会话。
+- **入口只有 NEW SESSION**：页头不放工作区切换器。点 NEW SESSION 弹出选择器，**必选目录才能建会话**。
+- **选择器从文件系统根出发，不是从当前 cwd**：默认落在 `~`，顶部是面包屑（`/ Users name Projects …` 可点），
+  `GO TO` 提供 HOME / ROOT / PROJECTS（macOS 另加 `/Volumes` 挂载卷），`RECENT` 列出已有会话的 cwd。
+  `GET /api/fs` 不带 `path` 时返回 home —— 这是选择器，不是"当前目录浏览器"。
+- **两段式：预览 → 提交**。浏览目录时文件树跟着走（`PREVIEW` 徽标 + amber 路径），但**不动当前会话**；
+  **预览只在工作区内生效**（`/api/tree` 有越界保护），超出时文件树停在原处并显示一行说明，
+  以免让人以为"树跟丢了"。确认后 `START SESSION` 才建会话。
 - **联动是双向的**：deck 里的目录点击驱动文件树根；文件树头部的 `USE` 按钮 / 路径也能回到 deck。
 - **提交后的反馈**：文件树保留在新工作区、显示 `workspace → ~/x · new session`，工具栏 WORKSPACE chip 同步更新，
   deck 自动关闭、PREVIEW 徽标消失。会话列表里多出一条（新会话）。
