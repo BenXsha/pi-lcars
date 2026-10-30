@@ -12,7 +12,7 @@ import { readFile, readdir, stat } from "node:fs/promises";
 import { extname, join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { loadSdk, agentDir, sdkSpec } from "./pi/sdk.mjs";
+import { loadSdk, agentDir, sdkSpec, sdkInfo, MIN_NODE } from "./pi/sdk.mjs";
 import { Approvals } from "./pi/approval.mjs";
 import { createQueue } from "./pi/queue.mjs";
 import { Registry } from "./pi/registry.mjs";
@@ -28,11 +28,17 @@ import { listProviders, listProviderModels, testProvider, setDefaultModel, setPr
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, "..");
 const DIST = join(ROOT, "dist");
-const PORT = Number(process.env.PORT || 4173);
-const CWD = resolve(process.env.PI_CWD || process.cwd());
-const SESSION_DIR = process.env.LCARS_SESSIONS || undefined;
-const TRUST = process.env.LCARS_TRUST_PROJECT !== "0";
-const RESUME = process.env.LCARS_RESUME === "1";
+
+/* Runtime config. Env defaults keep `node server/index.mjs` working on its own;
+ * start(opts) overrides them before anything is created. */
+let PORT = Number(process.env.PORT || 4173);
+let HOST = process.env.HOST || "127.0.0.1";
+let CWD = resolve(process.env.PI_CWD || process.cwd());
+let SESSION_DIR = process.env.LCARS_SESSIONS || undefined;
+let TRUST = process.env.LCARS_TRUST_PROJECT !== "0";
+let RESUME = process.env.LCARS_RESUME === "1";
+let POLICY = (process.env.LCARS_POLICY || "off").toLowerCase();
+let LOG = true;
 
 /* --------------------------------------------------------------- plumbing */
 const clients = new Set();
@@ -89,7 +95,7 @@ let bootPromise = null;
 const booted = () => bootPromise ?? Promise.resolve();
 const sdk = await loadSdk();
 const approvals = new Approvals({
-  policy: (process.env.LCARS_POLICY || "off").toLowerCase(),
+  policy: POLICY,
   timeoutMs: Number(process.env.LCARS_APPROVAL_TIMEOUT || 120_000),
 });
 const queue = createQueue({
@@ -333,7 +339,7 @@ const routes = {
     try {
       models = rt.getAvailableSnapshot?.() ?? [];
       if (!models.length) models = await rt.getAvailable();
-    } catch (e) {
+    } catch {
       models = rt.getModels?.() ?? [];
     }
     ok(res, {
@@ -374,6 +380,8 @@ const routes = {
       node: process.version,
       platform: `${process.platform} ${process.arch}`,
       piVersion: sdk.VERSION ?? null,
+      sdkVersion: sdkInfo()?.selected?.version ?? sdk.VERSION ?? null,
+      nodeMin: MIN_NODE,
       sdk: sdkPath,
       agentDir: agentDir(),
       cwd: CWD,
@@ -619,7 +627,8 @@ const routes = {
 };
 
 /* ---------------------------------------------------------------- server */
-const server = createServer(async (req, res) => {
+let server = null;
+const handler = async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
   const key = `${req.method} ${url.pathname}`;
 
@@ -650,34 +659,118 @@ const server = createServer(async (req, res) => {
       res.end(shell);
     } catch {
       res.writeHead(503, { "content-type": "text/plain; charset=utf-8" });
-      res.end("client not built yet\n\n  npm run build\n\nor run the dev server: npm run dev\n");
+      res.end("client not built yet\n\n  pi-lcars          # builds on demand\n  npm run build      # or build by hand\n");
     }
   }
-});
+};
 
-server.listen(PORT, "127.0.0.1", async () => {
-  console.log(`\n  LCARS console  →  http://127.0.0.1:${PORT}`);
-  console.log(`  cwd: ${CWD}`);
-  console.log(`  sessions: ${SESSION_DIR || "~/.pi/agent/sessions"}`);
-  console.log(`  approval policy: ${approvals.policy}${TRUST ? " · project trusted" : ""}\n`);
+/* --------------------------------------------------------------- lifecycle */
+function listenOnce(srv, port, host) {
+  return new Promise((done, reject) => {
+    const onError = (e) => {
+      srv.off("listening", onListening);
+      reject(e);
+    };
+    const onListening = () => {
+      srv.off("error", onError);
+      done(srv.address().port);
+    };
+    srv.once("error", onError);
+    srv.once("listening", onListening);
+    srv.listen(port, host);
+  });
+}
+
+/**
+ * Boot the console. Safe to call once per process.
+ *
+ * opts: { port, host, cwd, sessionDir, trust, resume, policy, log, strictPort }
+ *   strictPort — fail on EADDRINUSE instead of walking up to port+16.
+ * returns { url, port, host, cwd, close() }
+ */
+export async function start(opts = {}) {
+  if (server) throw new Error("server already started");
+  if (opts.port !== undefined) PORT = Number(opts.port);
+  if (opts.host) HOST = opts.host;
+  if (opts.cwd) CWD = resolve(opts.cwd);
+  if (opts.sessionDir !== undefined) SESSION_DIR = opts.sessionDir || undefined;
+  if (opts.trust !== undefined) TRUST = !!opts.trust;
+  if (opts.resume !== undefined) RESUME = !!opts.resume;
+  if (opts.policy) POLICY = String(opts.policy).toLowerCase();
+  if (opts.log !== undefined) LOG = !!opts.log;
+
+  /* the objects were built at import time from the env defaults */
+  approvals.policy = POLICY;
+  registry.sessionDir = SESSION_DIR;
+  registry.trustProject = TRUST;
+
+  server = createServer(handler);
+
+  const strict = opts.strictPort === true;
+  const tries = strict ? 1 : 17;
+  let lastError = null;
+  for (let i = 0; i < tries; i++) {
+    try {
+      await listenOnce(server, PORT + i, HOST);
+      PORT = server.address().port;
+      lastError = null;
+      break;
+    } catch (e) {
+      lastError = e;
+      if (e.code !== "EADDRINUSE") throw e;
+    }
+  }
+  if (lastError) {
+    const e = new Error(`port ${PORT}…${PORT + tries - 1} all in use on ${HOST}`);
+    e.code = "E_PORT";
+    throw e;
+  }
+
+  if (LOG) {
+    console.log(`\n  LCARS console  →  http://${HOST}:${PORT}`);
+    console.log(`  cwd: ${CWD}`);
+    console.log(`  sessions: ${SESSION_DIR || "~/.pi/agent/sessions"}`);
+    console.log(`  approval policy: ${approvals.policy}${TRUST ? " · project trusted" : ""}\n`);
+  }
+
   startHistoryScan({ sdk, sessionDir: SESSION_DIR });
   bootPromise = registry
     .boot(CWD, { resume: RESUME })
     .then((entry) => {
-      console.log(`[pi] session ready · ${entry.meta.model} · ${entry.id}`);
+      if (LOG) console.log(`[pi] session ready · ${entry.meta.model} · ${entry.id}`);
       return entry;
     })
     .catch((e) => {
       console.error(`[pi] boot failed: ${e.message}`);
       return null;
     });
-});
 
-const shutdown = async () => {
-  console.log("\n[shutdown]");
-  await registry.closeAll().catch(() => {});
-  server.close(() => process.exit(0));
-  setTimeout(() => process.exit(0), 1500).unref();
-};
-process.on("SIGINT", shutdown);
-process.on("SIGTERM", shutdown);
+  let closing = false;
+  const close = async () => {
+    if (closing) return;
+    closing = true;
+    await registry.closeAll().catch(() => {});
+    await new Promise((done) => server.close(done));
+  };
+
+  const onSignal = async () => {
+    if (LOG) console.log("\n[shutdown]");
+    const bail = setTimeout(() => process.exit(0), 1500);
+    bail.unref();
+    await close().catch(() => {});
+    process.exit(0);
+  };
+  process.once("SIGINT", onSignal);
+  process.once("SIGTERM", onSignal);
+
+  return { url: `http://${HOST}:${PORT}`, port: PORT, host: HOST, cwd: CWD, close };
+}
+
+/* direct execution (`node server/index.mjs`) still works */
+const MAIN = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (MAIN) {
+  start().catch((e) => {
+    console.error(`[fatal] ${e.code ? `${e.code}: ` : ""}${e.message}`);
+    process.exit(1);
+  });
+}
