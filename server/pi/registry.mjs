@@ -1,4 +1,5 @@
-import { unlink } from "node:fs/promises";
+import { readFile, unlink } from "node:fs/promises";
+import { join } from "node:path";
 import { applyEvent } from "./stream.mjs";
 import { shortArgs, textOf } from "./format.mjs";
 import { httpError } from "./errors.mjs";
@@ -6,6 +7,15 @@ import { httpError } from "./errors.mjs";
 let SEQ = 0;
 const nextSeq = () => ++SEQ;
 const MAX_ITEMS = 4000;
+
+/** settings.json is advisory: a missing or broken file must not block a session. */
+async function readSettings(agentDir) {
+  try {
+    return JSON.parse(await readFile(join(agentDir, "settings.json"), "utf8"));
+  } catch {
+    return {};
+  }
+}
 
 /**
  * Session registry: every open conversation, its transcript items, and its meta.
@@ -126,6 +136,42 @@ export class Registry {
     return entry.meta;
   }
 
+  /**
+   * A brand-new session has no model yet. Take pi's own defaults from
+   * settings.json, fall back to the first model with valid credentials, and
+   * carry over the default thinking level. Existing sessions keep theirs.
+   */
+  async #applyDefaults(session) {
+    const current = session?.model;
+    const resolved = current?.id && current.id !== "unknown" && current.provider !== "unknown";
+    if (resolved) return;
+    const runtime = session?.modelRuntime;
+    if (!runtime) return;
+
+    const settings = await readSettings(this.agentDir);
+    let model = null;
+    if (settings.defaultProvider && settings.defaultModel) {
+      model = runtime.getModel(settings.defaultProvider, settings.defaultModel) ?? null;
+    }
+    if (!model) {
+      try {
+        model = (await runtime.getAvailable())?.[0] ?? null;
+      } catch {
+        model = null;
+      }
+    }
+    if (!model) {
+      console.warn("[session] no model resolved — run /login in pi, or pick one in PROVIDERS");
+      return;
+    }
+    await session.setModel(model);
+
+    const level = settings.defaultThinkingLevel;
+    if (level && level !== "off" && String(session.thinkingLevel ?? "off") === "off") {
+      session.setThinkingLevel?.(level);
+    }
+  }
+
   /* ----------------------------------------------------------- lifecycle */
 
   async #load(manager, cwd) {
@@ -163,6 +209,10 @@ export class Registry {
 
     entry.session = session;
     entry.path = manager.getSessionFile?.() ?? entry.path;
+    // createAgentSession() without an explicit model leaves the session on
+    // pi's "unknown/unknown" placeholder until the first setModel() — which
+    // showed up in the shelf and in `pi-lcars status`. Resolve it once, here.
+    await this.#applyDefaults(session);
     session.subscribe((ev) => applyEvent(entry, ev));
 
     // Extensions are loaded but not bound yet: MCP connects its servers on

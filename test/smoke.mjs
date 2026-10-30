@@ -128,6 +128,12 @@ try {
   check("new session id differs", second && second !== first);
   check("session list grew", created.body?.data?.sessions?.length >= 2);
 
+  // a fresh session must land on a real model, not pi's "unknown/unknown"
+  const fresh = await get("/api/bootstrap");
+  const freshModel = fresh.body?.data?.meta?.model ?? "";
+  check("new session resolves a model", Boolean(freshModel) && !freshModel.includes("unknown"), freshModel);
+  check("new session model is provider/id", /^[^/]+\/[^/]+$/.test(freshModel), freshModel);
+
   // a session with no transcript cannot be forked — the server must say so, not 500
   const forkEmpty = await post("/api/session", { op: "fork", id: second });
   check("fork on empty session → 409", forkEmpty.status === 409 && forkEmpty.body?.code === "E_EMPTY", JSON.stringify(forkEmpty.body));
