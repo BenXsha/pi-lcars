@@ -215,6 +215,16 @@ export const actions = {
     if (b) setBootstrap(b);
     return b;
   },
+  async openPath(path: string) {
+    const b = await withError(() => api.openSession(path));
+    if (b) setBootstrap(b);
+    return b;
+  },
+  async forkPath(path: string) {
+    const b = await withError(() => api.forkPath(path));
+    if (b) setBootstrap(b);
+    return b;
+  },
   async fork() {
     const id = state.activeId;
     if (!id) return null;

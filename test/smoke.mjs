@@ -83,6 +83,10 @@ try {
   const outside = await post("/api/open", { path: "../../etc/hosts" });
   check("open refuses paths outside the workspace", outside.status === 403 && outside.body?.code === "E_OUTSIDE");
 
+  const hist = await get("/api/history?limit=5");
+  check("GET /api/history never blocks", hist.status === 200 && typeof hist.body?.data?.ready === "boolean");
+  check("history reports its scan", hist.body?.data && ["scanning", "scanned", "matched"].every((k) => k in hist.body.data));
+
   const skills = await get("/api/skills");
   check("GET /api/skills", skills.status === 200 && skills.body?.data?.available === true, `${skills.body?.data?.skills?.length ?? 0} skills`);
   check("skills carry a description (the trigger)", (skills.body?.data?.skills ?? []).every((s) => typeof s.description === "string"));

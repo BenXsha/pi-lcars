@@ -152,6 +152,29 @@ export type SkillRow = {
   bytes: number | null;
 };
 
+export type HistoryRow = {
+  path: string;
+  id: string;
+  cwd: string;
+  name: string | null;
+  title: string;
+  messages: number;
+  created: string;
+  modified: string;
+  parent: string | null;
+};
+
+export type HistoryResult = {
+  ready: boolean;
+  scanning: boolean;
+  progress: { loaded: number; total: number };
+  scanned: number;
+  matched: number;
+  error: string | null;
+  at: number;
+  sessions: HistoryRow[];
+};
+
 export type SystemInfo = {
   node: string;
   platform: string;
@@ -275,6 +298,10 @@ export const api = {
   setModel: (provider: string, model: string) => post<{ modelId: string }>("/api/model", { provider, model }),
   models: () => call<{ current: string; models: ModelInfo[] }>("/api/models"),
   system: () => call<SystemInfo>("/api/system"),
+  history: (q = "", refresh = false) =>
+    call<HistoryResult>(`/api/history?q=${encodeURIComponent(q)}${refresh ? "&refresh=1" : ""}`),
+  historyOp: (op: "rename" | "delete", payload: { path: string; name?: string }) => post<unknown>("/api/history", { op, ...payload }),
+  forkPath: (path: string) => post<Bootstrap>("/api/session", { op: "fork", path }),
   skills: () => call<SkillsResult>("/api/skills"),
   reloadSkills: () => post<SkillsResult>("/api/skills", { op: "reload" }),
   providers: () => call<ProvidersResult>("/api/providers"),

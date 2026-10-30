@@ -2204,3 +2204,60 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
   overflow-wrap: anywhere;
   border-radius: 0 var(--r-1) var(--r-1) 0;
 }
+
+/* ============================================================
+   history browser
+   ============================================================ */
+.hist-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  padding: 4px 8px;
+  background: var(--g0);
+  border-bottom: 2px solid var(--g1);
+  border-radius: 0 var(--r-1) 0 0;
+}
+.hist-search .icon { color: var(--g2); }
+.hist-search input {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  padding: 6px 0;
+  font: 400 12.5px/1.4 var(--mono);
+  color: var(--w);
+}
+.hist-search:focus-within { border-bottom-color: var(--orange); }
+.hist-scan { font: 400 11px/1.6 var(--mono); color: var(--amber); padding: 0 2px 8px; }
+
+.hist-list { display: flex; flex-direction: column; gap: 1px; max-width: 980px; }
+.hrow {
+  display: grid;
+  grid-template-columns: 4px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  min-height: 44px;
+  padding-right: 4px;
+  border-radius: 0 var(--r-1) var(--r-1) 0;
+}
+.hrow:hover { background: var(--g0); }
+.hrow[data-confirm="1"] { background: color-mix(in srgb, var(--tomato) 16%, #000); }
+.hrow .st { align-self: stretch; margin: 6px 0; background: var(--g1); border-radius: var(--r-pill); }
+.hrow .st[data-fork="1"] { background: var(--lav); }
+.hrow .hb { display: flex; flex-direction: column; gap: 1px; min-width: 0; padding: 4px 0; }
+.hrow .ht { font: 400 12.5px/1.45 var(--text); color: var(--w); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hrow .hm { font: 400 9.5px/1.4 var(--din); letter-spacing: 0.08em; color: var(--g3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hrow .ha { display: flex; gap: 2px; align-items: center; }
+.hrow .ha .pv-btn { min-width: 0; }
+.hren input {
+  width: 100%;
+  background: #000;
+  border: 0;
+  border-bottom: 2px solid var(--orange);
+  padding: 4px 6px;
+  font: 400 12.5px/1.4 var(--mono);
+  color: var(--w);
+  outline: none;
+}

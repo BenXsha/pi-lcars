@@ -20,7 +20,7 @@ import { Dialogs } from "./pi/dialogs.mjs";
 import { now, summaryOf } from "./pi/format.mjs";
 import { mcpStatus, setEnabled, addServer, removeServer } from "./pi/mcpConfig.mjs";
 import { listTree, openPath, readTextFile, streamFile } from "./pi/fs.mjs";
-import { listHistory, deleteHistoryFile, renameHistoryFile } from "./pi/history.mjs";
+import { queryHistory, startHistoryScan, historyCache as historyCacheRef, deleteHistoryFile, renameHistoryFile } from "./pi/history.mjs";
 import { listSkills, reloadSkills } from "./pi/skills.mjs";
 import { listProviders, listProviderModels, testProvider, setDefaultModel, setProviderKey, addProvider, removeProvider, reloadProviders } from "./pi/providers.mjs";
 
@@ -383,12 +383,11 @@ const routes = {
 
   "GET /api/history": async (req, res) => {
     const url = new URL(req.url, "http://x");
-    ok(res, await listHistory({
-      sdk: await loadSdk(),
-      sessionDir: SESSION_DIR,
-      query: url.searchParams.get("q") || "",
-      limit: url.searchParams.get("limit") || 80,
-    }));
+    if (url.searchParams.get("refresh") === "1") {
+      historyCacheRef.at = 0;
+    }
+    startHistoryScan({ sdk: await loadSdk(), sessionDir: SESSION_DIR });
+    ok(res, queryHistory({ query: url.searchParams.get("q") || "", limit: url.searchParams.get("limit") || 80 }));
   },
 
   "POST /api/history": async (req, res) => {
@@ -398,12 +397,15 @@ const routes = {
       const open = [...registry.sessions.values()].find((s) => s.path === b.path);
       if (open) await registry.remove(open.id);
       else await deleteHistoryFile(b.path);
+      historyCacheRef.at = 0;
       return ok(res, { ok: true });
     }
     if (b.op === "rename") {
       const open = [...registry.sessions.values()].find((s) => s.path === b.path);
       if (open) return ok(res, await registry.rename(open.id, b.name));
-      return ok(res, await renameHistoryFile({ sdk, path: b.path, name: b.name }));
+      const r = await renameHistoryFile({ sdk, path: b.path, name: b.name });
+      historyCacheRef.at = 0;
+      return ok(res, r);
     }
     fail(res, 400, `unknown op: ${b.op}`, { code: "E_HISTORY" });
   },
@@ -637,6 +639,7 @@ server.listen(PORT, "127.0.0.1", async () => {
   console.log(`  cwd: ${CWD}`);
   console.log(`  sessions: ${SESSION_DIR || "~/.pi/agent/sessions"}`);
   console.log(`  approval policy: ${approvals.policy}${TRUST ? " · project trusted" : ""}\n`);
+  startHistoryScan({ sdk, sessionDir: SESSION_DIR });
   bootPromise = registry
     .boot(CWD, { resume: RESUME })
     .then((entry) => {

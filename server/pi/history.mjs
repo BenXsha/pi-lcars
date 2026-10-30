@@ -7,6 +7,65 @@ import { unlink } from "node:fs/promises";
  * transcripts. listAll() walks every project directory, so results are capped
  * and the client is expected to search rather than scroll.
  */
+/**
+ * Scanning every transcript on the machine takes tens of seconds (404 files
+ * here), so the scan runs in the background and is cached. The endpoint never
+ * blocks: it reports `scanning`/`progress` and serves whatever is cached.
+ */
+export const historyCache = { at: 0, rows: [], scanning: false, progress: { loaded: 0, total: 0 }, error: null };
+
+export function startHistoryScan({ sdk, sessionDir }) {
+  if (historyCache.scanning) return;
+  historyCache.scanning = true;
+  historyCache.progress = { loaded: 0, total: 0 };
+  historyCache.error = null;
+  const onProgress = (p) => {
+    if (p && typeof p.loaded === "number") historyCache.progress = { loaded: p.loaded, total: p.total ?? historyCache.progress.total };
+  };
+  Promise.resolve(sessionDir ? sdk.SessionManager.listAll(sessionDir, onProgress) : sdk.SessionManager.listAll(onProgress))
+    .then((rows) => {
+      historyCache.rows = rows;
+      historyCache.at = Date.now();
+    })
+    .catch((e) => {
+      historyCache.error = e.message;
+    })
+    .finally(() => {
+      historyCache.scanning = false;
+    });
+}
+
+export function queryHistory({ query = "", limit = 80 } = {}) {
+  const q = String(query || "").trim().toLowerCase();
+  const rows = q
+    ? historyCache.rows.filter((r) =>
+        [r.name, r.firstMessage, r.allMessagesText, r.cwd, r.id].some((v) => v && String(v).toLowerCase().includes(q)),
+      )
+    : historyCache.rows;
+  const matched = rows.sort((a, b) => new Date(b.modified) - new Date(a.modified)).slice(0, Math.max(1, Math.min(400, Number(limit) || 80)));
+  return {
+    ready: !!historyCache.at,
+    scanning: historyCache.scanning,
+    progress: historyCache.progress,
+    scanned: historyCache.rows.length,
+    matched: matched.length,
+    error: historyCache.error,
+    at: historyCache.at,
+    sessions: matched.map((r) => ({
+      path: r.path,
+      id: r.id,
+      cwd: r.cwd,
+      name: r.name ?? null,
+      title: r.firstMessage || r.name || r.id.slice(0, 10),
+      messages: r.messageCount,
+      created: r.created,
+      modified: r.modified,
+      parent: r.parentSessionPath ?? null,
+    })),
+  };
+}
+
+/** Blocking variant, kept for scripts/tests. */
 export async function listHistory({ sdk, sessionDir, query = "", limit = 80 }) {
   const t0 = Date.now();
   let rows = [];

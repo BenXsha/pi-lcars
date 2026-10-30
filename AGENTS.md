@@ -426,6 +426,18 @@ Codex 的做法是：**工作区在你开 session 时就定了，之后不可变
 - 注意 `tool_search` 会重写 active tool set，实测在一次搜索后 `ask_user_question` 会被挤出列表；
   这是 pi 扩展行为，不是本项目的 bug，写在这里免得下次误判。
 
+### 7.6m 历史浏览器（HISTORY 站）
+
+全机 400+ 份 transcript，`SessionManager.listAll()` 全量解析要 **30 秒以上**，所以：
+
+- **扫描放后台 + 缓存**（`historyCache`）：服务端启动即扫一次，`GET /api/history` **立刻返回**，
+  带 `{ready, scanning, progress, scanned, matched}`；前端在 `scanning` 时每 1.8s 轮询，扫完自动落地。
+- 端点只做内存过滤（标题 / 全文 / cwd / id），排序按修改时间倒序，最多 200 条；不阻塞、不分页。
+- 每行：`4px 脊（forked = lavender）| 首句（单行）| cwd · N msgs · 相对时间 · forked/name | OPEN FORK RENAME ×`。
+- **删除是两段式**：点垃圾桶 → 整行转 tomato 底色 + `DELETE / KEEP`，不做系统 confirm。
+- 改名用行内输入（Enter 提交 / Esc 取消），不弹窗。
+- 打开 / fork 直接复用 `/api/session {op:"open"|"fork", path}`，fork 后自动切到新会话。
+
 ### 7.6l Skill 调用块
 
 用户输入 `/skill …` 时，pi 会把技能正文以
