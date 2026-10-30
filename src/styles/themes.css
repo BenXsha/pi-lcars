@@ -135,27 +135,27 @@
   --bg: #030507;
 }
 
-/* ---------- GRID / cyberpunk ----------
-   Neon on violet-black: magenta focus, electric cyan for running tools, acid
-   yellow metadata, hot coral for alerts. Saturation is high but every block is
-   lifted until black type clears 4.5:1 — the neon reads as signal, not noise. */
+/* ---------- GRID / cyberpunk, comfort pass ----------
+   Same hue map as the neon version, roughly half the chroma: the palette keeps
+   the cyberpunk read (magenta focus, cyan running, acid metadata) without
+   vibrating on a dark screen. Every block still carries black type at 4.5:1+. */
 [data-theme="grid"] {
-  --orange: #ff4fa3; /* focus: neon magenta */
-  --amber: #d8e44e; /* secondary metalabels: acid yellow */
-  --tang: #4fd6e4; /* tool running: electric cyan */
-  --tomato: #ff6b4a; /* alert: hot coral */
-  --lilac: #c79bff; /* memory / context: violet */
-  --lav: #9b8cff; /* subagents: periwinkle */
-  --ice: #a8f0ff; /* read-only refs: pale cyan */
-  --moon: #cbe86b; /* plan / pending: acid lime */
-  --cyan: #63f2c8; /* system / ok: neon teal */
+  --orange: #cf86ae; /* focus: muted magenta */
+  --amber: #c3cb9a; /* secondary metalabels: washed acid */
+  --tang: #86c3cd; /* tool running: dusty cyan */
+  --tomato: #c98272; /* alert: clay coral */
+  --lilac: #ad98c4; /* memory / context: dusty violet */
+  --lav: #9691cb; /* subagents: slate periwinkle */
+  --ice: #a3c6da; /* read-only refs: pale steel-cyan */
+  --moon: #c2cb9f; /* plan / pending: olive lime */
+  --cyan: #8bccbe; /* system / ok: soft teal */
 
-  --w: #f2ecff;
-  --g3: #a99ac9;
-  --g2: #7f6fa6;
-  --g1: #1e1334;
-  --g0: #0d0718;
-  --bg: #05010a;
+  --w: #eae9f1;
+  --g3: #9d9bb2;
+  --g2: #7c7a92;
+  --g1: #1a1828;
+  --g0: #0b0a12;
+  --bg: #050409;
 }
 
 /* ---------- MONO / LCARS 47 — desaturated neutrals + one ice accent ------ */

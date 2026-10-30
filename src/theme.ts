@@ -57,8 +57,8 @@ export const THEMES: ThemeMeta[] = [
     id: "grid",
     name: "GRID / NEON",
     short: "GRID",
-    note: "赛博朋克：紫黑底 + 霓虹洋红焦点 + 电青运行态 + 酸性黄读数",
-    swatch: ["#ff4fa3", "#4fd6e4", "#c79bff", "#d8e44e"],
+    note: "赛博朋克（舒适版）：靛黑底 + 哑光洋红焦点 + 灰青运行态",
+    swatch: ["#cf86ae", "#86c3cd", "#9691cb", "#c3cb9a"],
   },
   {
     id: "mono",
