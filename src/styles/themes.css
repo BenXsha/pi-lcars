@@ -158,6 +158,29 @@
   --bg: #050409;
 }
 
+/* ---------- BORG / phosphor ----------
+   An old green-on-black terminal wearing Borg alcove green: P1 phosphor for the
+   focus, spring green for running tools, mint for system, and one amber block
+   kept for alerts because a monochrome CRT had no red to give. */
+[data-theme="borg"] {
+  --orange: #33ff33; /* focus: P1 phosphor green */
+  --amber: #cfe8b0; /* secondary metalabels: pale phosphor */
+  --tang: #4adf8f; /* tool running: spring green */
+  --tomato: #e0a34a; /* alert: amber-phosphor warning (the only warm block) */
+  --lilac: #6fd6c0; /* memory / context: green-cyan */
+  --lav: #4fc9a8; /* subagents: alcove teal */
+  --ice: #a8e8d8; /* read-only refs: pale aqua */
+  --moon: #b8d98a; /* plan / pending: phosphor lime */
+  --cyan: #64e0b4; /* system / ok: mint */
+
+  --w: #d8ffd9;
+  --g3: #8fbf95;
+  --g2: #648f6b;
+  --g1: #122118;
+  --g0: #081009;
+  --bg: #010402;
+}
+
 /* ---------- MONO / LCARS 47 — desaturated neutrals + one ice accent ------ */
 [data-theme="mono"] {
   --orange: #e8e8e8; /* focus is white, not a hue */

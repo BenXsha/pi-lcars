@@ -1,4 +1,4 @@
-export type ThemeId = "tng" | "voy" | "ds9" | "kelvin" | "picard" | "hull" | "grid" | "mono";
+export type ThemeId = "tng" | "voy" | "ds9" | "kelvin" | "picard" | "hull" | "grid" | "borg" | "mono";
 
 export type ThemeMeta = {
   id: ThemeId;
@@ -59,6 +59,13 @@ export const THEMES: ThemeMeta[] = [
     short: "GRID",
     note: "赛博朋克（舒适版）：靛黑底 + 哑光洋红焦点 + 灰青运行态",
     swatch: ["#cf86ae", "#86c3cd", "#9691cb", "#c3cb9a"],
+  },
+  {
+    id: "borg",
+    name: "BORG / PHOSPHOR",
+    short: "BORG",
+    note: "老式绿色终端：P1 磷光绿焦点 + 薄荷系统色，琥珀只留给告警",
+    swatch: ["#33ff33", "#64e0b4", "#4fc9a8", "#e0a34a"],
   },
   {
     id: "mono",
