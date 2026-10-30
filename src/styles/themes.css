@@ -115,15 +115,17 @@
    ice highlight, and the copper of the engine glow. Roles are unchanged; only
    the hues move, and every block is lifted until black type clears 4.5:1. */
 [data-theme="hull"] {
-  --orange: #d28b74; /* focus: engine copper */
-  --amber: #a2b7c4; /* secondary metalabels: pale steel */
-  --tang: #75aeca; /* tool running: hull light */
-  --tomato: #c97a63; /* alert: hot copper */
-  --lilac: #7c8ea8; /* memory / context */
-  --lav: #6e93bd; /* subagents */
-  --ice: #9fc3d6; /* read-only refs */
-  --moon: #bfcfd8; /* plan / pending */
-  --cyan: #6fbdb8; /* system / ok: engine teal */
+  /* the frame is ~90% slate blue-grey, so the focus colour is blue-grey too;
+     copper appears only where the frame has it: the engine glow */
+  --orange: #9fb2c8; /* focus: hull blue-grey */
+  --amber: #cfdae5; /* secondary metalabels: pale steel */
+  --tang: #6f9ec4; /* tool running: saturated hull blue */
+  --tomato: #c07a63; /* alert: engine copper (the one warm block) */
+  --lilac: #8f9fb8; /* memory / context */
+  --lav: #7d8fb3; /* subagents */
+  --ice: #a9cfe3; /* read-only refs */
+  --moon: #c9d3de; /* plan / pending */
+  --cyan: #74b8b4; /* system / ok: engine teal */
 
   --w: #e8eef3;
   --g3: #93a3b5;

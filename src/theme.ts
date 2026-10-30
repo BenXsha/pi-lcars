@@ -50,8 +50,8 @@ export const THEMES: ThemeMeta[] = [
     id: "hull",
     name: "HULL / STILL",
     short: "HULL",
-    note: "取自舰体静帧：钢蓝外壳 + 引擎铜光 + 冰白高光",
-    swatch: ["#d28b74", "#9fc3d6", "#6e93bd", "#6fbdb8"],
+    note: "取自舰体静帧：钢蓝灰主色 + 冰白高光，铜光只留给告警",
+    swatch: ["#9fb2c8", "#a9cfe3", "#7d8fb3", "#c07a63"],
   },
   {
     id: "mono",
