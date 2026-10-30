@@ -119,6 +119,27 @@ PLAN.md            milestone plan (M0..M9) (repo only, not published)
 - `/?craft` — the primitive sheet (elbows, motion, icons, form language, themes),
   i.e. the visual contract on one page.
 
+## Troubleshooting
+
+**Typing space kills the page on KDE Wayland.** On KDE Plasma 6 (KWin 6.6) with
+fcitx5, a browser that uses the compositor's `text-input-v3` protocol can have its
+renderer killed when the IME commits a candidate with Space. It reproduces on a
+bare `file://` page with one `<textarea>`, so it is not this console's code: the
+input method, the compositor and the browser are the whole path. Two fixes, both
+outside the app:
+
+```bash
+# run the IME through the GTK module instead of text-input-v3
+GTK_IM_MODULE=fcitx QT_IM_MODULE=fcitx XMODIFIERS=@im=fcitx
+
+# or keep the browser off Wayland
+MOZ_ENABLE_WAYLAND=0 firefox        # Firefox
+google-chrome --ozone-platform=x11  # Chromium family
+```
+
+`/probe` (bare textarea) and `/lab` (five isolated inputs) exist to bisect this
+class of report: if `/probe` dies, the console is not involved.
+
 ## Keyboard
 
 | keys | action |

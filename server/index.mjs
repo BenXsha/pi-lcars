@@ -407,6 +407,94 @@ const routes = {
     ok(res, { recorded: true });
   },
 
+  /* Typing crashes need a bisect that does not involve our bundle. `/probe`
+     is one bare textarea; `/probe-css` adds our stylesheet, still no JS. */
+  "GET /probe": async (req, res) => {
+    const html = `<!doctype html><meta charset="utf-8"><title>probe</title>
+<body style="background:#111;color:#eee;font:16px system-ui;padding:40px">
+<h1 style="font-size:18px">bare textarea — no css, no js</h1>
+<textarea rows="3" cols="60" style="font:16px monospace;padding:8px"></textarea>
+</body>`;
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
+    res.end(html);
+  },
+
+  /* Five isolated inputs on one page, each reporting its own keydowns, so a
+     freeze names the exact combination that kills the renderer. */
+  "GET /lab": async (req, res) => {
+    let css = "";
+    try {
+      const shell = await readFile(join(DIST, "index.html"), "utf8");
+      css = /href="(\/assets\/[^"]+\.css)"/.exec(shell)?.[1] ?? "";
+    } catch {
+      /* no build yet */
+    }
+    const html = `<!doctype html><meta charset="utf-8"><title>lcars input lab</title>
+${css ? `<link rel="stylesheet" href="${css}">` : ""}
+<style>
+  body { background:#0c0c0c; color:#ddd; font:14px system-ui; padding:24px; }
+  h1 { font-size:15px; letter-spacing:.08em; text-transform:uppercase; color:#ff9c00; }
+  .case { margin:18px 0; }
+  .tag { font:700 11px/1 monospace; letter-spacing:.12em; color:#ffce9c; margin-bottom:6px; }
+  .box { border:1px solid #333; padding:0; }
+  .box textarea { width:100%; box-sizing:border-box; }
+</style>
+<body>
+<h1>input lab — type "show " in A, then B, C, D, E</h1>
+<div class="case"><div class="tag">A · bare textarea (no lcars css)</div>
+<div class="box"><textarea data-row="A" rows="1" style="font:16px monospace;padding:8px;background:#1a1a1a;color:#eee;border:0"></textarea></div></div>
+
+<div class="case"><div class="tag">B · our .cmd-field markup, no zoom wrapper</div>
+<div class="cmd-field" data-state="idle"><label class="inputline"><span class="caret"></span>
+<textarea data-row="B" rows="2"></textarea></label></div></div>
+
+<div class="case"><div class="tag">C · same inside .app (zoom: 1)</div>
+<div class="app"><div class="cmd-field" data-state="idle"><label class="inputline"><span class="caret"></span>
+<textarea data-row="C" rows="2"></textarea></label></div></div></div>
+
+<div class="case"><div class="tag">D · same inside .app, zoom 1.1</div>
+<div class="app" style="zoom:1.1"><div class="cmd-field" data-state="idle"><label class="inputline"><span class="caret"></span>
+<textarea data-row="D" rows="2"></textarea></label></div></div></div>
+
+<div class="case"><div class="tag">E · plain textarea inside .app</div>
+<div class="app"><div class="box"><textarea data-row="E" rows="2" style="font:16px monospace;padding:8px;background:#1a1a1a;color:#eee;border:0"></textarea></div></div></div>
+
+<script>
+  const post = (message) => {
+    const body = JSON.stringify({ message, source: "lab" });
+    if (navigator.sendBeacon) navigator.sendBeacon("/api/client-error", new Blob([body], { type: "application/json" }));
+    else fetch("/api/client-error", { method: "POST", body, keepalive: true });
+  };
+  for (const el of document.querySelectorAll("textarea")) {
+    el.addEventListener("focusin", () => post("lab focus row=" + el.dataset.row));
+    el.addEventListener("keydown", (e) => post("lab key row=" + el.dataset.row + " key=" + JSON.stringify(e.key) + " code=" + e.code));
+  }
+  post("lab ready");
+</script>
+</body>`;
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
+    res.end(html);
+  },
+
+  "GET /probe-css": async (req, res) => {
+    let css = "";
+    try {
+      const shell = await readFile(join(DIST, "index.html"), "utf8");
+      const match = /href="(\/assets\/[^"]+\.css)"/.exec(shell);
+      css = match?.[1] ?? "";
+    } catch {
+      /* no build yet */
+    }
+    const html = `<!doctype html><meta charset="utf-8"><title>probe css</title>
+${css ? `<link rel="stylesheet" href="${css}">` : ""}
+<body><div class="app"><div class="body"><main class="center"><div class="cmdwrap">
+<div class="cmdbar"><div class="cmd-field"><label class="inputline"><span class="caret"></span>
+<textarea rows="2">probe</textarea></label></div></div></div></main></div></div>
+</body>`;
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
+    res.end(html);
+  },
+
   "GET /api/commands": async (req, res) => {
     const url = new URL(req.url, "http://x");
     const entry = registry.get(url.searchParams.get("session") || undefined);
@@ -684,7 +772,13 @@ const handler = async (req, res) => {
   const file = join(DIST, rel.replace(/\.\./g, ""));
   try {
     const buf = await readFile(file);
-    res.writeHead(200, { "content-type": MIME[extname(file)] || "application/octet-stream" });
+    const ext = extname(file);
+    const immutable = url.pathname.startsWith("/assets/") && ext !== ".html";
+    res.writeHead(200, {
+      "content-type": MIME[ext] || "application/octet-stream",
+      // the shell must never be reused after a rebuild; hashed assets never change
+      "cache-control": immutable ? "public, max-age=31536000, immutable" : "no-store",
+    });
     res.end(buf);
   } catch {
     /* A missing asset must NOT fall back to index.html: the browser would

@@ -2594,11 +2594,3 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 }
 .panic-actions button:hover { background: var(--orange); color: #000; }
 
-/* `?nomotion` — diagnostic switch: no animations at all, for bisecting a
-   renderer fault without rebuilding the bundle. */
-html[data-motion="off"] *,
-html[data-motion="off"] *::before,
-html[data-motion="off"] *::after {
-  animation: none !important;
-  transition: none !important;
-}

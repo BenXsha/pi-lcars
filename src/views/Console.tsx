@@ -1041,7 +1041,10 @@ function textList(value: unknown): string[] {
   return value.filter((v): v is string => typeof v === "string" && v.length > 0);
 }
 
+const PLAIN_COMPOSER = new URLSearchParams(location.search).has("plain");
+
 function Composer({ running, disabled, queue }: { running: boolean; disabled: boolean; queue?: { steering: string[]; followUp: string[] } }) {
+  const plainRef = useRef<HTMLTextAreaElement>(null);
   const [text, setText] = useState("");
   const [flashQuote, setFlashQuote] = useState(false);
   const [cmds, setCmds] = useState<{ name: string; description: string; kind: string; hint?: string }[]>(UI_COMMANDS);
@@ -1126,6 +1129,55 @@ function Composer({ running, disabled, queue }: { running: boolean; disabled: bo
   const chars = text.length;
 
   const queued = [...textList(queue?.steering), ...textList(queue?.followUp)];
+
+  if (PLAIN_COMPOSER) {
+    return (
+      <div class="cmdwrap">
+        <div class="cmdbar">
+          <div class="cmd-field" data-state={disabled ? "off" : "idle"}>
+            <div class="cmd-help">
+              <span>PLAIN MODE · NO HANDLERS</span>
+            </div>
+            <label class="inputline">
+              <span class="caret" />
+              <textarea
+                ref={plainRef}
+                rows={2}
+                defaultValue=""
+                disabled={disabled}
+                placeholder="uncontrolled textarea — for bisecting the composer"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    const value = plainRef.current?.value.trim();
+                    if (!value) return;
+                    if (plainRef.current) plainRef.current.value = "";
+                    actions.send(value);
+                  }
+                }}
+              />
+            </label>
+          </div>
+          <div class="btns">
+            <BarButton
+              label={running ? t("cmd.steer") : t("cmd.run")}
+              hint="ENTER"
+              tone="ok"
+              disabled={disabled}
+              icon="act-send"
+              onClick={() => {
+                const value = plainRef.current?.value.trim();
+                if (!value) return;
+                if (plainRef.current) plainRef.current.value = "";
+                actions.send(value);
+              }}
+            />
+            <BarButton label={t("cmd.stop")} hint="ESC" tone="stop" disabled={!running} onClick={() => actions.abort()} icon="act-stop" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div class="cmdwrap">

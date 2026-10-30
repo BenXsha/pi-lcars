@@ -133,6 +133,7 @@ export function installInputTrace() {
     "keydown",
     (e) => {
       const el = e.target as HTMLElement | null;
+      (window as unknown as { __lcarsLast?: string }).__lcarsLast = `keydown ${JSON.stringify(e.key)} on ${el?.tagName ?? "?"}`;
       send(`keydown key=${JSON.stringify(e.key)} code=${e.code} target=${el?.tagName ?? "?"} prevented=${e.defaultPrevented}`);
     },
     true,
@@ -142,4 +143,45 @@ export function installInputTrace() {
     send(`focusin target=${el?.tagName ?? "?"} cls=${el?.className ?? ""}`);
   });
   send("trace installed");
+}
+
+/**
+ * Watchdog: a Web Worker keeps ticking while the main thread is blocked, so a
+ * freeze that ends in a renderer kill still leaves evidence. It reports how long
+ * the main thread was unresponsive and the last interaction we saw.
+ */
+export function installWatchdog() {
+  if (!new URLSearchParams(location.search).has("trace")) return;
+  try {
+    const source = `
+      let lastAt = Date.now();
+      let lastLabel = "start";
+      onmessage = (e) => { lastAt = Date.now(); lastLabel = e.data || lastLabel; };
+      setInterval(() => {
+        const gap = Date.now() - lastAt;
+        if (gap > 900) {
+          fetch("/api/client-error", {
+            method: "POST",
+            keepalive: true,
+            body: JSON.stringify({ message: "STALL " + gap + "ms last=" + lastLabel, source: "watchdog" }),
+          }).catch(() => {});
+        }
+      }, 250);
+    `;
+    const url = URL.createObjectURL(new Blob([source], { type: "text/javascript" }));
+    const worker = new Worker(url);
+    const beat = () => {
+      const label = (window as unknown as { __lcarsLast?: string }).__lcarsLast ?? "idle";
+      try {
+        worker.postMessage(label);
+      } catch {
+        /* terminated */
+      }
+    };
+    beat();
+    setInterval(beat, 250);
+    window.addEventListener("beforeunload", () => worker.terminate());
+  } catch {
+    /* workers unavailable — the keydown trace still applies */
+  }
 }
