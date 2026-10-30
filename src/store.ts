@@ -175,6 +175,9 @@ export const actions = {
   async abort() {
     await withError(() => api.abort());
   },
+  async compact() {
+    await withError(() => api.compact());
+  },
   async answer(id: string, value: string | null) {
     await withError(() => api.answer(id, value));
   },

@@ -426,6 +426,26 @@ Codex 的做法是：**工作区在你开 session 时就定了，之后不可变
 - 注意 `tool_search` 会重写 active tool set，实测在一次搜索后 `ask_user_question` 会被挤出列表；
   这是 pi 扩展行为，不是本项目的 bug，写在这里免得下次误判。
 
+### 7.6n 斜杠命令与压缩摘要
+
+**斜杠命令只列真正能跑的**：
+
+- 服务端 `GET /api/commands` 从 loader 取 `getSkills()` → `/skill:<name>`（带 `<task>` 提示）
+  与 `getPrompts()` → 模板名；**内置 CLI 命令（`/model` `/login` `/theme`）不进列表** ——
+  它们是 TUI 层的，走 `session.prompt()` 根本不会执行，列出来等于骗人。
+- 客户端再叠加五个"控制台自己的命令"：`/compact` `/fork` `/new` `/model` `/stop`，
+  这些由 UI 直接执行（`/new`、`/model` 通过 `askDeck()` 事件打开对应 deck，不自己造第二套弹窗）。
+- 输入以 `/` 开头且还没打空格时出现面板；`↑ ↓` 选择、`Tab/Enter` 补全（带参数的补全后留在输入框），
+  `Esc` 清空。面板行是 `命令 | 说明 | 参数提示` 三段，和提示词索引同一套条状语法。
+
+**压缩摘要**：
+
+- `compaction_end` 带 `result` 时推一条 `kind:"summary"` 的 item：
+  `CONTEXT COMPACTED · 148K → 24K TOKENS · MANUAL`，正文是模型自己写的摘要（可展开，走 Markdown 渲染）。
+- 手动触发：`POST /api/session {op:"compact"}` → `session.compact()`；**错误只走 `compaction_end`**，
+  路由的 catch 只记日志，否则同一次失败会出现两条 notice（踩过）。
+- 会话太小时 pi 会回 `Nothing to compact (session too small)`，这条要原样显示，不要吞。
+
 ### 7.6m 历史浏览器（HISTORY 站）
 
 全机 400+ 份 transcript，`SessionManager.listAll()` 全量解析要 **30 秒以上**，所以：

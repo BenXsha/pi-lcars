@@ -83,6 +83,9 @@ try {
   const outside = await post("/api/open", { path: "../../etc/hosts" });
   check("open refuses paths outside the workspace", outside.status === 403 && outside.body?.code === "E_OUTSIDE");
 
+  const cmds = await get("/api/commands");
+  check("GET /api/commands", cmds.status === 200 && Array.isArray(cmds.body?.data?.commands), `${cmds.body?.data?.commands?.length ?? 0} commands`);
+
   const hist = await get("/api/history?limit=5");
   check("GET /api/history never blocks", hist.status === 200 && typeof hist.body?.data?.ready === "boolean");
   check("history reports its scan", hist.body?.data && ["scanning", "scanned", "matched"].every((k) => k in hist.body.data));

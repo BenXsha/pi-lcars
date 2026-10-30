@@ -2261,3 +2261,48 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
   color: var(--w);
   outline: none;
 }
+
+/* ============================================================
+   slash command palette + compaction summary
+   ============================================================ */
+.cpal {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: 244px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--g1) transparent;
+}
+.cp {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: baseline;
+  min-height: 28px;
+  padding: 4px 8px 4px 6px;
+  text-align: left;
+  border-radius: 0 var(--r-1) var(--r-1) 0;
+  box-shadow: inset 2px 0 0 transparent;
+}
+.cp[data-on="1"] { background: var(--g1); box-shadow: inset 2px 0 0 var(--orange); }
+.cp .cn { font: 400 11.5px/1.4 var(--mono); color: var(--orange); }
+.cp .cd { font: 400 11px/1.4 var(--text); color: var(--g3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cp .ch { font: 400 9.5px/1.4 var(--mono); color: var(--g2); }
+
+.sum { display: grid; grid-template-columns: 4px minmax(0, 1fr); gap: var(--gap); margin: 6px 0; }
+.sum > .st { background: var(--moon); border-radius: var(--r-pill) 0 0 var(--r-pill); }
+.sum .sb {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--g0);
+  border-radius: 0 var(--r-1) var(--r-1) 0;
+}
+.sum .sb-hd { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.sum .sb-hd .lb { font: 700 10px/1 var(--din); letter-spacing: 0.16em; color: var(--moon); }
+.sum .sb-hd .dl { font: 400 10px/1.4 var(--mono); color: var(--g3); }
+.sum .sb-hd .rs { font: 700 9px/1 var(--din); letter-spacing: 0.12em; color: var(--g2); }
+.sum .sb-hd .pv-btn { margin-left: auto; }
+.sum .body { max-height: 42vh; overflow: auto; padding-top: 4px; scrollbar-width: thin; scrollbar-color: var(--g1) transparent; }

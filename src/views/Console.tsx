@@ -9,7 +9,8 @@ import { Icon, type IconName } from "../components/Icon";
 import { Logo } from "../components/Logo";
 import { FileTree } from "../components/FileTree";
 import { FileViewer } from "../components/FileViewer";
-import { askComposer, onComposerRequest } from "../composer";
+import { Markdown } from "../components/Markdown";
+import { askComposer, askDeck, onComposerRequest, onDeckRequest } from "../composer";
 import {
   ApprovalDeck,
   BarButton,
@@ -146,6 +147,7 @@ export function Console() {
   const [theme, setTheme] = useState<ThemeId>(appliedTheme());
 
   useEffect(() => connect(), []);
+  useEffect(() => onDeckRequest((d) => setDeck(d)), []);
 
   // which exchange is under the reading position — drives the outline marker
   useEffect(() => {
@@ -611,6 +613,31 @@ function Sidenav({
   );
 }
 
+/* -------------------------------------------------------------- summary */
+/** Context compaction: the model's own recap of what it kept. */
+function SummaryBlock({ item }: { item: Extract<Item, { kind: "summary" }> }) {
+  const [open, setOpen] = useState(false);
+  const fmt = (n: number | null) => (n == null ? "?" : n >= 1000 ? `${(n / 1000).toFixed(1)}K` : String(n));
+  return (
+    <div class="sum" data-open={open ? "1" : "0"}>
+      <span class="st" />
+      <div class="sb">
+        <div class="sb-hd">
+          <span class="lb">CONTEXT COMPACTED</span>
+          <span class="dl">
+            {fmt(item.tokensBefore)} → {fmt(item.tokensAfter)} TOKENS
+          </span>
+          <span class="rs">{item.reason.toUpperCase()}</span>
+          <button type="button" class="pv-btn ghost" onClick={() => setOpen(!open)}>
+            {open ? "HIDE" : "READ SUMMARY"}
+          </button>
+        </div>
+        {open ? <div class="body"><Markdown text={item.summary} /></div> : null}
+      </div>
+    </div>
+  );
+}
+
 /* ---------------------------------------------------------------- skill */
 /** A "/skill" invocation: the injected body collapses into one readable line. */
 function SkillBlock({ skill }: { skill: NonNullable<Extract<Item, { kind: "user" }>["skill"]> }) {
@@ -845,6 +872,14 @@ function Transcript({
           );
         }
 
+        if (it.kind === "summary") {
+          return (
+            <div class={cls} key={it.id} data-id={it.id}>
+              <SummaryBlock item={it} />
+            </div>
+          );
+        }
+
         if (it.kind === "ask") {
           return (
             <div class={cls} key={it.id} data-id={it.id}>
@@ -877,9 +912,42 @@ function Transcript({
 }
 
 /* -------------------------------------------------------------- composer */
+const UI_COMMANDS = [
+  { name: "/compact", description: "compact the context now", kind: "ui" },
+  { name: "/fork", description: "fork this session", kind: "ui" },
+  { name: "/new", description: "start a session in a workspace", kind: "ui" },
+  { name: "/model", description: "switch the model for the next turn", kind: "ui" },
+  { name: "/stop", description: "stop the current run", kind: "ui" },
+];
+
 function Composer({ running, disabled, queue }: { running: boolean; disabled: boolean; queue?: { steering: string[]; followUp: string[] } }) {
   const [text, setText] = useState("");
   const [flashQuote, setFlashQuote] = useState(false);
+  const [cmds, setCmds] = useState<{ name: string; description: string; kind: string; hint?: string }[]>(UI_COMMANDS);
+  const [pick, setPick] = useState(0);
+
+  useEffect(() => {
+    api
+      .commands()
+      .then((r) => setCmds([...UI_COMMANDS, ...r.commands]))
+      .catch(() => {});
+  }, []);
+
+  const slash = text.startsWith("/") && !text.includes(" ") ? text.toLowerCase() : null;
+  const matches = slash
+    ? cmds.filter((c) => c.name.toLowerCase().startsWith(slash) || c.name.toLowerCase().includes(slash.slice(1))).slice(0, 8)
+    : [];
+
+  /** Run a console-side command; returns true when it consumed the text. */
+  const runUi = (cmd: string) => {
+    const name = cmd.trim().toLowerCase();
+    if (name === "/compact") return actions.compact(), true;
+    if (name === "/fork") return actions.fork(), true;
+    if (name === "/stop") return actions.abort(), true;
+    if (name === "/new") return askDeck("new"), true;
+    if (name === "/model") return askDeck("model"), true;
+    return false;
+  };
 
   // quote appends, recall replaces — both arrive from the transcript
   useEffect(
@@ -909,6 +977,10 @@ function Composer({ running, disabled, queue }: { running: boolean; disabled: bo
   const submit = () => {
     const t = text.trim();
     if (!t) return;
+    if (runUi(t)) {
+      setText("");
+      return;
+    }
     setText("");
     actions.send(t);
   };
@@ -946,6 +1018,31 @@ function Composer({ running, disabled, queue }: { running: boolean; disabled: bo
           <span class="q-note">delivered after the current turn</span>
         </div>
       ) : null}
+    {matches.length ? (
+      <div class="cpal">
+        {matches.map((c, i) => (
+          <button
+            type="button"
+            key={c.name}
+            class="cp"
+            data-on={i === pick ? "1" : "0"}
+            onMouseEnter={() => setPick(i)}
+            onClick={() => {
+              if (c.hint || c.kind !== "ui") setText(`${c.name} `);
+              else {
+                setText("");
+                runUi(c.name);
+              }
+            }}
+          >
+            <span class="cn">{c.name}</span>
+            <span class="cd">{c.description || c.kind}</span>
+            {c.hint ? <span class="ch">{c.hint}</span> : null}
+          </button>
+        ))}
+      </div>
+    ) : null}
+
     <div class="cmdbar">
       <div class="entry-block">
         <span class="el">{t("cmd.entry")}</span>
@@ -971,6 +1068,35 @@ function Composer({ running, disabled, queue }: { running: boolean; disabled: bo
             onBlur={() => setFocused(false)}
             onInput={(e) => setText((e.target as HTMLTextAreaElement).value)}
             onKeyDown={(e) => {
+              if (matches.length) {
+                if (e.key === "ArrowDown") {
+                  e.preventDefault();
+                  setPick((p) => (p + 1) % matches.length);
+                  return;
+                }
+                if (e.key === "ArrowUp") {
+                  e.preventDefault();
+                  setPick((p) => (p - 1 + matches.length) % matches.length);
+                  return;
+                }
+                if (e.key === "Tab" || (e.key === "Enter" && !e.shiftKey)) {
+                  const cmd = matches[Math.min(pick, matches.length - 1)];
+                  e.preventDefault();
+                  if (cmd && (cmd.hint || cmd.kind !== "ui")) {
+                    setText(`${cmd.name} `);
+                    setPick(0);
+                    return;
+                  }
+                  if (cmd) setText(cmd.name);
+                  if (cmd) runUi(cmd.name);
+                  return;
+                }
+                if (e.key === "Escape") {
+                  e.preventDefault();
+                  setText("");
+                  return;
+                }
+              }
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
                 submit();

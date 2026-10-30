@@ -224,7 +224,7 @@ export function applyEvent(entry, ev) {
       });
       break;
 
-    case "compaction_end":
+    case "compaction_end": {
       if (ev.errorMessage) {
         entry.emit({
           kind: "notice",
@@ -234,8 +234,22 @@ export function applyEvent(entry, ev) {
           text: ev.errorMessage,
           ts: now(),
         });
+        break;
+      }
+      const r = ev.result;
+      if (r?.summary) {
+        entry.emit({
+          kind: "summary",
+          id: `sm${entry.nextId()}`,
+          summary: r.summary,
+          tokensBefore: r.tokensBefore ?? null,
+          tokensAfter: r.estimatedTokensAfter ?? null,
+          reason: ev.reason ?? "manual",
+          ts: now(),
+        });
       }
       break;
+    }
 
     case "queue_update":
       // keep the texts so the composer can show what is waiting

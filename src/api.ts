@@ -38,6 +38,15 @@ export type Item =
       ts: number;
     }
   | {
+      kind: "summary";
+      id: string;
+      summary: string;
+      tokensBefore: number | null;
+      tokensAfter: number | null;
+      reason: string;
+      ts: number;
+    }
+  | {
       kind: "ask";
       id: string;
       mode: "select" | "input" | "confirm";
@@ -298,6 +307,8 @@ export const api = {
   setModel: (provider: string, model: string) => post<{ modelId: string }>("/api/model", { provider, model }),
   models: () => call<{ current: string; models: ModelInfo[] }>("/api/models"),
   system: () => call<SystemInfo>("/api/system"),
+  commands: () => call<{ commands: { name: string; description: string; kind: string; hint?: string }[] }>("/api/commands"),
+  compact: () => post<{ started: boolean }>("/api/session", { op: "compact" }),
   history: (q = "", refresh = false) =>
     call<HistoryResult>(`/api/history?q=${encodeURIComponent(q)}${refresh ? "&refresh=1" : ""}`),
   historyOp: (op: "rename" | "delete", payload: { path: string; name?: string }) => post<unknown>("/api/history", { op, ...payload }),

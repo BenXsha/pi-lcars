@@ -17,6 +17,7 @@ import { Approvals } from "./pi/approval.mjs";
 import { createQueue } from "./pi/queue.mjs";
 import { Registry } from "./pi/registry.mjs";
 import { Dialogs } from "./pi/dialogs.mjs";
+import { listCommands } from "./pi/commands.mjs";
 import { now, summaryOf } from "./pi/format.mjs";
 import { mcpStatus, setEnabled, addServer, removeServer } from "./pi/mcpConfig.mjs";
 import { listTree, openPath, readTextFile, streamFile } from "./pi/fs.mjs";
@@ -170,6 +171,15 @@ const routes = {
       case "activate":
         entry = registry.setActive(b.id);
         break;
+      case "compact": {
+        const target = registry.get(b.id);
+        if (!target?.session) return fail(res, 404, "no session", { code: "E_NO_SESSION" });
+        // manual compaction; start/end still arrive as session events
+        // errors surface through compaction_end; logging here avoids a duplicate notice
+        target.session.compact(b.instructions).catch((e) => console.error("[compact]", e.message));
+        ok(res, { started: true });
+        break;
+      }
       case "rewind":
         entry = await registry.rewind(b.id ?? registry.activeId, b.turn);
         break;
@@ -366,6 +376,12 @@ const routes = {
       mcpEnabled: process.env.LCARS_MCP !== "0",
       approvals: approvals.snapshot,
     });
+  },
+
+  "GET /api/commands": async (req, res) => {
+    const url = new URL(req.url, "http://x");
+    const entry = registry.get(url.searchParams.get("session") || undefined);
+    ok(res, { commands: listCommands({ entry }) });
   },
 
   "GET /api/skills": async (req, res) => {
