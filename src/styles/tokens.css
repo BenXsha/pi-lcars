@@ -3,6 +3,11 @@
    Colour lives in themes.css, never here.
    ============================================================ */
 :root {
+  /* secondary text ON A BLOCK — --g2/--g3 are tuned for the page background,
+     not for --g1 strips (they land at 3.0-4.4:1 there) */
+  --t2: color-mix(in srgb, var(--w) 78%, #000);
+  --t3: color-mix(in srgb, var(--w) 70%, #000);
+
   /* type */
   --din: "DIN Alternate", "DIN Condensed", "Helvetica Neue", Arial, sans-serif;
   --text: "MiSans", "PingFang SC", "Source Han Sans SC", "Noto Sans SC", "Helvetica Neue", Arial, sans-serif;

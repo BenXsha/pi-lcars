@@ -151,7 +151,7 @@ button { cursor: pointer; }
 .seg button {
   flex: 1 1 0;
   background: var(--g1);
-  color: var(--g3);
+  color: var(--t2);
   font: 700 12.5px/1 var(--din);
   letter-spacing: 0.14em;
   border-radius: var(--r-1);
@@ -624,7 +624,7 @@ button { cursor: pointer; }
 .pv-sub code { font: 400 12.5px/2 var(--mono); color: var(--ice); }
 .pv-row { display: grid; grid-template-columns: 4px 132px minmax(0, 1fr) 96px; gap: var(--gap); align-items: stretch; min-height: 44px; }
 .pv-row .st { background: var(--g1); border-radius: var(--r-pill) 0 0 var(--r-pill); }
-.pv-row .k { display: flex; align-items: center; gap: 6px; padding: 0 10px; background: var(--g1); color: var(--g3); font: 700 11.5px/1 var(--din); letter-spacing: 0.1em; border-radius: 0 var(--r-1) var(--r-1) 0; }
+.pv-row .k { display: flex; align-items: center; gap: 6px; padding: 0 10px; background: var(--g1); color: var(--t2); font: 700 11.5px/1 var(--din); letter-spacing: 0.1em; border-radius: 0 var(--r-1) var(--r-1) 0; }
 .pv-row .v { display: flex; align-items: center; padding: 6px 12px; font: 400 13.5px/2 var(--mono); color: var(--w); overflow-wrap: anywhere; }
 .pv-row .n { display: flex; align-items: center; justify-content: flex-end; padding: 0 10px; font: 700 13.5px/2 var(--din); color: var(--cyan); font-variant-numeric: tabular-nums; }
 
@@ -722,11 +722,11 @@ button { cursor: pointer; }
   gap: 12px;
   font: 700 11px/2 var(--din);
   letter-spacing: 0.13em;
-  color: var(--g2);
+  color: var(--t3);
   white-space: nowrap;
 }
 .cmd-help .live { color: var(--orange); }
-.cmd-help .cnt { color: var(--g3); font-variant-numeric: tabular-nums; }
+.cmd-help .cnt { color: var(--t2); font-variant-numeric: tabular-nums; }
 
 /* the visible input surface: bottom readout bar + blinking caret */
 .inputline {
@@ -1459,12 +1459,13 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
   letter-spacing: 0.12em;
   padding: 6px 8px;
   background: var(--g1);
-  color: var(--g3);
+  /* g3 on a g1 block lands at ~4.4:1 — just under AA for 11px text */
+  color: color-mix(in srgb, var(--w) 78%, #000);
   border-radius: var(--r-1);
 }
 .pv-btn:hover:not(:disabled) { background: var(--orange); color: #000; }
 .pv-btn:disabled { opacity: 0.4; }
-.pv-btn.ghost { background: transparent; color: var(--g2); }
+.pv-btn.ghost { background: transparent; color: color-mix(in srgb, var(--w) 72%, #000); }
 .pv-btn.ghost:hover { background: var(--g1); color: var(--w); }
 .pv-test { font: 400 11.5px/2 var(--mono); color: var(--tomato); padding: 2px 8px 2px 30px; }
 .pv-test.ok { color: var(--cyan); }
@@ -1718,7 +1719,7 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
   border-radius: 0 var(--r-1) var(--r-1) 0;
 }
 .set-row:hover { background: var(--g0); }
-.set-row .k { font: 700 10.5px/1.3 var(--din); letter-spacing: 0.12em; color: var(--g3); }
+.set-row .k { font: 700 11px/1.3 var(--din); letter-spacing: 0.12em; color: var(--t2); }
 .set-row .v { font: 400 11.5px/1.4 var(--mono); color: var(--w); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .set-row .a { display: flex; gap: 2px; }
 
@@ -1826,7 +1827,7 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
   letter-spacing: 0.12em;
   white-space: nowrap;
 }
-.badge.dim { background: var(--g1); color: var(--g3); }
+.badge.dim { background: var(--g1); color: var(--t2); }
 .badge.moon { background: var(--moon); color: #000; }
 .badge.ice { background: var(--ice); color: #000; }
 .badge.cyan { background: var(--cyan); color: #000; }
@@ -2398,6 +2399,31 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
   color: var(--g2);
 }
 
+/* chronology: one bar per turn, so time reads without indenting every message */
+.tsep {
+  display: grid;
+  grid-template-columns: 4px auto auto 1fr;
+  gap: 8px;
+  align-items: center;
+  height: 24px;
+  margin: 6px 0 2px;
+  padding-right: 8px;
+  background: var(--g1);
+  border-radius: 0 var(--r-1) var(--r-1) 0;
+  box-shadow: inset 0 2px 0 var(--orange);
+}
+.tsep .st { align-self: stretch; background: var(--orange); border-radius: var(--r-pill); }
+.tsep .n {
+  font: 700 11px/1 var(--din);
+  letter-spacing: 0.14em;
+  color: #000;
+  background: var(--orange);
+  padding: 4px 6px;
+  border-radius: 0 var(--r-1) var(--r-1) 0;
+}
+.tsep .ts { font: 400 11px/1 var(--mono); color: color-mix(in srgb, var(--w) 74%, #000); font-variant-numeric: tabular-nums; }
+.tsep .ct { font: 700 11px/1 var(--din); letter-spacing: 0.12em; color: color-mix(in srgb, var(--w) 74%, #000); }
+
 .tv-body {
   flex: 1 1 auto;
   min-height: 0;
@@ -2414,7 +2440,7 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 .tnode {
   position: relative;
   display: grid;
-  grid-template-columns: 4px 78px minmax(0, 1fr) 42px 46px auto;
+  grid-template-columns: 34px 34px 78px minmax(0, 1fr) 66px 46px auto;
   gap: 8px;
   align-items: center;
   min-height: 34px;
@@ -2423,33 +2449,74 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
   background: var(--g0);
   border-radius: 0 var(--r-1) var(--r-1) 0;
 }
-.tnode .spine { align-self: stretch; margin: 7px 0; background: var(--g2); border-radius: var(--r-pill); }
-.tnode[data-kind="user"] .spine { background: var(--orange); }
-.tnode[data-kind="assistant"] .spine { background: var(--ice); }
-.tnode[data-kind="toolResult"] .spine { background: var(--tang); }
-.tnode[data-kind="compaction"] .spine { background: var(--moon); }
-.tnode[data-kind="branch_summary"] .spine,
-.tnode[data-kind="custom"] .spine { background: var(--lav); }
+.tnode .lane {
+  position: relative;
+  align-self: stretch;
+}
+.tnode .lane i {
+  position: absolute;
+  top: 7px;
+  bottom: 7px;
+  left: calc(var(--d, 0) * 8px);
+  width: 4px;
+  border-radius: var(--r-pill);
+  background: var(--g2);
+}
+.tnode[data-kind="user"] .lane i { background: var(--orange); }
+.tnode[data-kind="assistant"] .lane i { background: var(--ice); }
+.tnode[data-kind="toolResult"] .lane i { background: var(--tang); }
+.tnode[data-kind="compaction"] .lane i { background: var(--moon); }
+.tnode[data-kind="branch_summary"] .lane i,
+.tnode[data-kind="custom"] .lane i { background: var(--lav); }
 
 .tnode .kd {
   font: 700 11px/1.3 var(--din);
   letter-spacing: 0.1em;
-  color: var(--g2);
+  color: color-mix(in srgb, var(--w) 74%, #000);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .tnode .lb {
   font: 400 12.5px/1.5 var(--mono);
-  color: var(--g3);
+  color: color-mix(in srgb, var(--w) 68%, #000);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.tnode .fork,
+.tnode .seq {
+  font: 400 11px/1 var(--mono);
+  color: color-mix(in srgb, var(--w) 58%, #000);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.tnode .fork {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+}
+.tnode .fork .pg {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  background: var(--g1);
+  color: var(--t2);
+  font: 700 12px/1 var(--mono);
+  border-radius: 0 var(--r-1) var(--r-1) 0;
+}
+.tnode .fork .pg:hover:not(:disabled) { background: var(--orange); color: #000; }
+.tnode .fork .pg:disabled { opacity: 0.4; }
+.tnode .fork .ix {
+  min-width: 26px;
+  text-align: center;
+  font: 400 11px/1 var(--mono);
+  color: var(--t3);
+  font-variant-numeric: tabular-nums;
+}
 .tnode .ts {
   font: 400 11px/1 var(--mono);
-  color: var(--g2);
+  color: color-mix(in srgb, var(--w) 74%, #000);
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
@@ -2471,15 +2538,30 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 .tnode[data-current="1"] .kd,
 .tnode[data-current="1"] .ts,
 .tnode[data-current="1"] .fork { color: #000; }
-.tnode[data-current="1"] .spine { background: #000; }
+.tnode[data-current="1"] .lane i { background: #000; }
 .tnode[data-selected="1"] { filter: brightness(1.18); }
+.tnode[data-cursor="1"] { box-shadow: inset 4px 0 0 var(--cyan); filter: brightness(1.12); }
 .tnode:hover { filter: brightness(1.1); cursor: default; }
 .tnode[data-confirm="1"] { background: var(--tomato); filter: none; }
 .tnode[data-confirm="1"] .lb,
 .tnode[data-confirm="1"] .kd,
 .tnode[data-confirm="1"] .ts,
 .tnode[data-confirm="1"] .fork { color: #000; }
-.tnode[data-confirm="1"] .spine { background: #000; }
+.tnode[data-confirm="1"] .lane i { background: #000; }
+/* on a tomato block the buttons have to invert, not keep their dark-chip
+   styling: a transparent ghost button there is light text on light red */
+.tnode[data-confirm="1"] .pv-btn {
+  background: #000;
+  color: var(--tomato);
+}
+.tnode[data-confirm="1"] .pv-btn.ghost {
+  background: transparent;
+  color: #000;
+}
+.tnode[data-confirm="1"] .pv-btn:hover:not(:disabled) {
+  background: #000;
+  color: var(--w);
+}
 
 /* rail caveat line: says what the data does NOT contain */
 .rnote {
@@ -2564,7 +2646,7 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
   border-left-color: var(--g1);
   font-size: 12px;
   line-height: 1.8;
-  color: var(--g2);
+  color: var(--t3);
 }
 
 .about .pv-sub a,
@@ -2607,7 +2689,7 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 }
 .add-row .ic { height: 24px; display: flex; align-items: center; justify-content: flex-end; color: var(--orange); }
 .add-row .lb { font: 700 11px/1 var(--din); letter-spacing: 0.14em; white-space: nowrap; }
-.add-row .hint { font: 400 11px/1 var(--mono); color: var(--g2); text-align: right; white-space: nowrap; }
+.add-row .hint { font: 400 11px/1 var(--mono); color: var(--t3); text-align: right; white-space: nowrap; }
 .add-row:hover:not(:disabled),
 .add-row:focus-visible {
   background: var(--orange);

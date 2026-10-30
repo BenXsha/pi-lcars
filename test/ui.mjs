@@ -393,6 +393,34 @@ try {
   check("no uncaught exceptions", errors.length === 0, errors.slice(0, 2).join(" | "));
   check("no console errors", logged.length === 0, logged.slice(0, 2).join(" | "));
 
+  /* ------------------------------------- 10b. branch tree panel */
+  await evaluate(`[...document.querySelectorAll('.chips .badge')].find((b) => /TREE/.test(b.textContent))?.click()`);
+  await sleep(1200);
+  check("tree opens with tree semantics", await exists('.tv-body[role="tree"]'));
+  const treeRows = await evaluate(`document.querySelectorAll('.tnode[role="treeitem"]').length`);
+  if (treeRows === 0) {
+    // the harness runs on a throwaway session, so the tree is legitimately empty
+    check("empty tree says so", await evaluate(`/nothing in this session/i.test(document.querySelector('.tv')?.textContent ?? '')`));
+    results.push("skip  populated-tree checks — run with UI_MODEL=1 for a session with entries");
+  } else {
+    check("tree lists entries", treeRows > 0, `${treeRows} rows`);
+    check(
+      "every entry carries a lane rail",
+      (await evaluate(`document.querySelectorAll('.tnode .lane i').length`)) === treeRows,
+    );
+    check("entries are grouped into turns", (await evaluate(`document.querySelectorAll('.tsep').length`)) >= 1);
+    check(
+      "tree does not scroll sideways",
+      (await evaluate(`(() => { const b = document.querySelector('.tv-body'); return b.scrollWidth > b.clientWidth; })()`)) === false,
+    );
+    await evaluate(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }))`);
+    await sleep(200);
+    check("arrow keys move the tree cursor", await exists('.tnode[data-cursor="1"]'));
+  }
+  await evaluate(`[...document.querySelectorAll('.fv-hd .pv-btn')].find((b) => /CLOSE/.test(b.textContent))?.click()`);
+  await sleep(400);
+  check("tree closes back to the transcript", await inTranscript());
+
   /* -------------------------- 11. a crash surfaces, and reports to the server */
   await cdp.send("Page.navigate", { url: process.env.UI_BASE || handshake.url });
   await sleep(2200);
