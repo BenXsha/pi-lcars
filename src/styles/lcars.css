@@ -1638,17 +1638,18 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 .theme-opt.mini {
   display: grid;
   grid-template-columns: 44px auto;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
-  min-height: 28px;
-  padding: 3px 8px 3px 4px;
+  min-height: 30px;
+  /* 4px spine + 8px breathing room, so the selected marker never covers a swatch */
+  padding: 3px 10px 3px 12px;
   width: auto;
 }
 .theme-opt.mini .sw { height: 18px; }
-.theme-opt.mini .nm { font-size: 10.5px; letter-spacing: 0.08em; }
+.theme-opt.mini .nm { font-size: 11px; letter-spacing: 0.1em; }
 
 .seg.small { height: 30px; max-width: 320px; }
-.seg.small button { font-size: 10.5px; letter-spacing: 0.1em; }
+.seg.small button { font-size: 11px; letter-spacing: 0.1em; }
 
 .set-row {
   display: grid;
@@ -2482,3 +2483,20 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
   font: 400 11px/1.7 var(--mono);
   color: var(--g2);
 }
+
+/* ------------------------------------------------- multi-line config fields */
+.field[data-area="1"] { min-height: 78px; align-items: stretch; }
+.field[data-area="1"] > .fc { padding: 7px 12px; }
+.field[data-area="1"] > .fc textarea {
+  width: 100%;
+  min-height: 62px;
+  resize: vertical;
+  border: 0;
+  outline: 0;
+  background: none;
+  color: var(--w);
+  font: 12.5px/1.75 var(--mono);
+  field-sizing: content; /* progressive: grows with content where supported */
+}
+.field[data-area="1"] > .fc textarea::placeholder { color: var(--g3); }
+.form-note[data-err="1"] { color: var(--tomato); }

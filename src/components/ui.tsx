@@ -461,6 +461,17 @@ export function ApprovalDeck(props: {
    form language
    ============================================================ */
 
+/** Inline styling for the bare input inside `.field > .fc .in`. */
+const FIELD_INPUT_STYLE = {
+  border: "0",
+  background: "none",
+  padding: 0,
+  outline: 0,
+  flex: "1 1 auto",
+  color: "inherit",
+  font: "inherit",
+} as const;
+
 export function FieldRow(props: {
   label: string;
   icon?: IconName;
@@ -483,13 +494,23 @@ export function FieldRow(props: {
       <span class="fc">
         <span class="in">
           {props.value !== undefined ? (
-            <input
-              class="in"
-              style={{ border: "0", background: "none", padding: 0, outline: 0, flex: "1 1 auto", color: "inherit", font: "inherit" }}
-              type={(props.mask ? "password" : "text") as any}
-              value={props.value}
-              onInput={(e) => props.onInput?.((e.target as HTMLInputElement).value)}
-            />
+            props.mask ? (
+              <input
+                class="in"
+                style={FIELD_INPUT_STYLE}
+                type="password"
+                value={props.value}
+                onInput={(e) => props.onInput?.((e.target as HTMLInputElement).value)}
+              />
+            ) : (
+              <input
+                class="in"
+                style={FIELD_INPUT_STYLE}
+                type="text"
+                value={props.value}
+                onInput={(e) => props.onInput?.((e.target as HTMLInputElement).value)}
+              />
+            )
           ) : (
             <span class="ph">{props.placeholder ?? ""}</span>
           )}
@@ -501,6 +522,44 @@ export function FieldRow(props: {
         ) : null}
       </span>
       <span class="unit">{props.unit ?? ""}</span>
+    </label>
+  );
+}
+
+/** Same grid as FieldRow, but a textarea — for args / env / headers lists. */
+export function FieldArea(props: {
+  label: string;
+  icon?: IconName;
+  required?: boolean;
+  value: string;
+  placeholder?: string;
+  rows?: number;
+  state?: "idle" | "ok" | "error";
+  message?: string;
+  onInput?: (v: string) => void;
+}) {
+  return (
+    <label class="field" data-area="1" data-required={props.required ? "1" : "0"} data-state={props.state ?? "idle"}>
+      <span class="st" />
+      <span class="lb">
+        {props.icon ? <Icon name={props.icon} size={11} /> : null}
+        {props.label}
+      </span>
+      <span class="fc">
+        <textarea
+          value={props.value}
+          rows={props.rows ?? 3}
+          placeholder={props.placeholder}
+          spellcheck={false}
+          onInput={(e) => props.onInput?.((e.target as HTMLTextAreaElement).value)}
+        />
+        {props.message ? (
+          <span class="msg" data-tone={props.state === "error" ? "err" : props.state === "ok" ? "ok" : undefined}>
+            {props.message}
+          </span>
+        ) : null}
+      </span>
+      <span class="unit" />
     </label>
   );
 }

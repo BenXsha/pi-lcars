@@ -36,11 +36,12 @@
     "start": "node bin/pi-lcars.mjs",
     "icons": "node scripts/build-icons.mjs",
     "server": "node server/index.mjs",
-    "test": "node test/pi-env.mjs && node test/smoke.mjs && node test/launch.mjs && node test/ui.mjs",
+    "test": "node test/pi-env.mjs && node test/mcp-config.mjs && node test/smoke.mjs && node test/launch.mjs && node test/ui.mjs",
     "test:smoke": "node test/smoke.mjs",
     "test:launch": "node test/launch.mjs",
     "check:themes": "node scripts/check-themes.mjs",
-    "test:ui": "node test/ui.mjs"
+    "test:ui": "node test/ui.mjs",
+    "test:mcp": "node test/mcp-config.mjs"
   },
   "devDependencies": {
     "@preact/preset-vite": "^2.10.6",

@@ -500,7 +500,23 @@ const routes = {
         ok(res, await setEnabled({ ...ctx, name: b.name, enabled: !!b.enabled }));
         break;
       case "add":
-        ok(res, await addServer({ ...ctx, name: b.name, command: b.command, args: b.args, url: b.url, scope: b.scope, exposure: b.exposure }));
+        ok(
+          res,
+          await addServer({
+            ...ctx,
+            name: b.name,
+            command: b.command,
+            args: b.args,
+            url: b.url,
+            env: b.env,
+            headers: b.headers,
+            dir: b.dir,
+            timeout: b.timeout,
+            description: b.description,
+            scope: b.scope,
+            exposure: b.exposure,
+          }),
+        );
         break;
       case "remove":
         ok(res, await removeServer({ ...ctx, name: b.name }));

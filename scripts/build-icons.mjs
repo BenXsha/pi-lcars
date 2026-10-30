@@ -49,6 +49,8 @@ const MANIFEST = {
   "status-idle": "circle-fill",
   // actions
   "act-copy": "file-copy-fill",
+  "act-info": "information-fill",
+  "act-time": "time-fill",
   "act-expand": "arrow-down-s-fill",
   "act-collapse": "arrow-up-s-fill",
   "act-send": "arrow-right-fill",
@@ -70,6 +72,7 @@ const MANIFEST = {
   "fld-show": "eye-fill",
   "fld-hide": "eye-off-fill",
   "fld-model": "brain-fill",
+  "fld-args": "list-unordered",
   "fld-path": "folder-fill",
   // approval
   "ap-approve": "check-fill",

@@ -419,5 +419,9 @@ user | assistant | tool | approval | notice | subagent | diff
 - **Composer 渲染崩溃**：`meta.queue` 一处给数字、一处给文本数组，`...(... ?? [])` 抛异常导致整页不再重渲染（表现就是"点哪都没反应"）。服务端统一成数组，客户端 `textList()` 兜底。
 - **Escape 关不掉 deck / 分支树**：只有文件查看器处理 Esc。现在 deck → tree → viewer 依次关闭。
 - **NEW SESSION 布局被旧 CSS 拖成竖排**：`.lnew` 两条同名规则，新规则没重置 `flex-direction: column`，图标在上、标签被挤到底边。
-- **低于 11px 底线的字号**：`10px`（`.tgl`、`.set-tool`、MCP 内联说明）与 `10.5px`（`.set-section`）整体上调到 11px。
+- **低于 11px 底线的字号**：`10px`（`.tgl`、`.set-tool`、MCP 内联说明）与 `10.5px`（`.set-section`、主题标签、分段按钮）整体上调到 11px。
+- **MCP ADD 表单只有 command/url**：带 env 的 stdio server、需要鉴权头的 http server 都写不出来。现在补齐
+  `args / env / cwd / headers / timeout / description / exposure / scope`，解析在服务端（带行号报错），
+  密钥值只回报数量不回传值（`test/mcp-config.mjs` 27 检查）。
+- **主题选项的选中脊压在色板上**：左内距 4px + 4px 橙脊 = 色板起点被覆盖；改成 12px 内距。
 - **`unknown/unknown` 模型**：见 commit `d93b41c`。

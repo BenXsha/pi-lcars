@@ -375,6 +375,34 @@ Codex 的做法是：**工作区在你开 session 时就定了，之后不可变
 - 读取一律走**活着的 ModelRuntime**（`getProviders/getAllModels/hasConfiguredAuth`），
   不解析 models.json —— 保证界面和下一轮实际选择永远一致。
 
+### 7.6d-2 MCP 站（ADD 表单必须覆盖 pi 的完整 server schema）
+
+pi 的 `mcp.json` 一个 server 能写的字段远不止 `command` / `url`；表单少一项，用户就写不出那种配置。
+ADD 表单因此覆盖：
+
+| 字段 | 适用 | 说明 |
+|---|---|---|
+| `NAME` | 两者 | `[a-z0-9][a-z0-9._-]*`，工具名会变成 `mcp__<name>__<tool>` |
+| `TRANSPORT` | — | `AUTO / STDIO / HTTP`；AUTO 看填了 url 还是 command，两边都填直接判错 |
+| `COMMAND` | stdio | 只写可执行文件，不是 shell 字符串 |
+| `ARGS` | stdio | 空白分词（支持引号）或直接贴 JSON 数组 |
+| `WORKING DIR` | stdio | 绝对路径 / `~/…` / 相对会话目录 |
+| `ENV` | stdio | 一行一个 `KEY=VALUE`（或 JSON 对象），值可写 `${VAR}` 或 `!命令` |
+| `URL` / `HEADERS` | http | 一行一个 `Name: value`；同理支持 `${VAR}` |
+| `TIMEOUT` | 两者 | 秒，1–3600，默认 60 |
+| `DESCRIPTION` | 两者 | 一句话，进 system prompt 的 `mcp_servers` 段，也用于 tool search 排序 |
+| `EXPOSURE` | 两者 | `codemode`（默认）/ `deferred` / `direct` / `hidden`，选中有解释行 |
+| `SCOPE` | 两者 | `GLOBAL` 写 `~/.pi/agent/mcp.json`，`PROJECT` 写 `.pi/mcp.json`（需项目信任） |
+
+硬规则：
+
+- **解析在服务端**（`parseArgs` / `parsePairs`），客户端只传原始文本；错误必须带行号（`env line 3: expected KEY=VALUE`），
+  不静默丢弃行。JSON 数组/对象作为逃生口保留。
+- **秘密只进不出**：`env` / `headers` 的值可以含 token，`readMcp()` 只回报 `envKeys` / `headerKeys` 计数，
+  任何响应里都不出现值（测试里用真 token 断言这一点）。
+- 写入仍然 **备份 + 原子替换**，且 `command` 与 `url` 互斥（两种 transport 混写 pi 会判无效）。
+- `exposure` 非法值、`timeout` 越界、重名、坏名字一律 `400/409 E_MCP`，不做"尽力而为"。
+
 ### 7.6e Skills 面板（SKILLS 站）
 
 技能不是工具，pi 只在**判断适用时**把技能正文注入 system prompt —— 所以面板必须回答三个问题：
@@ -718,6 +746,8 @@ composer 上方出现 `QUEUED n` 条带，逐条显示待投递文本 + `deliver
 | 2026-xx-xx | `Esc` 统一关闭覆盖层：deck → 分支树 → 查看器 → 否则中断运行 | 只有查看器响应 Esc，deck/树关不掉，与"覆盖层可 Esc 关闭"的直觉冲突 | `src/views/Console.tsx` |
 | 2026-xx-xx | 右栏 context 条只画 `USED / FREE`，并写明"细分未由 SDK 提供" | 原来写死 `system 8% / tools 4%` 是编造数字，违反 §7.6；宁可少画一段也不假装有数据 | `src/views/Console.tsx`、`src/styles/lcars.css`（`.rnote`） |
 | 2026-xx-xx | 模型列表按 provider 分组、全量展示、带 `ctx · $in/$out Mtok · reasoning`，46vh 内滚 | 原来只 `slice(0, 8)` 且不给成本/窗口，等于让人盲选；pi 的 model 对象本来就带 `contextWindow` 与 `cost` | `src/views/Console.tsx`、`server/index.mjs`（`/api/models`）、`src/api.ts` |
+| 2026-xx-xx | MCP 的 ADD 表单补齐 pi 的 server schema（args / env / cwd / headers / timeout / description / exposure / scope），解析放服务端 | 只有 command/url 两项时，带 env 的 stdio server 与需要鉴权头的 http server 根本写不出来；手改 mcp.json 又绕过了备份与校验 | `src/views/Console.tsx`、`server/pi/mcpConfig.mjs`、`server/index.mjs`、`test/mcp-config.mjs` |
+| 2026-xx-xx | 主题选项的左内距 12px（4px 选中脊 + 8px 呼吸），标签 11px | 原来左内距 4px，选中时 4px 橙脊正压在色板上；标签还是 10.5px | `src/styles/lcars.css` |
 | 2026-xx-xx | 新会话在 `#load()` 里补齐默认模型与思考档：`createAgentSession()` 不传 model 时 pi 会停在 `unknown/unknown`，导致 shelf 与 `pi-lcars status` 显示假值 | “unknown/unknown” 违反 §7.6 数字自洽；同时它让 pi-lens 把 situational 工具当默认激活，工具清单虚高 | `server/pi/registry.mjs`、`test/smoke.mjs` |
 
 ---

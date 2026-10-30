@@ -17,6 +17,7 @@ import {
   BarButton,
   ControlChip,
   Deck,
+  FieldArea,
   FieldRow,
   MessageRow,
   Meter,
@@ -1536,13 +1537,58 @@ function ThinkDeck({ current, onClose }: { current?: string; onClose: () => void
 }
 
 /* ------------------------------------------------------------------ mcp */
+const MCP_NAME_RE = /^[a-z0-9][a-z0-9._-]{0,40}$/i;
+
+const EMPTY_MCP_DRAFT = {
+  name: "",
+  transport: "auto" as "auto" | "stdio" | "http",
+  command: "",
+  args: "",
+  url: "",
+  headers: "",
+  env: "",
+  dir: "",
+  timeout: "",
+  description: "",
+  exposure: "codemode",
+  scope: "global",
+};
+
+const EXPOSURE_HINT: Record<string, string> = {
+  codemode: "callable from codemode scripts; not declared to the model (default)",
+  "codemode-deferred": "alias of codemode",
+  deferred: "declared after tool_search loads a match",
+  direct: "declared like a built-in tool",
+  hidden: "registered but unreachable",
+};
+
+/** `[label][choice buttons]` — the same row language as the provider API picker. */
+function ChoiceRow(props: { label: string; value: string; options: [string, string][]; onPick: (v: string) => void }) {
+  return (
+    <div class="pv-form-row">
+      <span class="lb">{props.label}</span>
+      {props.options.map(([value, label]) => (
+        <button
+          key={value}
+          type="button"
+          class="pv-btn"
+          data-on={props.value === value ? "1" : "0"}
+          onClick={() => props.onPick(value)}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function McpPanel() {
   const [data, setData] = useState<McpConfig | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [showTools, setShowTools] = useState<Record<string, boolean>>({});
-  const [name, setName] = useState("");
-  const [command, setCommand] = useState("");
+  const [draft, setDraft] = useState(EMPTY_MCP_DRAFT);
+  const [addError, setAddError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [connectNote, setConnectNote] = useState<string | null>(null);
@@ -1573,6 +1619,19 @@ function McpPanel() {
   };
 
   const totals = data?.totals;
+
+  // "auto" follows whatever was filled first: a URL means http, otherwise stdio
+  const transport = draft.transport === "auto" ? (draft.url.trim() ? "http" : "stdio") : draft.transport;
+  const isHttp = transport === "http";
+  const problem = !MCP_NAME_RE.test(draft.name)
+    ? "name: letters, digits, dot, dash, underscore"
+    : draft.command.trim() && draft.url.trim()
+      ? "fill command (stdio) or url (http), not both"
+      : isHttp && !/^https?:\/\//.test(draft.url.trim())
+        ? "url: must start with http:// or https://"
+        : !isHttp && !draft.command.trim()
+          ? "command: required for stdio servers"
+          : null;
 
   return (
     <div class="pv">
@@ -1685,28 +1744,163 @@ function McpPanel() {
 
       <div class="pv-h">ADD SERVER</div>
       <div class="pv-form" style={{ maxWidth: "820px" }}>
-        <FieldRow label="NAME" icon="station-mcp" value={name} placeholder="filesystem" onInput={setName} required />
-        <FieldRow label="COMMAND / URL" icon="fld-host" value={command} placeholder="npx -y @modelcontextprotocol/server-filesystem ." onInput={setCommand} />
+        <FieldRow
+          label="NAME"
+          icon="station-mcp"
+          value={draft.name}
+          placeholder="filesystem"
+          onInput={(v) => setDraft({ ...draft, name: v })}
+          required
+          state={draft.name && !MCP_NAME_RE.test(draft.name) ? "error" : "idle"}
+          message={draft.name && !MCP_NAME_RE.test(draft.name) ? "letters, digits, dot, dash, underscore" : undefined}
+        />
+        <ChoiceRow
+          label="TRANSPORT"
+          value={draft.transport}
+          options={[
+            ["auto", "AUTO"],
+            ["stdio", "STDIO"],
+            ["http", "HTTP"],
+          ]}
+          onPick={(v) => setDraft({ ...draft, transport: v as typeof draft.transport })}
+        />
+
+        {!isHttp ? (
+          <>
+            <FieldRow
+              label="COMMAND"
+              icon="tool-bash"
+              value={draft.command}
+              placeholder="npx"
+              onInput={(v) => setDraft({ ...draft, command: v })}
+              required
+            />
+            <FieldArea
+              label="ARGS"
+              icon="fld-args"
+              value={draft.args}
+              rows={2}
+              placeholder="-y @modelcontextprotocol/server-filesystem ~/projects   (or a JSON array)"
+              onInput={(v) => setDraft({ ...draft, args: v })}
+            />
+            <FieldRow
+              label="WORKING DIR"
+              icon="fld-path"
+              value={draft.dir}
+              placeholder="optional · absolute, ~/…, or relative to the session"
+              onInput={(v) => setDraft({ ...draft, dir: v })}
+            />
+            <FieldArea
+              label="ENV"
+              icon="fld-key"
+              value={draft.env}
+              rows={2}
+              placeholder={"GITHUB_TOKEN=${GITHUB_TOKEN}\nAPI_BASE=https://api.example.com"}
+              onInput={(v) => setDraft({ ...draft, env: v })}
+            />
+          </>
+        ) : (
+          <>
+            <FieldRow
+              label="URL"
+              icon="fld-host"
+              value={draft.url}
+              placeholder="https://example.com/mcp"
+              onInput={(v) => setDraft({ ...draft, url: v })}
+              required
+            />
+            <FieldArea
+              label="HEADERS"
+              icon="fld-key"
+              value={draft.headers}
+              rows={2}
+              placeholder={"Authorization: Bearer ${DOCS_TOKEN}"}
+              onInput={(v) => setDraft({ ...draft, headers: v })}
+            />
+          </>
+        )}
+
+        <FieldRow
+          label="TIMEOUT"
+          icon="act-time"
+          value={draft.timeout}
+          placeholder="60"
+          unit="SEC"
+          onInput={(v) => setDraft({ ...draft, timeout: v })}
+        />
+        <FieldRow
+          label="DESCRIPTION"
+          icon="act-info"
+          value={draft.description}
+          placeholder="one sentence — listed in the system prompt"
+          onInput={(v) => setDraft({ ...draft, description: v })}
+        />
+        <ChoiceRow
+          label="EXPOSURE"
+          value={draft.exposure}
+          options={[
+            ["codemode", "CODEMODE"],
+            ["deferred", "DEFERRED"],
+            ["direct", "DIRECT"],
+            ["hidden", "HIDDEN"],
+          ]}
+          onPick={(v) => setDraft({ ...draft, exposure: v })}
+        />
+        <span class="form-note">{EXPOSURE_HINT[draft.exposure] ?? ""}</span>
+        <ChoiceRow
+          label="SCOPE"
+          value={draft.scope}
+          options={[
+            ["global", "GLOBAL"],
+            ["project", "PROJECT"],
+          ]}
+          onPick={(v) => setDraft({ ...draft, scope: v })}
+        />
+        <span class="form-note">
+          {draft.scope === "project"
+            ? `written to ${shortPath(data?.paths.project ?? ".pi/mcp.json")} — project servers load after project trust`
+            : `written to ${shortPath(data?.paths.global ?? "~/.pi/agent/mcp.json")} with a .bak`}
+        </span>
+
+        {addError ? (
+          <span class="form-note" data-err="1">
+            {addError}
+          </span>
+        ) : null}
+
         <div class="form-actions">
           <BarButton
             tone="ok"
             label="ADD"
             icon="act-new"
-            disabled={busy || !name || !command}
+            disabled={busy || Boolean(problem)}
             onClick={() =>
               run(async () => {
-                const isUrl = /^https?:\/\//.test(command);
-                await api.mcpAdd(isUrl ? { name, url: command } : { name, command: command.split(/\s+/)[0], args: command.split(/\s+/).slice(1).join(" ") });
-                setName("");
-                setCommand("");
+                setAddError(null);
+                try {
+                  await api.mcpAdd({
+                    name: draft.name.trim(),
+                    command: isHttp ? undefined : draft.command.trim(),
+                    args: isHttp ? undefined : draft.args,
+                    url: isHttp ? draft.url.trim() : undefined,
+                    headers: isHttp ? draft.headers : undefined,
+                    env: isHttp ? undefined : draft.env,
+                    dir: isHttp ? undefined : draft.dir,
+                    timeout: draft.timeout,
+                    description: draft.description,
+                    exposure: draft.exposure,
+                    scope: draft.scope,
+                  });
+                  setDraft(EMPTY_MCP_DRAFT);
+                } catch (e) {
+                  setAddError((e as Error).message);
+                }
               })
             }
           />
           <BarButton tone="quiet" label="RELOAD" icon="act-reload" onClick={() => load()} />
+          <span class="form-note">{problem ?? "args, env and headers accept one entry per line"}</span>
         </div>
-        <span class="form-note">
-          read from {shortPath(data?.paths.global ?? "~/.pi/agent/mcp.json")} · writes keep a .bak
-        </span>
       </div>
     </div>
   );

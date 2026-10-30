@@ -342,7 +342,19 @@ export const api = {
   providerReload: () => post<{ reloaded: boolean }>("/api/providers", { op: "reload" }),
   mcp: () => call<McpConfig>("/api/mcp"),
   mcpToggle: (name: string, enabled: boolean) => post<unknown>("/api/mcp", { op: "toggle", name, enabled }),
-  mcpAdd: (payload: { name: string; command?: string; args?: string; url?: string; scope?: string }) =>
+  mcpAdd: (payload: {
+    name: string;
+    command?: string;
+    args?: string;
+    url?: string;
+    env?: string;
+    headers?: string;
+    dir?: string;
+    timeout?: string;
+    description?: string;
+    scope?: string;
+    exposure?: string;
+  }) =>
     post<unknown>("/api/mcp", { op: "add", ...payload }),
   mcpRemove: (name: string) => post<unknown>("/api/mcp", { op: "remove", name }),
   mcpConnect: () => post<McpConfig & { connectMs: number; pending: boolean }>("/api/mcp", { op: "connect" }),

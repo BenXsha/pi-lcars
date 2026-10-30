@@ -216,6 +216,27 @@ try {
     check(`nav ${st.view}: transcript replaced`, !(await inTranscript()));
   }
 
+  /* -------------------------------------------- 4a. MCP add form fields */
+  await click(".lnav .station:nth-child(1)");
+  await sleep(400);
+  const mcpFields = await evaluate(`[...document.querySelectorAll('.pv-form .field .lb')].map((el) => el.textContent.trim())`);
+  check(
+    "mcp form exposes transport/args/env/exposure/scope",
+    ["NAME", "COMMAND", "ARGS", "WORKING DIR", "ENV", "DESCRIPTION"].every((label) => mcpFields.some((f) => f.includes(label))) &&
+      mcpFields.some((f) => f.includes("TIMEOUT")),
+    JSON.stringify(mcpFields),
+  );
+  const mcpChoices = await evaluate(`[...document.querySelectorAll('.pv-form .pv-form-row .lb')].map((el) => el.textContent.trim())`);
+  check("mcp form exposes choice rows", ["TRANSPORT", "EXPOSURE", "SCOPE"].every((k) => mcpChoices.includes(k)), JSON.stringify(mcpChoices));
+  check("mcp form has multi-line fields", (await evaluate(`document.querySelectorAll('.pv-form textarea').length`)) >= 2);
+  check("mcp add is blocked until the form is valid", await evaluate(`[...document.querySelectorAll('.pv-form .btn')].find((b) => /ADD/.test(b.textContent))?.disabled === true`));
+
+  // switching transport swaps stdio fields for url + headers
+  await evaluate(`(() => { const b = [...document.querySelectorAll('.pv-form .pv-btn')].find((el) => el.textContent.trim() === 'HTTP'); b?.click(); })()`);
+  await sleep(300);
+  const httpFields = await evaluate(`[...document.querySelectorAll('.pv-form .field .lb')].map((el) => el.textContent.trim())`);
+  check("mcp form switches to http fields", httpFields.some((f) => f.includes("URL")) && httpFields.some((f) => f.includes("HEADERS")) && !httpFields.some((f) => f.includes("COMMAND")), JSON.stringify(httpFields));
+
   /* ------------------------------------------- 4b. station numbering */
   const nums = await evaluate(`[...document.querySelectorAll('.lnav .station .num')].map((el) => el.textContent)`);
   check("rail numbers the stations", JSON.stringify(nums) === JSON.stringify(["01", "02", "03", "04", "05", "06"]), JSON.stringify(nums));
@@ -325,6 +346,12 @@ try {
 
   const themeOpts = await evaluate(`[...document.querySelectorAll('.theme-opt')].map((el) => el.textContent.trim())`);
   check("settings lists the themes", Array.isArray(themeOpts) && themeOpts.length >= 4, JSON.stringify(themeOpts));
+  const themeBox = await evaluate(
+    `(() => { const b = document.querySelector('.theme-opt.mini'); if (!b) return null; const sw = b.querySelector('.sw').getBoundingClientRect(); const br = b.getBoundingClientRect(); return { pad: Math.round(sw.x - br.x), sw: Math.round(sw.width), fs: getComputedStyle(b.querySelector('.nm')).fontSize }; })()`,
+  );
+  check("theme swatch clears the selection spine", themeBox && themeBox.pad >= 8, JSON.stringify(themeBox));
+  check("theme label respects the 11px floor", themeBox && parseFloat(themeBox.fs) >= 11, String(themeBox?.fs));
+
   const clickedVoy = await evaluate(
     `(() => { const b = [...document.querySelectorAll('.theme-opt')].find((el) => /VOY/i.test(el.textContent)); if (!b) return false; b.click(); return true; })()`,
   );
