@@ -686,6 +686,9 @@ composer 上方出现 `QUEUED n` 条带，逐条显示待投递文本 + `deliver
 | 2026-xx-xx | v2 改为“真实会话流”：失败原文 / 重试独立条 / 截断警告 / 并行 ×N / 流式 caret + 生成态 command bar | 真实感来自不均匀 + 可核验细节 | `boards/board-b.html` |
 | 2026-xx-xx | 交付 web 壳 `demo/`（SDK + SSE + 原生 DOM），画板降级为校验依据 | 静态稿无法验证节奏与状态，要能真跑 | §11 |
 | 2026-xx-xx | 不造假空态：`03 AGENTS` 列真实 21 个工具的 loadout，`05 SKILLS` 明写未接线 | 实测 SDK 会加载 packages 里的工具 | §11 |
+| 2026-xx-xx | 交付形态定为**一条命令**：`pi-lcars`（bin）= pi 后台 + UI + 浏览器；`dist` 随包发布，构建只在源码检出发生 | `opencode web` 式启动是产品级预期；全局安装不带 vite，不能要求用户先 build | PLAN.md §8（M9）、`bin/pi-lcars.mjs`、`package.json` 的 `bin`/`files`/`prepack` |
+| 2026-xx-xx | 启动前做 **pi 环境检查**：候选按“能 import + 具备所需 API”逐个探测，新版缺 API 就自动退到旧版；没装 pi 就打印平台对应安装命令（不打栈） | 用户机器上 pi 的版本/路径不可预测；“报错但不说怎么办”是启动器的最大摩擦 | `server/pi/sdk.mjs`、`bin/pi-lcars.mjs` 的 `doctor`、`test/pi-env.mjs`；PLAN §8.8 |
+| 2026-xx-xx | 路径一律 `node:os.homedir()` + `node:path`，支持 `PI_CODING_AGENT_DIR` / `PI_PACKAGE_DIR` | 旧代码读 `process.env.HOME`，在 Windows 上为空；pi 官方也提供这两个 env 覆盖 | `server/pi/sdk.mjs`、`server/index.mjs` |
 
 ---
 

@@ -14,33 +14,69 @@ A web console for [pi](https://pi.dev) where the agent transcript reads like an 
 
 ## Run
 
+One command boots the pi backend, the UI and the browser — the client is served
+by the same Node process that hosts the SDK, so there is nothing else to start.
+
+```bash
+npx pi-lcars            # from anywhere; builds the client on first run
+npm i -g pi-lcars       # or install it, then just `pi-lcars`
+```
+
+```
+  pi-lcars              start, open the browser
+  pi-lcars --dev        vite dev server with HMR on :5173
+  pi-lcars doctor       check the pi backend, print the fix when it is missing
+  pi-lcars status       running instances (pid, port, cwd, model)
+  pi-lcars stop         stop the newest instance
+```
+
+`--cwd <dir>` sets the workspace, `--port` the first port to try (it walks up
+when busy), `--host` the bind address, `--policy off|risky|all` the approval
+gate, `--json` prints `{url,port,pid,cwd}` on the first stdout line.
+
+### Requirements
+
+- Node **>= 22.19** (pi's own minimum)
+- pi itself — the installer (`curl -fsSL https://pi.dev/install.sh | sh`, or
+  `irm https://pi.dev/install.ps1` on Windows) or
+  `npm i -g --ignore-scripts @earendil-works/pi-coding-agent`
+
+`pi-lcars doctor` finds the backend automatically: `PI_SDK` → project
+`node_modules` → `<agent>/install/releases/*` (newest release that answers the
+SDK API the console calls) → npm global root. Nothing installed? It prints the
+platform-correct install command instead of failing with a stack trace.
+
+### Development
+
 ```bash
 npm install
-
 npm run dev      # client at :5173, proxies /api → :4173
 npm run server   # in another shell: real pi session, SSE on :4173
-npm test         # 31 endpoint checks against a throwaway session dir
+npm test         # pi-env (18) + endpoints (48) + launcher (28) checks
 
 SMOKE_MODEL=1 npm test   # also does one real turn + fork (costs a model call)
 ```
 
-Production: `npm run build && npm run server` → everything on http://127.0.0.1:4173
-
 | env | default | purpose |
 |---|---|---|
-| `PORT` | `4173` | server port |
+| `PORT` | `4173` | first port to try |
+| `HOST` | `127.0.0.1` | bind address (no auth — keep it loopback) |
 | `PI_CWD` | `process.cwd()` | workspace the agent runs in |
-| `LCARS_SESSIONS` | `~/.pi/agent/sessions` | where transcripts are written |
+| `LCARS_SESSIONS` | pi default | where transcripts are written |
 | `LCARS_POLICY` | `off` | approval gate: `off` / `risky` / `all` |
 | `LCARS_TRUST_PROJECT` | `1` | load project `.pi/` extensions |
 | `LCARS_RESUME` | `0` | `1` = resume the newest session in the workspace on boot |
-| `PI_SDK` | auto-resolved | explicit path to the pi SDK |
+| `LCARS_STATE_DIR` | `~/.pi/agent/lcars` | instance records for `status` / `stop` |
+| `PI_SDK` | auto-resolved | explicit path to (or specifier of) the pi SDK |
+| `PI_CODING_AGENT_DIR` | `~/.pi/agent` | pi config dir, honoured everywhere |
 
 ## Layout
 
 ```
+bin/pi-lcars.mjs   launcher: args, build-if-stale, port walk, status/stop/doctor
 server/            Node, no runtime deps beyond the pi SDK
-  index.mjs        http + SSE + routes
+  index.mjs        start(opts): http + SSE + routes
+  pi/sdk.mjs       pi backend discovery: PI_SDK → node_modules → releases → npm -g
   pi/registry.mjs  session lifecycle, transcript items, meta
   pi/queue.mjs     one global run at a time
   pi/approval.mjs  blocking tool approval gate (inline pi extension)
@@ -52,8 +88,8 @@ src/               Vite + Preact + TS client
   icons.ts         generated: remixicon -fill paths (56 icons, no font)
 demo/              v0 vanilla implementation, kept for reference
 boards/            MasterGo frames (v1 skeleton, v2 real stream)
-AGENTS.md          the design contract — read before touching UI
-PLAN.md            milestone plan (M0..M8)
+AGENTS.md          the design contract — read before touching UI (repo only, not published)
+PLAN.md            milestone plan (M0..M9) (repo only, not published)
 ```
 
 ## API
