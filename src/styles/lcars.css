@@ -2878,3 +2878,10 @@ html[data-backdrop="1"] body::after {
 }
 [data-theme="borg"] .sess[data-active="1"] .num,
 [data-theme="borg"] .sess[data-active="1"] .l1 { color: var(--orange); }
+/* the subtitle and the right-hand readout are mixed DOWN from the block colour
+   (they were designed for an orange tile); on borg's dark tile they vanish, so
+   they take the neutral text tokens instead */
+[data-theme="borg"] .sess .l2 { color: var(--t3); }
+[data-theme="borg"] .sess .rt { color: var(--t2); }
+[data-theme="borg"] .sess .num { color: var(--orange); }
+[data-theme="borg"] .sess .l1[data-empty="1"] { color: var(--g3); }
