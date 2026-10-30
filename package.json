@@ -1,16 +1,46 @@
 {
   "name": "pi-lcars",
-  "description": "LCARS agent console for pi — Vite + Preact client, in-process pi SDK server",
+  "version": "0.3.0",
+  "description": "LCARS agent console for pi — one command boots the web UI and the in-process pi backend",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://gitee.com/benshawn/pi-lcars.git"
+  },
+  "type": "module",
+  "bin": {
+    "pi-lcars": "bin/pi-lcars.mjs"
+  },
+  "files": [
+    "bin/",
+    "server/",
+    "dist/",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20.11"
+  },
+  "keywords": [
+    "pi",
+    "pi-coding-agent",
+    "lcars",
+    "agent",
+    "console",
+    "web-ui"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "prepack": "vite build",
+    "start": "node bin/pi-lcars.mjs",
     "icons": "node scripts/build-icons.mjs",
     "server": "node server/index.mjs",
-    "test": "node test/smoke.mjs",
+    "test": "node test/pi-env.mjs && node test/smoke.mjs && node test/launch.mjs",
+    "test:smoke": "node test/smoke.mjs",
+    "test:launch": "node test/launch.mjs",
     "check:themes": "node scripts/check-themes.mjs"
   },
-  "type": "module",
   "devDependencies": {
     "@preact/preset-vite": "^2.10.6",
     "highlight.js": "^11.12.0",
@@ -20,6 +50,5 @@
     "typescript": "^7.0.2",
     "vite": "^8.3.5"
   },
-  "private": true,
-  "version": "0.2.0"
+  "homepage": "https://gitee.com/benshawn/pi-lcars"
 }
