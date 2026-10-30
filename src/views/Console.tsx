@@ -2529,9 +2529,7 @@ function TreePanel({ onClose, onSwitch }: { onClose: () => void; onSwitch: () =>
               style={{ "--d": `${shownDepth.get(n.id) ?? 0}` } as Record<string, string>}
               onClick={() => setSelected(n.id)}
             >
-              <span class="lane" data-lane={Math.min(shownDepth.get(n.id) ?? 0, 3)}>
-                <i />
-              </span>
+              <span class="spine" />
               <span class="seq">{String(seqOf.get(n.id) ?? 0).padStart(3, "0")}</span>
               <span class="kd">{n.kind === "toolResult" ? "TOOL" : n.kind.toUpperCase()}</span>
               <span class="lb" title={n.label}>

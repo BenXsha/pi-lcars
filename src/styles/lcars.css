@@ -2437,56 +2437,49 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 }
 
 /* hierarchy = stepped left edge; the block's right edge stays aligned */
+/* Tree rows are LCARS readout strips, not a git graph: a kind-tinted block with
+   a solid kind edge, stepped right only where the graph forks. */
 .tnode {
+  --kind: var(--g2);
   position: relative;
   display: grid;
-  grid-template-columns: 34px 34px 78px minmax(0, 1fr) 66px 46px auto;
-  gap: 8px;
+  grid-template-columns: 6px 84px minmax(0, 1fr) 66px 50px auto;
+  gap: var(--gap);
   align-items: center;
-  min-height: 34px;
-  margin-left: calc(var(--d, 0) * 16px);
-  padding: 0 8px 0 0;
-  background: var(--g0);
+  min-height: 40px;
+  margin-left: calc(var(--d, 0) * 18px);
+  padding-right: 6px;
+  background: color-mix(in srgb, var(--kind) 10%, #000);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--kind) 24%, transparent);
   border-radius: 0 var(--r-1) var(--r-1) 0;
 }
-.tnode .lane {
-  position: relative;
-  align-self: stretch;
-}
-.tnode .lane i {
-  position: absolute;
-  top: 7px;
-  bottom: 7px;
-  left: calc(var(--d, 0) * 8px);
-  width: 4px;
-  border-radius: var(--r-pill);
-  background: var(--g2);
-}
-.tnode[data-kind="user"] .lane i { background: var(--orange); }
-.tnode[data-kind="assistant"] .lane i { background: var(--ice); }
-.tnode[data-kind="toolResult"] .lane i { background: var(--tang); }
-.tnode[data-kind="compaction"] .lane i { background: var(--moon); }
-.tnode[data-kind="branch_summary"] .lane i,
-.tnode[data-kind="custom"] .lane i { background: var(--lav); }
+.tnode[data-kind="user"] { --kind: var(--orange); }
+.tnode[data-kind="assistant"] { --kind: var(--ice); }
+.tnode[data-kind="toolResult"] { --kind: var(--tang); }
+.tnode[data-kind="compaction"] { --kind: var(--moon); }
+.tnode[data-kind="branch_summary"],
+.tnode[data-kind="custom"] { --kind: var(--lav); }
+
+.tnode .spine { align-self: stretch; background: var(--kind); border-radius: 0 var(--r-1) var(--r-1) 0; }
 
 .tnode .kd {
-  font: 700 11px/1.3 var(--din);
-  letter-spacing: 0.1em;
-  color: color-mix(in srgb, var(--w) 74%, #000);
+  font: 700 11px/1 var(--din);
+  letter-spacing: 0.12em;
+  color: var(--kind);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .tnode .lb {
   font: 400 12.5px/1.5 var(--mono);
-  color: color-mix(in srgb, var(--w) 68%, #000);
+  color: var(--w);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .tnode .seq {
   font: 400 11px/1 var(--mono);
-  color: color-mix(in srgb, var(--w) 58%, #000);
+  color: var(--t3);
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
@@ -2497,26 +2490,27 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
   gap: 2px;
 }
 .tnode .fork .pg {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 22px;
   padding: 0;
   background: var(--g1);
-  color: var(--t2);
+  color: var(--w);
   font: 700 12px/1 var(--mono);
   border-radius: 0 var(--r-1) var(--r-1) 0;
 }
-.tnode .fork .pg:hover:not(:disabled) { background: var(--orange); color: #000; }
+.tnode .fork .pg:hover:not(:disabled) { background: var(--kind); color: #000; }
 .tnode .fork .pg:disabled { opacity: 0.4; }
 .tnode .fork .ix {
-  min-width: 26px;
+  min-width: 24px;
   text-align: center;
-  font: 400 11px/1 var(--mono);
-  color: var(--t3);
+  font: 700 11px/1 var(--din);
+  letter-spacing: 0.08em;
+  color: var(--kind);
   font-variant-numeric: tabular-nums;
 }
 .tnode .ts {
   font: 400 11px/1 var(--mono);
-  color: color-mix(in srgb, var(--w) 74%, #000);
+  color: var(--t3);
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
@@ -2530,37 +2524,81 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
   border-radius: 0 var(--r-1) var(--r-1) 0;
 }
 
-/* the path to HEAD reads at full strength, side branches recede but stay legible */
-.tnode[data-path="1"] { background: var(--g1); }
-.tnode[data-path="1"] .lb { color: var(--w); }
-.tnode[data-current="1"] { background: var(--orange); }
-.tnode[data-current="1"] .lb,
+/* side branches recede; the path to HEAD and the cursor come forward */
+.tnode[data-path="0"] { opacity: 0.72; }
+.tnode[data-path="0"]:hover { opacity: 1; }
+.tnode[data-current="1"] {
+  background: var(--orange);
+  box-shadow: none;
+  opacity: 1;
+}
+.tnode[data-current="1"] .spine { background: #000; }
 .tnode[data-current="1"] .kd,
+.tnode[data-current="1"] .lb,
 .tnode[data-current="1"] .ts,
-.tnode[data-current="1"] .fork { color: #000; }
-.tnode[data-current="1"] .lane i { background: #000; }
-.tnode[data-selected="1"] { filter: brightness(1.18); }
-.tnode[data-cursor="1"] { box-shadow: inset 4px 0 0 var(--cyan); filter: brightness(1.12); }
-.tnode:hover { filter: brightness(1.1); cursor: default; }
-.tnode[data-confirm="1"] { background: var(--tomato); filter: none; }
-.tnode[data-confirm="1"] .lb,
+.tnode[data-current="1"] .seq,
+.tnode[data-current="1"] .fork .ix { color: #000; }
+.tnode[data-selected="1"] { opacity: 1; }
+.tnode[data-cursor="1"] { box-shadow: inset 0 0 0 2px var(--kind), inset 0 0 0 4px #000; }
+.tnode:hover { filter: brightness(1.16); cursor: default; }
+.tnode[data-confirm="1"] {
+  background: var(--tomato);
+  box-shadow: none;
+  opacity: 1;
+  filter: none;
+}
+.tnode[data-confirm="1"] .spine { background: #000; }
 .tnode[data-confirm="1"] .kd,
+.tnode[data-confirm="1"] .lb,
 .tnode[data-confirm="1"] .ts,
-.tnode[data-confirm="1"] .fork { color: #000; }
-.tnode[data-confirm="1"] .lane i { background: #000; }
-/* on a tomato block the buttons have to invert, not keep their dark-chip
-   styling: a transparent ghost button there is light text on light red */
-.tnode[data-confirm="1"] .pv-btn {
-  background: #000;
-  color: var(--tomato);
+.tnode[data-confirm="1"] .seq,
+.tnode[data-confirm="1"] .fork .ix { color: #000; }
+/* on a tomato block the buttons invert: black chip, tomato label */
+.tnode[data-confirm="1"] .pv-btn { background: #000; color: var(--tomato); }
+.tnode[data-confirm="1"] .pv-btn.ghost { background: transparent; color: #000; }
+.tnode[data-confirm="1"] .pv-btn:hover:not(:disabled) { background: #000; color: var(--w); }
+
+/* turn header: a big number block butt-joined to a neutral readout strip */
+.tsep {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  gap: var(--gap);
+  align-items: stretch;
+  height: 30px;
+  margin: 8px 0 2px;
+  padding: 0;
 }
-.tnode[data-confirm="1"] .pv-btn.ghost {
-  background: transparent;
+.tsep .st { display: none; }
+.tsep .n {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  background: var(--orange);
   color: #000;
+  font: 700 21px/1 var(--din);
+  letter-spacing: -0.02em;
+  border-radius: 0 var(--r-pill) var(--r-pill) 0;
+  font-variant-numeric: tabular-nums;
 }
-.tnode[data-confirm="1"] .pv-btn:hover:not(:disabled) {
-  background: #000;
-  color: var(--w);
+.tsep .ts {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  background: var(--g1);
+  color: var(--t2);
+  font: 700 11px/1 var(--din);
+  letter-spacing: 0.12em;
+  border-radius: 0 var(--r-1) var(--r-1) 0;
+}
+.tsep .ct {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  background: var(--g1);
+  color: var(--t3);
+  font: 700 11px/1 var(--din);
+  letter-spacing: 0.12em;
+  border-radius: 0 var(--r-1) var(--r-1) 0;
 }
 
 /* rail caveat line: says what the data does NOT contain */
