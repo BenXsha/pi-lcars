@@ -9,6 +9,7 @@ import { Icon, type IconName } from "../components/Icon";
 import { Logo } from "../components/Logo";
 import { FileTree } from "../components/FileTree";
 import { FileViewer } from "../components/FileViewer";
+import { askComposer, onComposerRequest } from "../composer";
 import {
   ApprovalDeck,
   BarButton,
@@ -306,7 +307,20 @@ export function Console() {
             ) : (
             <div class="scroll" id="scroll">
               {view === "session" ? (
-                <Transcript items={s.items} onOpenDiff={(p, d) => setViewer({ path: p, diff: d })} />
+                <Transcript
+                  items={s.items}
+                  onOpenDiff={(p, d) => setViewer({ path: p, diff: d })}
+                  onRecall={async (turn, text, itemId) => {
+                    if (!turn) return;
+                    const r = await actions.rewind(turn);
+                    if (r) {
+                      setActiveTurn(null);
+                      askComposer({ kind: "replace", text });
+                      setFlash(`recalled exchange ${String(turn).padStart(2, "0")} — edit and send again`);
+                      setTimeout(() => setFlash(null), 3200);
+                    }
+                  }}
+                />
               ) : view === "mcp" ? (
                 <McpPanel />
               ) : view === "providers" ? (
@@ -319,7 +333,7 @@ export function Console() {
             </div>
             )}
 
-            <Composer running={!!meta?.running} disabled={s.link !== "open"} />
+            <Composer running={!!meta?.running} disabled={s.link !== "open"} queue={meta?.queue} />
           </main>
 
           {rail ? (
@@ -587,9 +601,11 @@ function Sidenav({
 function Transcript({
   items,
   onOpenDiff,
+  onRecall,
 }: {
   items: Item[];
   onOpenDiff?: (path: string, diff: DiffData) => void;
+  onRecall?: (turn: number, text: string, itemId: string) => void;
 }) {
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const t0 = items[0]?.ts ?? Date.now();
@@ -629,7 +645,12 @@ function Transcript({
         if (it.kind === "user") {
           return (
             <div class={cls} key={it.id} data-id={it.id} data-turn="1">
-              <MessageRow role="user" time={`T+${mmss(it.ts - t0)}`} text={it.text} />
+              <MessageRow
+                role="user"
+                time={`T+${mmss(it.ts - t0)}`}
+                text={it.text}
+                onRecall={onRecall ? () => onRecall(buildTurns(items).find((tn) => tn.id === it.id)?.n ?? 0, it.text, it.id) : undefined}
+              />
               {it.steer || it.queued ? (
                 <div style={{ marginLeft: "88px", marginTop: "2px", font: "700 10px/1.4 var(--din)", letterSpacing: "0.14em", color: it.steer ? "var(--orange)" : "var(--moon)" }}>
                   {it.steer ? "STEERED INTO RUN" : "QUEUED"}
@@ -709,8 +730,33 @@ function Transcript({
 }
 
 /* -------------------------------------------------------------- composer */
-function Composer({ running, disabled }: { running: boolean; disabled: boolean }) {
+function Composer({ running, disabled, queue }: { running: boolean; disabled: boolean; queue?: { steering: string[]; followUp: string[] } }) {
   const [text, setText] = useState("");
+  const [flashQuote, setFlashQuote] = useState(false);
+
+  // quote appends, recall replaces — both arrive from the transcript
+  useEffect(
+    () =>
+      onComposerRequest((intent) => {
+        if (intent.kind === "replace") setText(intent.text);
+        else
+          setText((prev) => {
+            const quoted = intent.text
+              .trim()
+              .split("\n")
+              .map((l) => `> ${l}`)
+              .join("\n");
+            return prev.trim() ? `${prev.trim()}\n\n${quoted}\n\n` : `${quoted}\n\n`;
+          });
+        setFlashQuote(intent.kind === "quote");
+        requestAnimationFrame(() => {
+          ref.current?.focus();
+          ref.current?.setSelectionRange(9999, 9999);
+        });
+        setTimeout(() => setFlashQuote(false), 1200);
+      }),
+    [],
+  );
   const ref = useRef<HTMLTextAreaElement>(null);
 
   const submit = () => {
@@ -738,7 +784,21 @@ function Composer({ running, disabled }: { running: boolean; disabled: boolean }
   const [focused, setFocused] = useState(false);
   const chars = text.length;
 
+  const queued = [...(queue?.steering ?? []), ...(queue?.followUp ?? [])];
+
   return (
+    <div class="cmdwrap">
+      {queued.length ? (
+        <div class="qstrip">
+          <span class="q-lb">QUEUED {queued.length}</span>
+          {queued.map((q, i) => (
+            <span class="q-item" key={i} title={q}>
+              {q.replace(/\s+/g, " ")}
+            </span>
+          ))}
+          <span class="q-note">delivered after the current turn</span>
+        </div>
+      ) : null}
     <div class="cmdbar">
       <div class="entry-block">
         <span class="el">{t("cmd.entry")}</span>
@@ -778,6 +838,7 @@ function Composer({ running, disabled }: { running: boolean; disabled: boolean }
         <BarButton label={t("cmd.stop")} hint="ESC" tone="stop" disabled={!running} onClick={() => actions.abort()} icon="act-stop" />
         <BarButton label={t("cmd.fork")} hint="COPY" tone="quiet" onClick={() => actions.fork()} icon="act-copy" />
       </div>
+    </div>
     </div>
   );
 }

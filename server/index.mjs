@@ -167,6 +167,9 @@ const routes = {
       case "activate":
         entry = registry.setActive(b.id);
         break;
+      case "rewind":
+        entry = await registry.rewind(b.id ?? registry.activeId, b.turn);
+        break;
       case "rename":
         await registry.rename(b.id, b.name);
         entry = registry.get(b.id);

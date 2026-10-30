@@ -404,6 +404,24 @@ Codex 的做法是：**工作区在你开 session 时就定了，之后不可变
 - 语言只翻**界面外壳**（导航、按钮、输入提示、设置面板），消息与工具输出保持原文，
   面板底部明确写出这一点；新增文案先加 `i18n.ts` 的 key，不要在组件里写死中英文。
 
+### 7.6j 消息动作：复制 / 引用 / 撤回 / 排队
+
+**每条消息（用户与助手）悬停出三个动作**，绝对定位在行右上，不占静态空间：
+
+- `COPY` — 原文进剪贴板，不做 Markdown→纯文本的猜测。
+- `QUOTE` — 通过 `composer.ts` 的 `askComposer({kind:"quote"})` 追加成 `> 行…` 引用块，聚焦并置尾；
+  不替换用户现有草稿（引用是叠加，不是覆盖）。
+- `RECALL`（仅用户消息）— 真正的"撤回"：`POST /api/session {op:"rewind", turn}`。
+  pi 是 append-only，所以实现是 **branch + 重建 session**：`manager.branch(该消息前一条)` →
+  dispose 旧 session → 用同一个 manager `createAgentSession` → 从 `session.messages` 重建 items →
+  推 `{e:"items"}` 事件让前端整段替换。turn 从 1 起算，对应用户消息序号。
+  跑的过程中拒绝（`409 E_BUSY`），前端提示先 STOP。
+- 撤回后原文通过 `askComposer({kind:"replace"})` 放回输入框，光标置尾 —— 编辑完再发即是"改完重发"。
+
+**排队可见**：`queue_update` 事件里的 `steering` / `followUp` **保留原文**（不是只留计数），
+composer 上方出现 `QUEUED n` 条带，逐条显示待投递文本 + `delivered after the current turn`。
+运行中按回车仍是 steer，不另开入口。
+
 ### 7.6i Thinking 块与提示词索引
 
 **Thinking**（推理旁白，不是正文）：

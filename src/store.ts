@@ -110,6 +110,13 @@ function applyEvent(ev: StreamEvent) {
       state.sessions = ev.sessions;
       emit();
       break;
+    case "items": {
+      itemsBySession.set(ev.sessionId, ev.items);
+      for (const it of ev.items) byId.set(it.id, it);
+      if (ev.sessionId === state.activeId) state.items = ev.items;
+      emit();
+      break;
+    }
     case "item":
       upsertItem(ev.sessionId, ev.item);
       break;
@@ -212,6 +219,13 @@ export const actions = {
     if (b) setBootstrap(b);
     return b;
   },
+  /** rewind to just before exchange `turn`; the session keeps its id */
+  async rewind(turn: number) {
+    const b = await withError(() => api.rewind(turn));
+    if (b) setBootstrap(b);
+    return b;
+  },
+
   async rename(name: string) {
     const id = state.activeId;
     if (!id) return null;

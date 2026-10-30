@@ -1,5 +1,6 @@
 import { unlink } from "node:fs/promises";
 import { applyEvent } from "./stream.mjs";
+import { shortArgs, textOf } from "./format.mjs";
 import { httpError } from "./errors.mjs";
 
 let SEQ = 0;
@@ -231,6 +232,97 @@ export class Registry {
       throw httpError(409, "E_EMPTY", e.message);
     }
     return this.#load(manager, src.cwd);
+  }
+
+  /**
+   * Rewind to just before exchange `turn` (1-based user message), then rebuild
+   * the live session from the branched transcript. pi is append-only, so this
+   * is the honest way to "unsend": branch the manager, recreate the session.
+   */
+  async rewind(id, turn) {
+    const entry = this.get(id);
+    if (!entry) throw httpError(404, "E_NO_SESSION", "unknown session");
+    if (entry.meta.running) throw httpError(409, "E_BUSY", "stop the run before rewinding");
+
+    const manager = entry.manager;
+    const messages = manager.getEntries().filter((e) => e.type === "message");
+    const users = messages.filter((e) => e.message?.role === "user");
+    const target = users[Number(turn) - 1];
+    if (!target) throw httpError(400, "E_TURN", `no exchange ${turn}`);
+    const idx = messages.findIndex((e) => e.id === target.id);
+    if (idx <= 0) throw httpError(409, "E_FIRST", "the first exchange has nothing before it to rewind to");
+
+    manager.branch(messages[idx - 1].id);
+
+    const { createAgentSession } = this.sdk;
+    try {
+      entry.session.dispose();
+    } catch {}
+    const { session } = await createAgentSession({
+      cwd: entry.cwd,
+      sessionManager: manager,
+      ...(entry.loader ? { resourceLoader: entry.loader } : {}),
+    });
+    entry.session = session;
+    entry.bound = false;
+    try {
+      await session.bindExtensions?.({ mode: "print" });
+      entry.bound = true;
+    } catch {
+      /* extensions are optional */
+    }
+    session.subscribe((ev) => applyEvent(entry, ev));
+
+    // rebuild the transcript from what survived the branch
+    entry.items = [];
+    entry.byId = new Map();
+    entry.cur = null;
+    const calls = new Map();
+    let n = 0;
+    const push = (item) => {
+      entry.items.push(item);
+      entry.byId.set(item.id, item);
+    };
+    for (const m of session.messages ?? []) {
+      if (m.role === "user") {
+        push({ kind: "user", id: `u${m.timestamp}-${++n}`, text: textOf(m.content), ts: m.timestamp });
+      } else if (m.role === "assistant") {
+        const content = m.content ?? [];
+        for (const c of content) if (c?.type === "toolCall") calls.set(c.id, c);
+        const text = textOf(content);
+        const thinking = content.filter((c) => c?.type === "thinking").map((c) => c.thinking).join("");
+        if (text || thinking) {
+          push({
+            kind: "assistant",
+            id: `a${m.timestamp}-${++n}`,
+            text,
+            thinking,
+            streaming: false,
+            ts: m.timestamp,
+            usage: m.usage
+              ? { input: m.usage.input, output: m.usage.output, cost: m.usage.cost?.total ?? 0, total: m.usage.totalTokens }
+              : undefined,
+          });
+        }
+      } else if (m.role === "toolResult") {
+        const call = calls.get(m.toolCallId);
+        const out = textOf(m.content);
+        push({
+          kind: "tool",
+          id: `t${m.toolCallId}`,
+          callId: m.toolCallId,
+          name: m.toolName,
+          args: call ? shortArgs(m.toolName, call.arguments) : "",
+          status: m.isError ? "error" : "ok",
+          output: out,
+          ts: m.timestamp,
+        });
+      }
+    }
+
+    this.refreshMeta(entry);
+    this.sink({ seq: nextSeq(), sessionId: entry.id, e: "items", items: entry.items });
+    return entry;
   }
 
   async rename(id, name) {

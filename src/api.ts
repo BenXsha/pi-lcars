@@ -94,7 +94,7 @@ export type Meta = {
   usage: { input: number; output: number; cost: number; total: number };
   running: boolean;
   queued: boolean;
-  queue: { steering: number; followUp: number };
+  queue: { steering: string[]; followUp: string[] };
   policy: string;
   pending: number;
   approvalWired: boolean;
@@ -243,6 +243,7 @@ export const api = {
   fork: (id: string) => post<Bootstrap>("/api/session", { op: "fork", id }),
   activate: (id: string) => post<Bootstrap>("/api/session", { op: "activate", id }),
   rename: (id: string, name: string) => post<Bootstrap>("/api/session", { op: "rename", id, name }),
+  rewind: (turn: number) => post<Bootstrap>("/api/session", { op: "rewind", turn }),
   remove: (id: string) => post<Bootstrap>("/api/session", { op: "delete", id }),
   prompt: (text: string) => post<{ mode: string }>("/api/prompt", { text }),
   abort: () => post<unknown>("/api/abort", {}),
@@ -284,6 +285,7 @@ export const api = {
 export type StreamEvent =
   | { e: "hello"; seq: number } & Bootstrap
   | { e: "sessions"; sessions: SessionSummary[] }
+  | { e: "items"; sessionId: string; items: Item[] }
   | { e: "item"; sessionId: string; item: Item }
   | { e: "patch"; sessionId: string; id: string; patch: Partial<Item> }
   | { e: "delta"; sessionId: string; id: string; field: "text" | "thinking"; d: string }

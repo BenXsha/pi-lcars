@@ -143,6 +143,9 @@ try {
     check("fork after a turn", forked.status === 200 && forked.body?.ok, JSON.stringify(forked.body?.error ?? ""));
   }
 
+  const badRewind = await post("/api/session", { op: "rewind", turn: 99 });
+  check("rewind rejects unknown exchanges", badRewind.status === 400 && badRewind.body?.code === "E_TURN");
+
   const renamed = await post("/api/session", { op: "rename", id: second, name: "SMOKE" });
   check("POST session rename", renamed.status === 200 && renamed.body?.ok);
   check("rename lands in list", renamed.body?.data?.sessions.some((s) => s.id === second && s.name === "SMOKE"));

@@ -238,7 +238,11 @@ export function applyEvent(entry, ev) {
       break;
 
     case "queue_update":
-      entry.meta.queue = { steering: ev.steering?.length || 0, followUp: ev.followUp?.length || 0 };
+      // keep the texts so the composer can show what is waiting
+      entry.meta.queue = {
+        steering: (ev.steering ?? []).slice(0, 5),
+        followUp: (ev.followUp ?? []).slice(0, 5),
+      };
       entry.pushMeta();
       break;
 

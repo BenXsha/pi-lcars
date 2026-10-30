@@ -1,6 +1,7 @@
 import type { ComponentChildren } from "preact";
 import { Icon, type IconName } from "./Icon";
 import { Markdown } from "./Markdown";
+import { askComposer } from "../composer";
 import type { AgentMeta, DiffData, SubCall } from "../api";
 import { highlight, langFromPath } from "../highlight";
 
@@ -355,6 +356,8 @@ export function MessageRow(props: {
   onToggleThinking?: () => void;
   streaming?: boolean;
   rate?: number;
+  /** shown only for user messages: rewind this exchange back into the composer */
+  onRecall?: () => void;
 }) {
   const isUser = props.role === "user";
   return (
@@ -367,6 +370,21 @@ export function MessageRow(props: {
         <span>{isUser ? props.time : props.model ?? ""}</span>
       </div>
       <div class="cell">
+        {props.text ? (
+          <div class="msg-act">
+            <button type="button" onClick={() => navigator.clipboard?.writeText(props.text).catch(() => {})}>
+              COPY
+            </button>
+            <button type="button" onClick={() => askComposer({ kind: "quote", text: props.text })}>
+              QUOTE
+            </button>
+            {props.onRecall ? (
+              <button type="button" class="recall" onClick={props.onRecall}>
+                RECALL
+              </button>
+            ) : null}
+          </div>
+        ) : null}
         {props.thinking ? (
           <button
             type="button"
