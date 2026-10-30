@@ -46,7 +46,7 @@ export function Elbow({ vw = 64, vh = 104, hw, hh, r = 22, class: cls }: ElbowPr
  * so the cap flows into the thin shelf bar next to it. Reproduces the canvas
  * shape (block minus a circle centred on its bottom-right corner).
  */
-export function TopCap(props: { w?: number; h?: number; bar?: number; r?: number; children?: ComponentChildren; class?: string }) {
+export function TopCap(props: { w?: number; h?: number; bar?: number; r?: number; flat?: boolean; children?: ComponentChildren; class?: string }) {
   const w = props.w ?? 320;
   const h = props.h ?? 100;
   const bar = props.bar ?? 44;
@@ -58,7 +58,7 @@ export function TopCap(props: { w?: number; h?: number; bar?: number; r?: number
   return (
     <div class={`cap ${props.class ?? ""}`} style={{ width: `${w}px`, height: `${h}px`, flex: `0 0 ${h}px` }}>
       <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden="true" style={{ position: "absolute", inset: 0 }}>
-        <path d={d} fill="currentColor" />
+        {props.flat ? <rect width={w} height={h} fill="currentColor" /> : <path d={d} fill="currentColor" />}
       </svg>
       {props.children}
     </div>
@@ -177,7 +177,7 @@ export function Station(props: {
   return (
     <button
       type="button"
-      class={`station ${props.full ? "is-full" : ""}`}
+      class={`station ${props.full ? "is-full" : ""} ${props.label ? "" : "is-icon"}`}
       data-tone={props.tone}
       aria-current={props.active ? "true" : "false"}
       style={props.full ? { height: `${props.h ?? 44}px` } : { width: `${props.w ?? 196}px`, height: `${props.h ?? 52}px` }}

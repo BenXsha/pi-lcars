@@ -334,9 +334,11 @@ function Sidenav({
 
   return (
     <aside class="sidenav" data-cramped={cramped ? "1" : "0"} style={{ width: `${col}px`, flex: `0 0 ${col}px` }}>
-      <TopCap w={col + 55} h={100} bar={44}>
+      {/* collapsed: a 64px square cap — there is no bar to merge with, so the
+          elbow becomes a plain block and the mark centres in the 64px column */}
+      <TopCap w={collapsed ? 64 : col + 55} h={100} bar={44} flat={collapsed}>
         <span class={`cap-logo ${collapsed ? "is-mini" : ""}`}>
-          <Logo size={collapsed ? 30 : 72} />
+          <Logo size={collapsed ? 74 : 72} />
         </span>
       </TopCap>
 

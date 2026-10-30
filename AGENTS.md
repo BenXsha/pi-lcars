@@ -369,7 +369,9 @@ LCARS 的左轨**从不留纯黑空洞**：内容排不满时，纵向剩余由*
 ### 7.6f 可折叠面板与设置
 
 - **两侧都可折叠**，且不是"隐藏"：左栏折叠成 **64px 窄轨**，保留交互 —— 会话变成只剩大号编号的方块、
-  NEW SESSION 只剩 `+`、导航只剩图标；cap 依然是 `col + 55`，所以肘形在小宽度下照样对齐。
+  NEW SESSION 只剩 `+`、导航只剩图标。**窄轨里所有东西都必须居中于 64px**（不是靠右）：
+  图标项 `justify-content: center` 且去掉左右 padding，会话编号 `justify-self: center`。
+  展开态 cap 是 `col + 55`（肘形贴列边界）；折叠态 cap 是 64px 直角块，shelf 左内距回到 12px。
 - 快捷键：`⌘B / Ctrl B` 左栏、`⌘⇧B / Ctrl ⇧B` 右栏；**在输入框里也生效**（composer 没有占用这组绑定）。
 - 状态写 localStorage（`lcars.left` / `lcars.right`），刷新保留。
 - SETTINGS 站只放**界面相关**的东西：配色 / 界面缩放 / 动效 / 语言 / PI 运行时路径 / 快捷键表 / 审批策略。

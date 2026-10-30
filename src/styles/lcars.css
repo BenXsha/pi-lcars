@@ -820,7 +820,7 @@ button { cursor: pointer; }
   display: flex;
   color: #000;
 }
-.cap .cap-logo.is-mini { left: 50%; top: 35px; transform: translateX(-50%); }
+.cap .cap-logo.is-mini { left: 50%; top: 13px; transform: translateX(-50%); }
 /* new session: neutral action strip (distinct from session blocks,
    which are tinted; active session is the only solid orange block) */
 .lnew {
@@ -1533,12 +1533,18 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 .sess[data-mini="1"][data-active="1"] { background: var(--orange); }
 .sess[data-mini="1"][data-active="1"] .num { color: #000; opacity: 1; }
 
-.lnav .station.is-full .lbl:empty { display: none; }
-.lnav .station.is-full:not(:has(.lbl)) .ic,
-.lnav .station.is-full .lbl:empty + .ic { margin: 0 auto; }
+/* icon-only nav item: the icon sits in the middle of the narrow rail */
+.station.is-icon {
+  justify-content: center;
+  gap: 0;
+  padding: 0;
+}
+.station.is-icon .num,
+.station.is-icon .lbl { display: none; }
+.station.is-icon .ic { margin: 0; }
 
-/* the shelf keeps the same left inset: the cap is still column + 55 */
-.app[data-left="0"] .shelf { padding-left: 70px; }
+/* collapsed: the cap is a plain 64px block, so the shelf starts right there */
+.app[data-left="0"] .shelf { padding-left: 12px; }
 
 /* ============================================================
    interface scale + reduced motion (settings panel)
