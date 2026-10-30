@@ -336,7 +336,7 @@ function Sidenav({
     <aside class="sidenav" data-cramped={cramped ? "1" : "0"} style={{ width: `${col}px`, flex: `0 0 ${col}px` }}>
       <TopCap w={col + 55} h={100} bar={44}>
         <span class={`cap-logo ${collapsed ? "is-mini" : ""}`}>
-          <Logo size={collapsed ? 26 : 58} />
+          <Logo size={collapsed ? 30 : 72} />
         </span>
       </TopCap>
 

@@ -815,12 +815,12 @@ button { cursor: pointer; }
 .cap svg { pointer-events: none; }
 .cap .cap-logo {
   position: absolute;
-  left: 20px;
-  top: 21px;
+  left: 22px;
+  top: 14px; /* 100 - 72, centred */
   display: flex;
   color: #000;
 }
-.cap .cap-logo.is-mini { left: 50%; top: 37px; transform: translateX(-50%); }
+.cap .cap-logo.is-mini { left: 50%; top: 35px; transform: translateX(-50%); }
 /* new session: neutral action strip (distinct from session blocks,
    which are tinted; active session is the only solid orange block) */
 .lnew {
