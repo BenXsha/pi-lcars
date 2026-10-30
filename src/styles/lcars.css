@@ -2573,6 +2573,31 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 .field[data-area="1"] > .fc textarea::placeholder { color: var(--g3); }
 .form-note[data-err="1"] { color: var(--tomato); }
 
+/* ------------------------------------------------------------- jump bar */
+/* Appears only when the reader has scrolled away from the tail. */
+.jumpbar {
+  flex: 0 0 32px;
+  height: 32px;
+  margin: 0 var(--seam) var(--gap) var(--seam);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  background: var(--g1);
+  color: var(--orange);
+  font: 700 11px/1 var(--din);
+  letter-spacing: 0.14em;
+  border-radius: 0 var(--r-pill) var(--r-pill) 0;
+  box-shadow: inset 4px 0 0 var(--orange);
+  text-align: left;
+}
+.jumpbar .ar { font-size: 13px; line-height: 1; }
+.jumpbar:hover {
+  background: var(--orange);
+  color: #000;
+  box-shadow: none;
+}
+
 /* ------------------------------------------------------------------ panic */
 /* A crash replaces the console with a fault report — never a blank screen. */
 .panic { display: flex; flex-direction: column; gap: 8px; padding: 24px; max-width: 920px; }

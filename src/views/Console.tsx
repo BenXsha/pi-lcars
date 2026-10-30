@@ -145,6 +145,11 @@ export function Console() {
   const [treeOpen, setTreeOpen] = useState(false);
   const [activeTurn, setActiveTurn] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
+  // stream following: pinned to the bottom unless the reader scrolled up
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const followRef = useRef(true);
+  const [following, setFollowing] = useState(true);
+  const [unseen, setUnseen] = useState(0);
   const [panes, setPanes] = useState(() => {
     const read = (k: string) => {
       try {
@@ -171,6 +176,65 @@ export function Console() {
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
+
+  // ---- follow the stream ------------------------------------------------
+  const pinToBottom = (el: HTMLElement) => {
+    el.scrollTop = el.scrollHeight;
+  };
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      const gap = el.scrollHeight - el.scrollTop - el.clientHeight;
+      const near = gap < 48;
+      if (near === followRef.current) return;
+      followRef.current = near;
+      setFollowing(near);
+      if (near) setUnseen(0);
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [view]);
+
+  // content grows without a scroll event: streaming text, tweened expansion
+  useEffect(() => {
+    const el = scrollRef.current;
+    const inner = el?.firstElementChild;
+    if (!el || !inner || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => {
+      if (followRef.current) pinToBottom(el);
+    });
+    ro.observe(inner);
+    return () => ro.disconnect();
+  }, [view, s.activeId]);
+
+  // a new item either keeps the tail in view or counts for the jump bar
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    if (followRef.current) requestAnimationFrame(() => pinToBottom(el));
+    else if (view === "session") setUnseen((n) => n + 1);
+  }, [s.items.length, view]);
+
+  // switching sessions always starts at the newest message
+  useEffect(() => {
+    followRef.current = true;
+    setFollowing(true);
+    setUnseen(0);
+    requestAnimationFrame(() => {
+      const el = scrollRef.current;
+      if (el) pinToBottom(el);
+    });
+  }, [s.activeId]);
+
+  const jumpToLatest = () => {
+    const el = scrollRef.current;
+    if (el) pinToBottom(el);
+    followRef.current = true;
+    setFollowing(true);
+    setUnseen(0);
+  };
 
   // Escape dismisses whatever is layered over the transcript: view deck, then tree.
   useEffect(() => {
@@ -384,7 +448,7 @@ export function Console() {
                 }}
               />
             ) : (
-            <div class="scroll" id="scroll">
+            <div class="scroll" id="scroll" ref={scrollRef}>
               <div key={view} class={view === "session" ? undefined : "anim-swap"}>
               {view === "session" ? (
                 <Transcript
@@ -426,6 +490,15 @@ export function Console() {
               </div>
             </div>
             )}
+
+            {view === "session" && !viewer && !treeOpen && !following ? (
+              <button type="button" class="jumpbar" onClick={jumpToLatest} title="Jump to the newest message">
+                <span class="ar" aria-hidden="true">
+                  ↓
+                </span>
+                LATEST{unseen ? ` · ${unseen} NEW` : ""}
+              </button>
+            ) : null}
 
             <Composer running={!!meta?.running} disabled={s.link !== "open"} queue={meta?.queue} />
           </main>
