@@ -26,6 +26,7 @@ const MANIFEST = {
   "station-history": "history-fill",
   "station-provider": "cloud-fill",
   "station-mcp": "plug-fill",
+  "station-about": "information-fill",
   // tools
   "tool-bash": "terminal-fill",
   "tool-read": "file-text-fill",

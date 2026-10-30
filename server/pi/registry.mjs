@@ -66,7 +66,10 @@ export class Registry {
       meta: {
         running: false,
         queued: false,
-        queue: { steering: 0, followUp: 0 },
+        // arrays, not counts: the composer renders the queued texts (§7.6j).
+        // `queue_update` replaces this wholesale; a number here crashed the
+        // client's spread on every render before the first update arrived.
+        queue: { steering: [], followUp: [] },
         model: "—",
         modelId: "—",
         thinking: "off",

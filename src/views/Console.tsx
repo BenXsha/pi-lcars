@@ -9,6 +9,7 @@ import { Icon, type IconName } from "../components/Icon";
 import { Logo } from "../components/Logo";
 import { FileTree } from "../components/FileTree";
 import { FileViewer } from "../components/FileViewer";
+import { AboutPanel } from "./About";
 import { Markdown } from "../components/Markdown";
 import { askComposer, askDeck, onComposerRequest, onDeckRequest } from "../composer";
 import {
@@ -30,7 +31,14 @@ import {
 } from "../components/ui";
 
 /* ---------------------------------------------------------------- setup */
-type View = "session" | "mcp" | "skills" | "providers" | "history" | "system";
+type View = "session" | "mcp" | "skills" | "providers" | "history" | "system" | "about";
+
+/** Stations are hash-addressable so a link can open e.g. #about. */
+const VIEWS: View[] = ["session", "mcp", "skills", "providers", "history", "system", "about"];
+const viewFromHash = (): View => {
+  const hash = typeof location === "undefined" ? "" : location.hash.replace(/^#/, "");
+  return (VIEWS as string[]).includes(hash) ? (hash as View) : "session";
+};
 
 const NAV: { view: View; key: TKey2; icon: IconName; tone: "amber" | "lav" | "moon" | "ice" | "cyan" }[] = [
   { view: "mcp", key: "nav.mcp", icon: "station-mcp", tone: "lav" },
@@ -38,6 +46,7 @@ const NAV: { view: View; key: TKey2; icon: IconName; tone: "amber" | "lav" | "mo
   { view: "providers", key: "nav.providers", icon: "station-provider", tone: "cyan" },
   { view: "history", key: "nav.history", icon: "station-history", tone: "amber" },
   { view: "system", key: "nav.settings", icon: "station-system", tone: "moon" },
+  { view: "about", key: "nav.about", icon: "station-about", tone: "ice" },
 ];
 type TKey2 = Parameters<typeof t>[0];
 
@@ -127,7 +136,7 @@ function useStore() {
 /* ---------------------------------------------------------------- shell */
 export function Console() {
   const s = useStore();
-  const [view, setView] = useState<View>("session");
+  const [view, setView] = useState<View>(viewFromHash);
   const [deck, setDeck] = useState<null | "new" | "model" | "think">(null);
   const [sideMode, setSideMode] = useState<"sessions" | "files">("sessions");
   const [previewCwd, setPreviewCwd] = useState<string | null>(null);
@@ -149,6 +158,31 @@ export function Console() {
 
   useEffect(() => connect(), []);
   useEffect(() => onDeckRequest((d) => setDeck(d)), []);
+
+  // keep the hash in step with the station (replace, so Back stays useful)
+  useEffect(() => {
+    const want = view === "session" ? "" : `#${view}`;
+    if (location.hash === want) return;
+    history.replaceState(null, "", want ? `${location.pathname}${want}` : location.pathname);
+  }, [view]);
+  useEffect(() => {
+    const onHash = () => setView(viewFromHash());
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+
+  // Escape dismisses whatever is layered over the transcript: view deck, then tree.
+  useEffect(() => {
+    if (!deck && !treeOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      if (deck) setDeck(null);
+      else setTreeOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [deck, treeOpen]);
 
   // which exchange is under the reading position — drives the outline marker
   useEffect(() => {
@@ -356,6 +390,8 @@ export function Console() {
                 />
               ) : view === "skills" ? (
                 <SkillsPanel meta={meta} policy={s.policy} />
+              ) : view === "about" ? (
+                <AboutPanel />
               ) : (
                 <SettingsPanel items={s.items} meta={meta} policy={s.policy} theme={theme} onTheme={(id) => { applyTheme(id); setTheme(id); }} />
               )}
@@ -435,6 +471,7 @@ function subtitleFor(view: View) {
     providers: "providers and models available to this session",
     history: "every transcript on this machine, searchable",
     system: "runtime, policy and tool loadout",
+    about: "version, credits, and what this console owes to LCARS",
     session: "",
   }[view];
 }
@@ -934,6 +971,12 @@ const UI_COMMANDS = [
   { name: "/stop", description: "stop the current run", kind: "ui" },
 ];
 
+/** Queue payloads have been both counts and texts — never trust the shape. */
+function textList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((v): v is string => typeof v === "string" && v.length > 0);
+}
+
 function Composer({ running, disabled, queue }: { running: boolean; disabled: boolean; queue?: { steering: string[]; followUp: string[] } }) {
   const [text, setText] = useState("");
   const [flashQuote, setFlashQuote] = useState(false);
@@ -1017,7 +1060,7 @@ function Composer({ running, disabled, queue }: { running: boolean; disabled: bo
   const [focused, setFocused] = useState(false);
   const chars = text.length;
 
-  const queued = [...(queue?.steering ?? []), ...(queue?.followUp ?? [])];
+  const queued = [...textList(queue?.steering), ...textList(queue?.followUp)];
 
   return (
     <div class="cmdwrap">
@@ -1588,11 +1631,11 @@ function McpPanel() {
         );
       })}
 
-      <div class="pv-title" style={{ fontSize: "13px", marginTop: "18px" }}>ADD SERVER</div>
-      <div style={{ display: "flex", flexDirection: "column", gap: "var(--gap)", maxWidth: "820px" }}>
+      <div class="pv-h">ADD SERVER</div>
+      <div class="pv-form" style={{ maxWidth: "820px" }}>
         <FieldRow label="NAME" icon="station-mcp" value={name} placeholder="filesystem" onInput={setName} required />
         <FieldRow label="COMMAND / URL" icon="fld-host" value={command} placeholder="npx -y @modelcontextprotocol/server-filesystem ." onInput={setCommand} />
-        <div style={{ display: "flex", gap: "var(--gap)" }}>
+        <div class="form-actions">
           <BarButton
             tone="ok"
             label="ADD"
@@ -1608,10 +1651,10 @@ function McpPanel() {
             }
           />
           <BarButton tone="quiet" label="RELOAD" icon="act-reload" onClick={() => load()} />
-          <span style={{ font: "400 10px/2.4 var(--mono)", color: "var(--g2)" }}>
-            read from {shortPath(data?.paths.global ?? "~/.pi/agent/mcp.json")} · writes keep a .bak
-          </span>
         </div>
+        <span class="form-note">
+          read from {shortPath(data?.paths.global ?? "~/.pi/agent/mcp.json")} · writes keep a .bak
+        </span>
       </div>
     </div>
   );
@@ -1821,14 +1864,20 @@ function ProvidersPanel({ meta }: { meta: ReturnType<typeof getState>["meta"] })
         </>
       ) : null}
 
-      <div class="pv-title" style={{ fontSize: "13px", marginTop: "18px" }}>ADD CUSTOM PROVIDER</div>
+      <div class="pv-h">ADD CUSTOM PROVIDER</div>
       <div class="pv-sub" style={{ marginBottom: "8px", maxWidth: "760px" }}>
         Any OpenAI-, Anthropic- or Google-compatible endpoint can be added by base URL. Models are just ids — pi learns
         capabilities when it first calls them. Setting only <code>baseUrl</code> for an id that already exists routes that
         built-in provider through a proxy.
       </div>
       {!adding ? (
-        <BarButton tone="ok" label="NEW PROVIDER" icon="act-new" onClick={() => setAdding(true)} />
+        <button type="button" class="add-row" onClick={() => setAdding(true)}>
+          <span class="ic">
+            <Icon name="act-new" size={13} />
+          </span>
+          <span class="lb">NEW PROVIDER</span>
+          <span class="hint">models.json</span>
+        </button>
       ) : (
         <div class="pv-form">
           <FieldRow label="ID" icon="station-provider" value={draft.id} placeholder="local-proxy" onInput={(v) => setDraft({ ...draft, id: v })} required />
@@ -1870,7 +1919,7 @@ function ProvidersPanel({ meta }: { meta: ReturnType<typeof getState>["meta"] })
             placeholder="qwen2.5-coder:7b, llama-3.3-70b"
             onInput={(v) => setDraft({ ...draft, models: v })}
           />
-          <div style={{ display: "flex", gap: "var(--gap)", alignItems: "center" }}>
+          <div class="form-actions">
             <BarButton
               tone="ok"
               label="ADD"
@@ -1893,8 +1942,8 @@ function ProvidersPanel({ meta }: { meta: ReturnType<typeof getState>["meta"] })
               }}
             />
             <BarButton tone="quiet" label="CANCEL" icon="act-close" onClick={() => setAdding(false)} />
-            <span class="pv-note">writes models.json with a .bak, then reloads the model runtime</span>
           </div>
+          <span class="form-note">writes models.json with a .bak, then reloads the model runtime</span>
         </div>
       )}
 

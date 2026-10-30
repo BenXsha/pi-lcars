@@ -787,20 +787,6 @@ button { cursor: pointer; }
   gap: var(--gap);
   padding-bottom: var(--seam);
 }
-.lnew {
-  height: 56px;
-  flex: 0 0 56px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  align-items: flex-start;
-  padding: 10px 12px;
-  background: var(--orange);
-  color: #000;
-  text-align: left;
-  border-radius: 0 var(--r-1) var(--r-1) 0;
-}
-.lnew:hover { filter: brightness(1.1); }
 .lsessions {
   flex: 0 1 auto;
   min-height: 0;
@@ -890,32 +876,33 @@ button { cursor: pointer; }
 .cap .cap-logo.is-mini { left: 32px; top: 26px; transform: translateX(-50%); }
 /* new session: neutral action strip (distinct from session blocks,
    which are tinted; active session is the only solid orange block) */
+/* Grid mirrors .sess (34px number column | title | right) so the icon lands on
+   the number axis and the label on the title axis — 50px in both cases. */
 .lnew {
   height: 40px;
   flex: 0 0 40px;
-  display: flex;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 0;
-  padding: 0 14px 0 10px;
+  gap: 8px;
+  padding: 0 12px 0 8px;
   background: var(--g1);
   color: var(--orange);
   border-radius: 0 var(--r-pill) var(--r-pill) 0;
+  box-shadow: inset 4px 0 0 var(--orange); /* 4px spine: the action-strip idiom */
   text-align: left;
   outline: none;
 }
 .lnew .ic {
-  width: 24px;
   height: 24px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  flex: 0 0 24px;
+  justify-content: flex-end; /* flush with the session numbers' right edge */
   color: var(--orange);
 }
 .lnew .lb {
-  margin-left: 14px;
-  font: 700 12.5px/1 var(--din);
-  letter-spacing: 0.16em;
+  font: 700 11px/1 var(--din);
+  letter-spacing: 0.14em;
   white-space: nowrap;
 }
 /* instant state change, no transition — AGENTS.md §5 */
@@ -923,6 +910,7 @@ button { cursor: pointer; }
 .lnew:focus-visible {
   background: var(--orange);
   color: #000;
+  box-shadow: none;
 }
 .lnew:hover .ic,
 .lnew:focus-visible .ic { color: #000; }
@@ -1629,7 +1617,7 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 .set-section {
   margin: 18px 0 8px;
   padding-bottom: 4px;
-  font: 700 10.5px/1 var(--din);
+  font: 700 11px/1 var(--din);
   letter-spacing: 0.18em;
   color: var(--amber);
   box-shadow: inset 0 -2px 0 var(--g1);
@@ -2331,3 +2319,126 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 .trow2 .lb { font: 400 11.5px/1.45 var(--mono); color: var(--w); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .trow2 .cf { display: flex; gap: 2px; align-items: center; }
 .trow2 .cur { font: 700 9px/1 var(--din); letter-spacing: 0.12em; color: #000; background: var(--orange); padding: 3px 5px; border-radius: var(--r-1); }
+
+/* ------------------------------------------------------------------ about */
+/* Credits read as rows on a spine, not as cards: [4px bar][name][why][ver][lic] */
+.about .pv-row .st { background: var(--g2); }
+.about .pv-row .st[data-tone="cyan"] { background: var(--cyan); }
+.about .pv-row .st[data-tone="ice"] { background: var(--ice); }
+
+.about-credit {
+  display: grid;
+  grid-template-columns: 4px 190px minmax(0, 1fr) 62px 92px;
+  gap: var(--gap);
+  align-items: center;
+  min-height: 30px;
+  padding-right: 10px;
+  font: 400 11.5px/1.4 var(--mono);
+  color: var(--g3);
+}
+.about-credit:hover { background: var(--g0); }
+.about-credit .bar { align-self: stretch; margin: 6px 0; background: var(--g1); border-radius: var(--r-pill); }
+.about-credit .nm {
+  font: 700 11.5px/1.4 var(--din);
+  letter-spacing: 0.06em;
+  color: var(--w);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.about-credit .use { font: 400 11.5px/1.4 var(--text); color: var(--g3); }
+.about-credit .ver { font: 400 11.5px/1.4 var(--mono); color: var(--g3); text-align: right; font-variant-numeric: tabular-nums; }
+.about-credit .lic {
+  font: 700 11px/1.4 var(--din);
+  letter-spacing: 0.06em;
+  color: var(--moon);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.about-note {
+  margin: 0 8px 8px;
+  padding: 9px 12px 10px;
+  background: var(--g0);
+  border-left: 4px solid var(--ice);
+  font: 400 13px/1.85 var(--text);
+  color: var(--g3);
+  max-width: 78ch;
+}
+.about-note.quiet {
+  border-left-color: var(--g1);
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--g2);
+}
+
+.about .pv-sub a,
+.about .pv-row .v a {
+  color: var(--ice);
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--ice) 35%, transparent);
+}
+.about .pv-sub a:hover,
+.about .pv-row .v a:hover { color: var(--w); }
+
+/* ------------------------------------------------- panel action language */
+/* A section inside a panel is a label with a spine, never a second 24px title. */
+.pv-h {
+  margin: 18px 0 8px;
+  padding: 2px 0 2px 10px;
+  box-shadow: inset 4px 0 0 var(--orange);
+  font: 700 11px/1.4 var(--din);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--amber);
+}
+
+/* Add-a-row strip: the panel-level twin of .lnew (same 40px / 34px icon cell). */
+.add-row {
+  width: 100%;
+  min-height: 40px;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px 0 8px;
+  margin-top: 4px;
+  background: var(--g1);
+  color: var(--orange);
+  border-radius: 0 var(--r-pill) var(--r-pill) 0;
+  box-shadow: inset 4px 0 0 var(--orange);
+  text-align: left;
+  outline: none;
+}
+.add-row .ic { height: 24px; display: flex; align-items: center; justify-content: flex-end; color: var(--orange); }
+.add-row .lb { font: 700 11px/1 var(--din); letter-spacing: 0.14em; white-space: nowrap; }
+.add-row .hint { font: 400 11px/1 var(--mono); color: var(--g2); text-align: right; white-space: nowrap; }
+.add-row:hover:not(:disabled),
+.add-row:focus-visible {
+  background: var(--orange);
+  color: #000;
+  box-shadow: none;
+}
+.add-row:hover:not(:disabled) .ic,
+.add-row:hover:not(:disabled) .hint,
+.add-row:focus-visible .ic,
+.add-row:focus-visible .hint { color: #000; }
+.add-row:disabled { opacity: 0.45; }
+
+/* Buttons that close a form sit on one row, 36px tall, 8px apart. */
+.form-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--seam);
+  margin-top: var(--seam);
+}
+.form-actions .btn { min-height: 36px; flex-direction: row; gap: 8px; }
+.form-actions .btn b { font-size: 11px; letter-spacing: 0.14em; }
+
+/* Explanations go under the row at the 11px floor, never inline at 10px. */
+.form-note {
+  display: block;
+  margin-top: 6px;
+  font: 400 11px/1.7 var(--mono);
+  color: var(--g2);
+}
