@@ -813,26 +813,14 @@ button { cursor: pointer; }
   flex: 0 0 auto;
 }
 .cap svg { pointer-events: none; }
-.cap .cap-ttl {
+.cap .cap-logo {
   position: absolute;
-  left: 16px;
-  top: 18px;
-  font: 700 18px/1 var(--din);
-  letter-spacing: 0.06em;
+  left: 20px;
+  top: 21px;
+  display: flex;
   color: #000;
-  white-space: nowrap;
 }
-.cap .cap-sub {
-  position: absolute;
-  left: 16px;
-  top: 42px;
-  font: 700 11.5px/1 var(--din);
-  letter-spacing: 0.18em;
-  color: #000;
-  opacity: 0.65;
-  white-space: nowrap;
-}
-
+.cap .cap-logo.is-mini { left: 50%; top: 37px; transform: translateX(-50%); }
 /* new session: neutral action strip (distinct from session blocks,
    which are tinted; active session is the only solid orange block) */
 .lnew {

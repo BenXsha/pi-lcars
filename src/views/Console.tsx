@@ -6,6 +6,7 @@ import { THEMES, appliedTheme, applyTheme, type ThemeId } from "../theme";
 import { getSettings, setSettings, subscribeSettings } from "../settings";
 import { t } from "../i18n";
 import { Icon, type IconName } from "../components/Icon";
+import { Logo } from "../components/Logo";
 import { FileTree } from "../components/FileTree";
 import {
   ApprovalDeck,
@@ -334,12 +335,9 @@ function Sidenav({
   return (
     <aside class="sidenav" data-cramped={cramped ? "1" : "0"} style={{ width: `${col}px`, flex: `0 0 ${col}px` }}>
       <TopCap w={col + 55} h={100} bar={44}>
-        {collapsed ? null : (
-          <>
-            <span class="cap-ttl">PI AGENT CONSOLE</span>
-            <span class="cap-sub">LCARS / SESSION CONSOLE</span>
-          </>
-        )}
+        <span class={`cap-logo ${collapsed ? "is-mini" : ""}`}>
+          <Logo size={collapsed ? 26 : 58} />
+        </span>
       </TopCap>
 
       <div class="lseg" role="tablist" style={collapsed ? { display: "none" } : undefined}>
