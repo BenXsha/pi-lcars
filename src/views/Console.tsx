@@ -2381,7 +2381,7 @@ function TreePanel({ onClose, onSwitch }: { onClose: () => void; onSwitch: () =>
   const [err, setErr] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
-  const [cursor, setCursor] = useState(0);
+  const [cursor, setCursor] = useState<number | null>(null);
 
   const load = () =>
     api
@@ -2401,14 +2401,15 @@ function TreePanel({ onClose, onSwitch }: { onClose: () => void; onSwitch: () =>
       if (!list.length) return;
       e.preventDefault();
       if (e.key === "Enter") {
-        const row = list[cursor];
+        const row = cursor === null ? null : list[cursor];
         if (row && !row.current) {
           setConfirm(row.id);
           setSelected(row.id);
         }
         return;
       }
-      setCursor((c) => Math.max(0, Math.min(list.length - 1, c + (e.key === "ArrowDown" ? 1 : -1))));
+      const down = e.key === "ArrowDown";
+      setCursor((c) => (c === null ? (down ? 0 : list.length - 1) : Math.max(0, Math.min(list.length - 1, c + (down ? 1 : -1)))));
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -2526,7 +2527,7 @@ function TreePanel({ onClose, onSwitch }: { onClose: () => void; onSwitch: () =>
               data-path={n.isLeafPath ? "1" : "0"}
               data-confirm={confirm === n.id ? "1" : "0"}
               data-selected={selected === n.id ? "1" : "0"}
-              data-cursor={nodes[cursor]?.id === n.id ? "1" : "0"}
+              data-cursor={cursor !== null && nodes[cursor]?.id === n.id ? "1" : "0"}
               role="treeitem"
               aria-level={(shownDepth.get(n.id) ?? 0) + 1}
               aria-selected={selected === n.id}

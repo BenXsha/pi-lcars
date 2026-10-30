@@ -2548,8 +2548,10 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 .tnode[data-current="1"] .ts,
 .tnode[data-current="1"] .ix { color: #000; }
 .tnode[data-current="1"] .go:not(.wide) { background: #000; color: var(--orange); }
+/* the keyboard cursor marks the cap only — a ring on the tail read as a stray
+   bright edge at the right end of the strip */
 .tnode[data-cursor="1"] .cap { box-shadow: inset 0 0 0 2px #000; }
-.tnode[data-cursor="1"] .tl { box-shadow: inset 0 0 0 2px var(--kind); }
+.tnode[data-cursor="1"] { filter: brightness(1.08); }
 .tnode:hover { filter: brightness(1.12); cursor: default; }
 
 /* confirm: the strip goes tomato, the actions invert to black chips */
