@@ -109,6 +109,7 @@ export function Console() {
   const [sideMode, setSideMode] = useState<"sessions" | "files">("sessions");
   const [previewCwd, setPreviewCwd] = useState<string | null>(null);
   const [viewer, setViewer] = useState<{ path: string; diff?: DiffData } | null>(null);
+  const [activePrompt, setActivePrompt] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
   const [panes, setPanes] = useState(() => {
     const read = (k: string) => {
@@ -283,6 +284,15 @@ export function Console() {
                 meta={meta}
                 queue={s.queue}
                 width={rail}
+                prompts={s.items.filter((i): i is Extract<Item, { kind: "user" }> => i.kind === "user")}
+                onJump={(id) => {
+                  setViewer(null);
+                  setActivePrompt(id);
+                  requestAnimationFrame(() => {
+                    document.querySelector(`#scroll [data-id="${id}"]`)?.scrollIntoView({ block: "center" });
+                  });
+                }}
+                activePrompt={activePrompt}
                 onToggle={() => setPanes((p) => ({ ...p, right: !p.right }))}
               />
             ) : (
@@ -566,7 +576,7 @@ function Transcript({
 
         if (it.kind === "user") {
           return (
-            <div class={cls} key={it.id}>
+            <div class={cls} key={it.id} data-id={it.id}>
               <MessageRow role="user" time={`T+${mmss(it.ts - t0)}`} text={it.text} />
               {it.steer || it.queued ? (
                 <div style={{ marginLeft: "88px", marginTop: "2px", font: "700 10px/1.4 var(--din)", letterSpacing: "0.14em", color: it.steer ? "var(--orange)" : "var(--moon)" }}>
@@ -579,7 +589,7 @@ function Transcript({
 
         if (it.kind === "assistant") {
           return (
-            <div class={cls} key={it.id}>
+            <div class={cls} key={it.id} data-id={it.id}>
               <MessageRow
                 role="assistant"
                 time=""
@@ -726,14 +736,22 @@ function Rail({
   meta,
   queue,
   width,
+  prompts,
+  activePrompt,
+  onJump,
   onToggle,
 }: {
   items: Item[];
   meta: ReturnType<typeof getState>["meta"];
   queue: { waiting: string[] };
   width: number;
+  prompts: Extract<Item, { kind: "user" }>[];
+  activePrompt: string | null;
+  onJump: (id: string) => void;
   onToggle: () => void;
 }) {
+  const [allPrompts, setAllPrompts] = useState(false);
+  const shownPrompts = allPrompts ? prompts : prompts.slice(-6);
   const stats = useMemo(() => {
     const out: Record<string, { calls: number; fails: number; trunc: number }> = {};
     for (const it of items) {
@@ -754,6 +772,40 @@ function Rail({
   return (
     <aside class="rail" style={{ width: `${width}px`, flex: `0 0 ${width}px` }}>
       <div class="rail-body">
+      <div class="phead lav">{t("rail.prompts")} / {prompts.length}</div>
+      <div class="panel">
+        {prompts.length === 0 ? <div class="pv-note">nothing sent yet in this session</div> : null}
+        {prompts.length > 6 && !allPrompts ? (
+          <button type="button" class="pv-more" onClick={() => setAllPrompts(true)}>
+            + {prompts.length - 6} EARLIER
+          </button>
+        ) : null}
+        <div class="plist">
+          {shownPrompts.map((p) => {
+            const n = prompts.indexOf(p) + 1;
+            return (
+              <button
+                type="button"
+                key={p.id}
+                class="prow"
+                data-active={p.id === activePrompt ? "1" : "0"}
+                title={p.text}
+                onClick={() => onJump(p.id)}
+              >
+                <span class="pn">{String(n).padStart(2, "0")}</span>
+                <span class="pt">{p.text.replace(/\s+/g, " ")}</span>
+                <span class="pw">{new Date(p.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+              </button>
+            );
+          })}
+        </div>
+        {allPrompts && prompts.length > 6 ? (
+          <button type="button" class="pv-more" onClick={() => setAllPrompts(false)}>
+            − COLLAPSE
+          </button>
+        ) : null}
+      </div>
+
       <div class="phead">RESOURCES</div>
       <div class="panel">
         <div class="ctx-top">

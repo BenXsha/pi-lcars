@@ -37,6 +37,7 @@ const DICT = {
     "set.keys": "KEYBOARD",
     "set.policy": "APPROVAL POLICY",
     "set.tools": "TOOL LOADOUT",
+    "rail.prompts": "PROMPTS",
     "set.note": "Chrome only — messages, tool output and skill text stay in their original language.",
   },
   zh: {
@@ -71,6 +72,7 @@ const DICT = {
     "set.keys": "快捷键",
     "set.policy": "审批策略",
     "set.tools": "工具清单",
+    "rail.prompts": "提示词",
     "set.note": "仅界面文案；消息、工具输出与技能正文保持原文。",
   },
 } as const;

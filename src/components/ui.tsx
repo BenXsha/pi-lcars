@@ -368,12 +368,20 @@ export function MessageRow(props: {
       </div>
       <div class="cell">
         {props.thinking ? (
-          <div class="think" data-open={props.thinkingOpen ? "1" : "0"} onClick={props.onToggleThinking}>
-            <span class="tl">
-              <Icon name="role-system" size={10} /> THINKING
+          <button
+            type="button"
+            class="think"
+            data-open={props.thinkingOpen ? "1" : "0"}
+            aria-expanded={props.thinkingOpen ? "true" : "false"}
+            onClick={props.onToggleThinking}
+          >
+            <span class="th-hd">
+              <Icon name={props.thinkingOpen ? "act-collapse" : "act-expand"} size={10} />
+              <span class="th-lb">THINKING</span>
+              <span class="th-words">{props.thinking.trim().split(/\s+/).length} W</span>
             </span>
-            <span class="tb">{props.thinking}</span>
-          </div>
+            <span class="th-body">{props.thinking}</span>
+          </button>
         ) : null}
         {props.text ? (
           props.role === "assistant" ? <Markdown text={props.text} /> : <div class="txt">{props.text}</div>
