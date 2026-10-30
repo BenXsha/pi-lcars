@@ -2399,38 +2399,13 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
   color: var(--g2);
 }
 
-/* chronology: one bar per turn, so time reads without indenting every message */
-.tsep {
-  display: grid;
-  grid-template-columns: 4px auto auto 1fr;
-  gap: 8px;
-  align-items: center;
-  height: 24px;
-  margin: 6px 0 2px;
-  padding-right: 8px;
-  background: var(--g1);
-  border-radius: 0 var(--r-1) var(--r-1) 0;
-  box-shadow: inset 0 2px 0 var(--orange);
-}
-.tsep .st { align-self: stretch; background: var(--orange); border-radius: var(--r-pill); }
-.tsep .n {
-  font: 700 11px/1 var(--din);
-  letter-spacing: 0.14em;
-  color: #000;
-  background: var(--orange);
-  padding: 4px 6px;
-  border-radius: 0 var(--r-1) var(--r-1) 0;
-}
-.tsep .ts { font: 400 11px/1 var(--mono); color: color-mix(in srgb, var(--w) 74%, #000); font-variant-numeric: tabular-nums; }
-.tsep .ct { font: 700 11px/1 var(--din); letter-spacing: 0.12em; color: color-mix(in srgb, var(--w) 74%, #000); }
-
 .tv-body {
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   padding-bottom: 6px;
   scrollbar-width: thin;
   scrollbar-color: var(--g1) transparent;
@@ -2439,19 +2414,21 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 /* hierarchy = stepped left edge; the block's right edge stays aligned */
 /* Tree rows are LCARS readout strips, not a git graph: a kind-tinted block with
    a solid kind edge, stepped right only where the graph forks. */
+/* Tree rows are LCARS capsules: one rounded strip per entry, a pill cap for the
+   kind colour, black seams between rows, and a stepped left edge at forks. */
 .tnode {
   --kind: var(--g2);
   position: relative;
   display: grid;
-  grid-template-columns: 6px 84px minmax(0, 1fr) 66px 50px auto;
-  gap: var(--gap);
+  grid-template-columns: 12px 32px 88px minmax(0, 1fr) 70px 46px auto;
+  gap: 8px;
   align-items: center;
   min-height: 40px;
+  flex: 0 0 auto;
   margin-left: calc(var(--d, 0) * 18px);
-  padding-right: 6px;
-  background: color-mix(in srgb, var(--kind) 10%, #000);
-  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--kind) 24%, transparent);
-  border-radius: 0 var(--r-1) var(--r-1) 0;
+  padding: 0 14px 0 10px;
+  background: color-mix(in srgb, var(--kind) 12%, #000);
+  border-radius: var(--r-pill);
 }
 .tnode[data-kind="user"] { --kind: var(--orange); }
 .tnode[data-kind="assistant"] { --kind: var(--ice); }
@@ -2460,7 +2437,13 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 .tnode[data-kind="branch_summary"],
 .tnode[data-kind="custom"] { --kind: var(--lav); }
 
-.tnode .spine { align-self: stretch; background: var(--kind); border-radius: 0 var(--r-1) var(--r-1) 0; }
+/* the kind cap: a solid pill inside the capsule, not an edge line */
+.tnode .spine {
+  width: 12px;
+  height: 22px;
+  border-radius: var(--r-pill);
+  background: var(--kind);
+}
 
 .tnode .kd {
   font: 700 11px/1 var(--din);
@@ -2483,25 +2466,20 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
-.tnode .fork {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 2px;
-}
+.tnode .fork { display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
 .tnode .fork .pg {
-  width: 20px;
+  width: 22px;
   height: 22px;
   padding: 0;
   background: var(--g1);
   color: var(--w);
   font: 700 12px/1 var(--mono);
-  border-radius: 0 var(--r-1) var(--r-1) 0;
+  border-radius: var(--r-pill);
 }
 .tnode .fork .pg:hover:not(:disabled) { background: var(--kind); color: #000; }
 .tnode .fork .pg:disabled { opacity: 0.4; }
 .tnode .fork .ix {
-  min-width: 24px;
+  min-width: 26px;
   text-align: center;
   font: 700 11px/1 var(--din);
   letter-spacing: 0.08em;
@@ -2514,91 +2492,80 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
-.tnode .cf { display: flex; gap: 4px; align-items: center; justify-content: flex-end; }
+.tnode .cf { display: flex; gap: 6px; align-items: center; justify-content: flex-end; }
 .tnode .cur {
-  padding: 4px 7px;
+  padding: 4px 9px;
   font: 700 11px/1 var(--din);
   letter-spacing: 0.12em;
   color: #000;
   background: var(--amber);
-  border-radius: 0 var(--r-1) var(--r-1) 0;
+  border-radius: var(--r-pill);
 }
 
-/* side branches recede; the path to HEAD and the cursor come forward */
+/* side branches recede; HEAD and the cursor come forward */
 .tnode[data-path="0"] { opacity: 0.72; }
 .tnode[data-path="0"]:hover { opacity: 1; }
-.tnode[data-current="1"] {
-  background: var(--orange);
-  box-shadow: none;
-  opacity: 1;
-}
+.tnode[data-current="1"] { background: var(--orange); opacity: 1; }
 .tnode[data-current="1"] .spine { background: #000; }
 .tnode[data-current="1"] .kd,
 .tnode[data-current="1"] .lb,
 .tnode[data-current="1"] .ts,
 .tnode[data-current="1"] .seq,
 .tnode[data-current="1"] .fork .ix { color: #000; }
-.tnode[data-selected="1"] { opacity: 1; }
-.tnode[data-cursor="1"] { box-shadow: inset 0 0 0 2px var(--kind), inset 0 0 0 4px #000; }
+.tnode[data-cursor="1"] { box-shadow: 0 0 0 2px var(--kind); }
 .tnode:hover { filter: brightness(1.16); cursor: default; }
-.tnode[data-confirm="1"] {
-  background: var(--tomato);
-  box-shadow: none;
-  opacity: 1;
-  filter: none;
-}
+.tnode[data-confirm="1"] { background: var(--tomato); opacity: 1; }
 .tnode[data-confirm="1"] .spine { background: #000; }
 .tnode[data-confirm="1"] .kd,
 .tnode[data-confirm="1"] .lb,
 .tnode[data-confirm="1"] .ts,
 .tnode[data-confirm="1"] .seq,
 .tnode[data-confirm="1"] .fork .ix { color: #000; }
-/* on a tomato block the buttons invert: black chip, tomato label */
-.tnode[data-confirm="1"] .pv-btn { background: #000; color: var(--tomato); }
+.tnode[data-confirm="1"] .pv-btn { background: #000; color: var(--tomato); border-radius: var(--r-pill); }
 .tnode[data-confirm="1"] .pv-btn.ghost { background: transparent; color: #000; }
 .tnode[data-confirm="1"] .pv-btn:hover:not(:disabled) { background: #000; color: var(--w); }
 
-/* turn header: a big number block butt-joined to a neutral readout strip */
+/* turn header: one capsule, big number cap on the left, readouts after it */
 .tsep {
   display: grid;
-  grid-template-columns: auto auto 1fr auto;
-  gap: var(--gap);
+  grid-template-columns: auto auto 1fr;
+  gap: 0;
   align-items: stretch;
-  height: 30px;
-  margin: 8px 0 2px;
-  padding: 0;
+  flex: 0 0 32px;
+  height: 32px;
+  min-height: 32px;
+  margin: 10px 0 6px;
+  border-radius: var(--r-pill);
+  overflow: hidden;
 }
 .tsep .st { display: none; }
 .tsep .n {
   display: flex;
   align-items: center;
-  padding: 0 10px;
+  padding: 0 16px;
   background: var(--orange);
   color: #000;
   font: 700 21px/1 var(--din);
   letter-spacing: -0.02em;
-  border-radius: 0 var(--r-pill) var(--r-pill) 0;
   font-variant-numeric: tabular-nums;
 }
 .tsep .ts {
   display: flex;
   align-items: center;
-  padding: 0 10px;
+  padding: 0 12px;
   background: var(--g1);
   color: var(--t2);
   font: 700 11px/1 var(--din);
   letter-spacing: 0.12em;
-  border-radius: 0 var(--r-1) var(--r-1) 0;
 }
 .tsep .ct {
   display: flex;
   align-items: center;
-  padding: 0 10px;
+  padding: 0 14px;
   background: var(--g1);
   color: var(--t3);
   font: 700 11px/1 var(--din);
   letter-spacing: 0.12em;
-  border-radius: 0 var(--r-1) var(--r-1) 0;
 }
 
 /* rail caveat line: says what the data does NOT contain */
