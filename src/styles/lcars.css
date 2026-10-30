@@ -223,6 +223,7 @@ button { cursor: pointer; }
   overflow-wrap: anywhere;
   max-height: 3.8em; /* exactly 2 lines — a mid-line clamp reads as a bug */
   overflow: hidden;
+  transition: max-height var(--t-3) var(--ease);
 }
 .tool > .bd .out {
   font: 400 12.5px/2 var(--mono);
@@ -231,6 +232,7 @@ button { cursor: pointer; }
   overflow-wrap: anywhere;
   max-height: 4em; /* 2 lines */
   overflow: hidden;
+  transition: max-height var(--t-3) var(--ease);
 }
 .tool > .bd .err {
   font: 400 12.5px/2 var(--mono);
@@ -239,6 +241,7 @@ button { cursor: pointer; }
   overflow-wrap: anywhere;
   max-height: 6em; /* 3 lines: the error text is the weight */
   overflow: hidden;
+  transition: max-height var(--t-3) var(--ease);
 }
 .tool > .bd .warn {
   font: 400 11.5px/1.9 var(--mono);
@@ -335,14 +338,19 @@ button { cursor: pointer; }
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   max-width: 86ch;
-}
-.think[data-open="0"] .th-body {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  /* clamp by height, not line-clamp: line-clamp cannot be transitioned */
+  max-height: calc(1.68em * 2);
   overflow: hidden;
+  transition: max-height var(--t-3) var(--ease);
 }
-.think[data-open="1"] .th-body { color: var(--w); opacity: 0.86; }
+.think[data-open="1"] .th-body {
+  color: var(--w);
+  opacity: 0.86;
+  max-height: 52vh; /* the tween target — a transition cannot target `none` */
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--g1) transparent;
+}
 
 .stream { display: flex; align-items: center; gap: 8px; font: 700 11.5px/1 var(--din); letter-spacing: 0.14em; color: var(--orange); }
 .caret { width: 2px; height: 17px; background: var(--orange); animation: blink 1s steps(1) infinite; }
@@ -1036,13 +1044,14 @@ button { cursor: pointer; }
 
 /* expanded state: the clamp must actually lift (data-expanded was missing
    for a while, which left the button clicking against a fixed max-height) */
-.tool[data-expanded="1"] > .bd .args { max-height: none; }
+.tool[data-expanded="1"] > .bd .args { max-height: 40vh; overflow-y: auto; scrollbar-width: thin; }
 /* expanded output can be long: cap it and scroll inside instead of pushing
    the whole transcript down by 700px */
 .tool[data-expanded="1"] > .bd .out,
 .tool[data-expanded="1"] > .bd .err {
   max-height: 52vh;
   overflow-y: auto;
+  transition: max-height var(--t-3) var(--ease);
   scrollbar-width: thin;
   scrollbar-color: var(--g1) transparent;
 }
@@ -2240,6 +2249,9 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 .skl .pth { font: 400 10px/1.5 var(--mono); color: var(--g2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .skl .head {
   margin: 2px 0 0;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height var(--t-3) var(--ease);
   padding: 8px 10px;
   background: #000;
   font: 400 11px/1.5 var(--mono);
@@ -2349,7 +2361,10 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 .sum .sb-hd .dl { font: 400 10px/1.4 var(--mono); color: var(--g3); }
 .sum .sb-hd .rs { font: 700 9px/1 var(--din); letter-spacing: 0.12em; color: var(--g2); }
 .sum .sb-hd .pv-btn { margin-left: auto; }
-.sum .body { max-height: 42vh; overflow: auto; padding-top: 4px; scrollbar-width: thin; scrollbar-color: var(--g1) transparent; }
+.sum .body { max-height: 0; overflow: hidden; padding-top: 4px; transition: max-height var(--t-3) var(--ease); }
+.sum .body[data-open="1"],
+.skl .head[data-open="1"] { max-height: 42vh; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--g1) transparent; }
+.skl .head[data-open="1"] { max-height: 40vh; }
 
 /* ============================================================
    branch tree

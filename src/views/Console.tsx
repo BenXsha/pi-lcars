@@ -712,7 +712,9 @@ function SummaryBlock({ item }: { item: Extract<Item, { kind: "summary" }> }) {
             {open ? "HIDE" : "READ SUMMARY"}
           </button>
         </div>
-        {open ? <div class="body"><Markdown text={item.summary} /></div> : null}
+        <div class="body" data-open={open ? "1" : "0"}>
+          <Markdown text={item.summary} />
+        </div>
       </div>
     </div>
   );
@@ -737,11 +739,9 @@ function SkillBlock({ skill }: { skill: NonNullable<Extract<Item, { kind: "user"
           </button>
         </div>
         <div class="pth">{skill.location.replace(/^\/Users\/[^/]+/, "~")}</div>
-        {open ? (
-          <pre class="head anim-in" key="open">
-            {skill.head}
-          </pre>
-        ) : null}
+        <pre class="head" data-open={open ? "1" : "0"}>
+          {skill.head}
+        </pre>
       </div>
     </div>
   );

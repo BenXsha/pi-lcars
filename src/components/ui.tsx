@@ -265,7 +265,7 @@ export function ToolStrip(props: {
           </span>
         </div>
       )}
-      <div class={`bd${props.expanded ? " anim-in" : ""}`} key={props.expanded ? "open" : "closed"}>
+      <div class="bd">
         <div class="args">{props.args}</div>
         {props.diff ? (
           <>
@@ -401,9 +401,7 @@ export function MessageRow(props: {
               <span class="th-lb">THINKING</span>
               <span class="th-words">{props.thinking.trim().split(/\s+/).length} W</span>
             </span>
-            <span class={`th-body${props.thinkingOpen ? " anim-in" : ""}`} key={props.thinkingOpen ? "open" : "closed"}>
-              {props.thinking}
-            </span>
+            <span class="th-body">{props.thinking}</span>
           </button>
         ) : null}
         {props.text ? (
