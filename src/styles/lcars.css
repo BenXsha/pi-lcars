@@ -2857,3 +2857,24 @@ html[data-backdrop="1"] body::after {
   background: linear-gradient(180deg, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.52) 45%, rgba(0, 0, 0, 0.55));
 }
 #root { position: relative; z-index: 1; }
+
+/* borg: the big surfaces are machinery — dark blocks with a coloured spine and
+   a coloured label, so the green never floods the screen */
+[data-theme="borg"] .station {
+  background: var(--g1);
+  color: var(--w);
+  box-shadow: inset 5px 0 0 var(--orange);
+}
+[data-theme="borg"] .station .lbl,
+[data-theme="borg"] .station .num { color: var(--orange); }
+[data-theme="borg"] .station[aria-current="true"] {
+  background: var(--g0);
+  box-shadow: inset 5px 0 0 var(--w);
+}
+[data-theme="borg"] .sess[data-active="1"] {
+  background: var(--g1);
+  color: var(--w);
+  box-shadow: inset 4px 0 0 var(--orange);
+}
+[data-theme="borg"] .sess[data-active="1"] .num,
+[data-theme="borg"] .sess[data-active="1"] .l1 { color: var(--orange); }

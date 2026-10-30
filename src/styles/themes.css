@@ -163,21 +163,24 @@
    focus, spring green for running tools, mint for system, and one amber block
    kept for alerts because a monochrome CRT had no red to give. */
 [data-theme="borg"] {
-  --orange: #33ff33; /* focus: P1 phosphor green */
-  --amber: #cfe8b0; /* secondary metalabels: pale phosphor */
-  --tang: #4adf8f; /* tool running: spring green */
-  --tomato: #e0a34a; /* alert: amber-phosphor warning (the only warm block) */
-  --lilac: #6fd6c0; /* memory / context: green-cyan */
-  --lav: #4fc9a8; /* subagents: alcove teal */
-  --ice: #a8e8d8; /* read-only refs: pale aqua */
-  --moon: #b8d98a; /* plan / pending: phosphor lime */
-  --cyan: #64e0b4; /* system / ok: mint */
+  /* Large surfaces are machinery: desaturated green, no glow. The phosphor
+     brightness lives in the text (--w) and in the thin marks (spines, status
+     bars), which is where a terminal puts it too. */
+  --orange: #5fae6b; /* focus: muted phosphor, used on blocks */
+  --amber: #c8dcc0; /* secondary metalabels: pale, almost grey-green */
+  --tang: #4f9f7a; /* tool running */
+  --tomato: #b8863f; /* alert: dimmed amber (the only warm block) */
+  --lilac: #63a894; /* memory / context */
+  --lav: #4d9483; /* subagents */
+  --ice: #8fc9bb; /* read-only refs */
+  --moon: #9bb471; /* plan / pending */
+  --cyan: #5fa38f; /* system / ok */
 
-  --w: #d8ffd9;
-  --g3: #8fbf95;
-  --g2: #648f6b;
-  --g1: #122118;
-  --g0: #081009;
+  --w: #eaffec; /* text carries the phosphor brightness instead */
+  --g3: #9cc2a2;
+  --g2: #6d9975;
+  --g1: #16241a;
+  --g0: #0a120c;
   --bg: #010402;
 }
 
