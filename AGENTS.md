@@ -756,6 +756,7 @@ composer 上方出现 `QUEUED n` 条带，逐条显示待投递文本 + `deliver
 | 2026-xx-xx | 工具读数行改为**一条 tone 驱动的色带**
 | 2026-xx-xx | 新增 `kelvin` / `picard` 两套主题
 | 2026-xx-xx | 背景图改为**自绘 SVG**（`scripts/build-backdrop.mjs` → `public/backdrop.svg`），随包按 MIT 分发；不再使用影视剧照 | 参考图能表达"舰体+星空"的味道，但素材版权不明，不能随开源包分发。自绘只用平涂与低透明度，符合 §2 R4（无渐变/发光） | `scripts/build-backdrop.mjs`、`public/backdrop.svg`、`src/styles/lcars.css` |，角色语义不变；色值来自 fan-canon 调色板（trekcolors / thelcars.com 的 Picard、Nemesis 等）并逐色提到"黑字可读"的亮度 | 用户要求跟进最近两部电影与新剧的配色；原四套已够用但没有"影视新作"的表达 | `src/styles/themes.css`、`src/theme.ts`、`scripts/check-themes.mjs` |：状态色同时决定 4px 状态条、名字块实色、正文 9% 透明底、读数块 22% 底 | 原来正文块无底色，实色名字块与灰读数块浮在黑底上，一行像两个岛，不是 LCARS 的连续条带 | `src/styles/lcars.css`（`.tool` 的 `--tone`） |
+| 2026-xx-xx | 背景图换成用户提供的舰体静帧（`public/backdrop.jpg`，1600px / 238 KB，40% 不透明度 + 55% 黑幕）；自绘 SVG 生成脚本保留作为可复现的替代方案 | 用户要的是这张图的实际观感；同一条"最坏合成 ≤ 46"的约束仍然成立（g3 4.9:1，g2 3.3:1 非文本） | `public/backdrop.jpg`、`src/styles/lcars.css`、`scripts/build-backdrop.mjs` |
 | 2026-xx-xx | 新会话在 `#load()` 里补齐默认模型与思考档：`createAgentSession()` 不传 model 时 pi 会停在 `unknown/unknown`，导致 shelf 与 `pi-lcars status` 显示假值 | “unknown/unknown” 违反 §7.6 数字自洽；同时它让 pi-lens 把 situational 工具当默认激活，工具清单虚高 | `server/pi/registry.mjs`、`test/smoke.mjs` |
 
 ---
