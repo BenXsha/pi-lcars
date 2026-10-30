@@ -163,12 +163,18 @@ export class Registry {
     entry.path = manager.getSessionFile?.() ?? entry.path;
     session.subscribe((ev) => applyEvent(entry, ev));
 
-    // extensions (notably MCP) connect their servers on session_start
-    try {
-      await session.bindExtensions?.({ mode: "print" });
-    } catch (e) {
-      console.warn(`[extensions] bind failed: ${e.message}`);
-    }
+    // Extensions are loaded but not bound yet: MCP connects its servers on
+    // session_start, and that costs seconds. The operator starts it from the
+    // MCP panel instead (entry.bind()).
+    entry.bound = false;
+    entry.bind = async () => {
+      if (entry.bound) return { bound: true, ms: 0, already: true };
+      const t0 = Date.now();
+      await entry.session.bindExtensions?.({ mode: "print" });
+      entry.bound = true;
+      entry.pushMeta();
+      return { bound: true, ms: Date.now() - t0 };
+    };
 
     this.sessions.set(entry.id, entry);
     this.activeId = entry.id;

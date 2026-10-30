@@ -12,7 +12,7 @@ import { readFile, readdir, stat } from "node:fs/promises";
 import { extname, join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { loadSdk, agentDir } from "./pi/sdk.mjs";
+import { loadSdk, agentDir, sdkSpec } from "./pi/sdk.mjs";
 import { Approvals } from "./pi/approval.mjs";
 import { createQueue } from "./pi/queue.mjs";
 import { Registry } from "./pi/registry.mjs";
@@ -309,6 +309,29 @@ const routes = {
     ok(res, { modelId: entry.meta.modelId, model: entry.meta.model });
   },
 
+  "GET /api/system": async (req, res) => {
+    const sdk = await loadSdk();
+    let sdkPath = sdkSpec();
+    if (sdkPath && !sdkPath.startsWith("/")) {
+      try {
+        sdkPath = await import("node:module").then((m) => m.createRequire(import.meta.url).resolve(sdkPath));
+      } catch {
+        /* keep the bare specifier */
+      }
+    }
+    ok(res, {
+      node: process.version,
+      platform: `${process.platform} ${process.arch}`,
+      piVersion: sdk.VERSION ?? null,
+      sdk: sdkPath,
+      agentDir: agentDir(),
+      cwd: CWD,
+      port: PORT,
+      mcpEnabled: process.env.LCARS_MCP !== "0",
+      approvals: approvals.snapshot,
+    });
+  },
+
   "GET /api/skills": async (req, res) => {
     const url = new URL(req.url, "http://x");
     const entry = registry.get(url.searchParams.get("session") || undefined);
@@ -397,7 +420,8 @@ const routes = {
   "GET /api/mcp": async (req, res) => {
     const url = new URL(req.url, "http://x");
     const entry = registry.get(url.searchParams.get("session") || undefined);
-    ok(res, await mcpStatus({ agentDir: agentDir(), cwd: CWD, session: entry?.session }));
+    const status = await mcpStatus({ agentDir: agentDir(), cwd: CWD, session: entry?.session });
+    ok(res, { ...status, bound: !!entry?.bound });
   },
 
   "POST /api/mcp": async (req, res) => {
@@ -413,6 +437,31 @@ const routes = {
       case "remove":
         ok(res, await removeServer({ ...ctx, name: b.name }));
         break;
+      case "connect": {
+        const entry = registry.get(b.session);
+        if (!entry?.bind) return fail(res, 409, "no session to bind", { code: "E_NO_SESSION" });
+        const r = await entry.bind();
+        // MCP connects in the background after session_start: poll until tools
+        // exist (or give up and report what we have — never claim success).
+        const started = Date.now();
+        const deadline = started + Math.min(30_000, Number(b.timeout) || 15_000);
+        let status = await mcpStatus({ agentDir: agentDir(), cwd: CWD, session: entry.session });
+        // MCP connects per server in the background; keep waiting while any
+        // enabled server is still without tools, but never past the deadline.
+        while (status.totals.connected < status.totals.enabled && Date.now() < deadline) {
+          await new Promise((res2) => setTimeout(res2, 500));
+          status = await mcpStatus({ agentDir: agentDir(), cwd: CWD, session: entry.session });
+        }
+        entry.pushMeta();
+        ok(res, {
+          ...status,
+          bound: true,
+          connectMs: Date.now() - started,
+          pending: status.totals.connected < status.totals.enabled,
+          bindMs: r.ms,
+        });
+        break;
+      }
       default:
         fail(res, 400, `unknown op: ${b.op}`, { code: "E_MCP" });
     }

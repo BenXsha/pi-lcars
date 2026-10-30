@@ -65,11 +65,12 @@ export function TopCap(props: { w?: number; h?: number; bar?: number; r?: number
   );
 }
 
-export function Shelf(props: { brand: string; tag: string; children?: ComponentChildren }) {
+export function Shelf(props: { brand: string; tag: string; left?: ComponentChildren; children?: ComponentChildren }) {
   return (
     <header class="shelf">
       <div class="shelf-l">
-        <span class="brand">{props.brand}</span>
+        {props.left}
+        {props.brand ? <span class="brand">{props.brand}</span> : null}
         <span class="station-tag">{props.tag}</span>
       </div>
       <div class="shelf-r">{props.children}</div>

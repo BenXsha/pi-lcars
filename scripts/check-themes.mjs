@@ -58,7 +58,8 @@ const checks = [
   ...BLOCK_ROLES.map((r) => ({ a: "#000000", b: r, min: 4.5, why: `black on --${r}` })),
   { a: "w", b: "bg", min: 7, why: "body text on background" },
   { a: "g3", b: "bg", min: 4.5, why: "secondary text" },
-  { a: "g2", b: "bg", min: 3, why: "tertiary / decorative" },
+  // small labels use --g2, so it has to clear AA for normal text, not just 3:1
+  { a: "g2", b: "bg", min: 4.5, why: "small labels on background" },
   { a: "cyan", b: "g1", min: 4.5, why: "tool duration on meta block" },
   { a: "orange", b: "bg", min: 4.5, why: "streaming label" },
   { a: "amber", b: "bg", min: 4.5, why: "panel header text / warnings" },

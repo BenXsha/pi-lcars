@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import type { DirEntry, Item, McpServer, ModelInfo, ProviderRow, ProvidersResult, SkillsResult } from "../api";
+import type { DirEntry, Item, McpConfig, McpServer, ModelInfo, ProviderRow, ProvidersResult, SkillsResult, SystemInfo } from "../api";
 import { api } from "../api";
 import { actions, connect, getState, subscribe } from "../store";
 import { THEMES, appliedTheme, applyTheme, type ThemeId } from "../theme";
+import { getSettings, setSettings, subscribeSettings } from "../settings";
+import { t } from "../i18n";
 import { Icon, type IconName } from "../components/Icon";
 import { FileTree } from "../components/FileTree";
 import {
@@ -26,12 +28,13 @@ import {
 /* ---------------------------------------------------------------- setup */
 type View = "session" | "mcp" | "skills" | "providers" | "system";
 
-const NAV: { view: View; label: string; icon: IconName; tone: "amber" | "lav" | "moon" | "ice" | "cyan" }[] = [
-  { view: "mcp", label: "MCP", icon: "station-mcp", tone: "lav" },
-  { view: "skills", label: "SKILLS", icon: "station-skills", tone: "ice" },
-  { view: "providers", label: "PROVIDERS", icon: "station-provider", tone: "cyan" },
-  { view: "system", label: "SETTINGS", icon: "station-system", tone: "moon" },
+const NAV: { view: View; key: TKey2; icon: IconName; tone: "amber" | "lav" | "moon" | "ice" | "cyan" }[] = [
+  { view: "mcp", key: "nav.mcp", icon: "station-mcp", tone: "lav" },
+  { view: "skills", key: "nav.skills", icon: "station-skills", tone: "ice" },
+  { view: "providers", key: "nav.providers", icon: "station-provider", tone: "cyan" },
+  { view: "system", key: "nav.settings", icon: "station-system", tone: "moon" },
 ];
+type TKey2 = Parameters<typeof t>[0];
 
 const TOOL_ICON: Record<string, IconName> = {
   bash: "tool-bash",
@@ -69,6 +72,27 @@ const ago = (ts: number | null) => {
 const shortPath = (p: string) => p.replace(/^\/Users\/[^/]+/, "~");
 const fmtTok = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(1)}K` : String(n));
 
+/**
+ * Column widths by viewport. The cap is always column + 55 (r), so the scoop
+ * keeps landing on the column edge instead of drifting.
+ */
+function useLayoutWidths() {
+  const calc = () => {
+    const w = typeof window === "undefined" ? 1600 : window.innerWidth;
+    if (w >= 1500) return { col: 320, rail: 328 };
+    if (w >= 1280) return { col: 288, rail: 300 };
+    if (w >= 1100) return { col: 256, rail: 272 };
+    return { col: 224, rail: 0 };
+  };
+  const [dims, setDims] = useState(calc);
+  useEffect(() => {
+    const on = () => setDims(calc());
+    window.addEventListener("resize", on);
+    return () => window.removeEventListener("resize", on);
+  }, []);
+  return dims;
+}
+
 function useStore() {
   const [, force] = useState(0);
   useEffect(() => subscribe(() => force((n) => n + 1)), []);
@@ -80,19 +104,69 @@ export function Console() {
   const s = useStore();
   const [view, setView] = useState<View>("session");
   const [deck, setDeck] = useState<null | "cwd" | "model" | "think" | "theme">(null);
+  const [panes, setPanes] = useState(() => {
+    const read = (k: string) => {
+      try {
+        return localStorage.getItem(k) !== "0";
+      } catch {
+        return true;
+      }
+    };
+    return { left: read("lcars.left"), right: read("lcars.right") };
+  });
   const [theme, setTheme] = useState<ThemeId>(appliedTheme());
 
   useEffect(() => connect(), []);
 
+  // locale / scale / motion live in a module store; the shell re-renders on change
+  const [, bumpSettings] = useState(0);
+  useEffect(() => subscribeSettings(() => bumpSettings((n) => n + 1)), []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("lcars.left", panes.left ? "1" : "0");
+      localStorage.setItem("lcars.right", panes.right ? "1" : "0");
+    } catch {
+      /* private mode */
+    }
+  }, [panes.left, panes.right]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      // works while composing too: the composer has no Ctrl/Cmd+B binding
+      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "b") return;
+      e.preventDefault();
+      setPanes((p) => (e.shiftKey ? { ...p, right: !p.right } : { ...p, left: !p.left }));
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   const meta = s.meta;
   const active = s.sessions.find((x) => x.id === s.activeId);
+  const { col: wideCol, rail } = useLayoutWidths();
+  const col = panes.left ? wideCol : 64;
 
   return (
-    <div class="app">
-      <Sidenav sessions={s.sessions} activeId={s.activeId} view={view} onView={setView} cwd={meta?.cwd ?? ""} />
+    <div class="app" data-left={panes.left ? "1" : "0"} data-right={panes.right ? "1" : "0"}>
+      <Sidenav sessions={s.sessions} activeId={s.activeId} view={view} onView={setView} cwd={meta?.cwd ?? ""} col={col} collapsed={!panes.left} />
 
       <div class="main">
-        <Shelf brand="" tag={view === "session" ? "MISSION LOG" : view.toUpperCase()}>
+        <Shelf
+          brand=""
+          tag={view === "session" ? "MISSION LOG" : view.toUpperCase()}
+          left={
+            <button
+              type="button"
+              class="pane-tgl"
+              title={panes.left ? "Collapse sidebar (⌘B)" : "Expand sidebar (⌘B)"}
+              aria-pressed={panes.left ? "true" : "false"}
+              onClick={() => setPanes((p) => ({ ...p, left: !p.left }))}
+            >
+              <Icon name={panes.left ? "act-collapse" : "act-expand"} size={11} />
+            </button>
+          }
+        >
           {meta ? (
             <>
               <ControlChip
@@ -130,6 +204,15 @@ export function Console() {
           ) : (
             <span style={{ font: "700 11px/1 var(--din)", letterSpacing: "0.14em" }}>CONNECTING…</span>
           )}
+          <button
+            type="button"
+            class="pane-tgl"
+            title={panes.right ? "Collapse resources (⌘⇧B)" : "Expand resources (⌘⇧B)"}
+            aria-pressed={panes.right ? "true" : "false"}
+            onClick={() => setPanes((p) => ({ ...p, right: !p.right }))}
+          >
+            <Icon name={panes.right ? "act-collapse" : "act-expand"} size={11} />
+          </button>
         </Shelf>
 
         {deck === "cwd" ? <CwdDeck meta={meta} onClose={() => setDeck(null)} /> : null}
@@ -175,14 +258,14 @@ export function Console() {
               ) : view === "skills" ? (
                 <SkillsPanel meta={meta} policy={s.policy} />
               ) : (
-                <SettingsPanel items={s.items} meta={meta} policy={s.policy} />
+                <SettingsPanel items={s.items} meta={meta} policy={s.policy} theme={theme} onTheme={(id) => { applyTheme(id); setTheme(id); }} />
               )}
             </div>
 
             <Composer running={!!meta?.running} disabled={s.link !== "open"} />
           </main>
 
-          <Rail items={s.items} meta={meta} queue={s.queue} />
+          {rail && panes.right ? <Rail items={s.items} meta={meta} queue={s.queue} width={rail} /> : null}
         </div>
       </div>
     </div>
@@ -222,12 +305,16 @@ function Sidenav({
   view,
   onView,
   cwd,
+  col,
+  collapsed,
 }: {
   sessions: { id: string; name?: string; title?: string | null; items: number; running: boolean; queued: boolean; lastTs: number | null; pending: boolean; modelId: string; cwd: string }[];
   activeId: string | null;
   view: View;
   onView: (v: View) => void;
   cwd: string;
+  col: number;
+  collapsed: boolean;
 }) {
   const sorted = [...sessions].sort((a, b) => (b.lastTs ?? 0) - (a.lastTs ?? 0));
   const listRef = useRef<HTMLDivElement>(null);
@@ -245,36 +332,41 @@ function Sidenav({
   }, [sessions.length]);
 
   return (
-    <aside class="sidenav" data-cramped={cramped ? "1" : "0"}>
-      <TopCap w={375} h={100} bar={44}>
-        <span class="cap-ttl">PI AGENT CONSOLE</span>
-        <span class="cap-sub">LCARS / SESSION CONSOLE</span>
+    <aside class="sidenav" data-cramped={cramped ? "1" : "0"} style={{ width: `${col}px`, flex: `0 0 ${col}px` }}>
+      <TopCap w={col + 55} h={100} bar={44}>
+        {collapsed ? null : (
+          <>
+            <span class="cap-ttl">PI AGENT CONSOLE</span>
+            <span class="cap-sub">LCARS / SESSION CONSOLE</span>
+          </>
+        )}
       </TopCap>
 
-      <div class="lseg" role="tablist">
+      <div class="lseg" role="tablist" style={collapsed ? { display: "none" } : undefined}>
         <button type="button" aria-selected={mode === "sessions" ? "true" : "false"} onClick={() => setMode("sessions")}>
-          SESSIONS
+          {t("side.sessions")}
         </button>
         <button type="button" aria-selected={mode === "files" ? "true" : "false"} onClick={() => setMode("files")}>
-          FILES
+          {t("side.files")}
         </button>
       </div>
 
-      {mode === "files" ? <FileTree root={cwd} /> : null}
+      {mode === "files" && !collapsed ? <FileTree root={cwd} /> : null}
 
       <button
         type="button"
-        class="lnew"
+        class={`lnew ${collapsed ? "is-mini" : ""}`}
         style={mode === "files" ? { display: "none" } : undefined}
+        title="New session"
         onClick={() => { actions.newSession(); onView("session"); }}
       >
         <span class="ic">
           <Icon name="act-new" size={15} />
         </span>
-        <span class="lb">NEW SESSION</span>
+        {collapsed ? null : <span class="lb">{t("side.new")}</span>}
       </button>
 
-      <div class="lsessions" ref={listRef} style={mode === "files" ? { display: "none" } : undefined}>
+      <div class={`lsessions ${collapsed ? "is-mini" : ""}`} ref={listRef} style={mode === "files" ? { display: "none" } : undefined}>
         {sorted.length === 0 ? <div class="lempty">no sessions</div> : null}
         {sorted.map((s, i) => (
           <div
@@ -282,6 +374,7 @@ function Sidenav({
             class="sess"
             data-active={s.id === activeId ? "1" : "0"}
             data-run={s.running ? "1" : "0"}
+            data-mini={collapsed ? "1" : "0"}
             role="button"
             tabIndex={0}
             title={`${s.name ?? s.id}\n${s.cwd}`}
@@ -297,12 +390,16 @@ function Sidenav({
             }}
           >
             <span class="num">{String(Number(s.id.match(/^s(\d+)/)?.[1] ?? i + 1)).padStart(2, "0")}</span>
-            <span class="l1" data-empty={s.title ? "0" : "1"}>
-              {s.title ?? "UNTITLED SESSION"}
-            </span>
-            <span class="l2">
-              {s.modelId.toUpperCase()} / {s.id.slice(0, 7).toUpperCase()}
-            </span>
+            {collapsed ? null : (
+              <>
+                <span class="l1" data-empty={s.title ? "0" : "1"}>
+                  {s.title ?? "UNTITLED SESSION"}
+                </span>
+                <span class="l2">
+                  {s.modelId.toUpperCase()} / {s.id.slice(0, 7).toUpperCase()}
+                </span>
+              </>
+            )}
             <span class="rt">
               {s.queued ? "QUEUED" : s.running ? "LIVE" : s.pending ? "HELD" : s.lastTs ? ago(s.lastTs) : "NEW"}
               {s.items ? ` · ${s.items}` : ""}
@@ -331,7 +428,17 @@ function Sidenav({
 
       <div class="lnav">
         {NAV.map((n) => (
-          <Station key={n.view} num="" label={n.label} icon={n.icon} tone={n.tone} full h={42} active={view === n.view} onClick={() => onView(n.view)} />
+          <Station
+            key={n.view}
+            num=""
+            label={collapsed ? "" : t(n.key)}
+            icon={n.icon}
+            tone={n.tone}
+            full
+            h={42}
+            active={view === n.view}
+            onClick={() => onView(n.view)}
+          />
         ))}
       </div>
     </aside>
@@ -471,14 +578,14 @@ function Composer({ running, disabled }: { running: boolean; disabled: boolean }
   return (
     <div class="cmdbar">
       <div class="entry-block">
-        <span class="el">ENTRY</span>
-        <span class="eh">{running ? "STEER" : "CTRL K"}</span>
+        <span class="el">{t("cmd.entry")}</span>
+        <span class="eh">{running ? t("cmd.steer") : "CTRL K"}</span>
       </div>
 
       <div class="cmd-field" data-state={disabled ? "off" : running ? "live" : "idle"}>
         <div class="cmd-help">
           <span class={running ? "live" : ""}>
-            {running ? "GENERATING / ESC TO INTERRUPT / ENTER QUEUES A STEER" : "ENTER SEND / SHIFT+ENTER NEWLINE"}
+            {running ? t("cmd.live") : t("cmd.send")}
           </span>
           <span class="cnt">{chars ? `${chars} CHARS` : "INPUT"}</span>
         </div>
@@ -487,7 +594,7 @@ function Composer({ running, disabled }: { running: boolean; disabled: boolean }
           <textarea
             ref={ref}
             rows={2}
-            placeholder={running ? "插入一条消息，不打断当前生成…" : "让 pi 构建、重构或调查…"}
+            placeholder={running ? t("cmd.placeholderLive") : t("cmd.placeholder")}
             value={text}
             disabled={disabled}
             onFocus={() => setFocused(true)}
@@ -504,16 +611,16 @@ function Composer({ running, disabled }: { running: boolean; disabled: boolean }
       </div>
 
       <div class="btns">
-        <BarButton label={running ? "STEER" : "RUN"} hint="ENTER" tone="ok" disabled={disabled} onClick={submit} icon="act-send" />
-        <BarButton label="STOP" hint="ESC" tone="stop" disabled={!running} onClick={() => actions.abort()} icon="act-stop" />
-        <BarButton label="FORK" hint="COPY" tone="quiet" onClick={() => actions.fork()} icon="act-copy" />
+        <BarButton label={running ? t("cmd.steer") : t("cmd.run")} hint="ENTER" tone="ok" disabled={disabled} onClick={submit} icon="act-send" />
+        <BarButton label={t("cmd.stop")} hint="ESC" tone="stop" disabled={!running} onClick={() => actions.abort()} icon="act-stop" />
+        <BarButton label={t("cmd.fork")} hint="COPY" tone="quiet" onClick={() => actions.fork()} icon="act-copy" />
       </div>
     </div>
   );
 }
 
 /* ------------------------------------------------------------------ rail */
-function Rail({ items, meta, queue }: { items: Item[]; meta: ReturnType<typeof getState>["meta"]; queue: { waiting: string[] } }) {
+function Rail({ items, meta, queue, width }: { items: Item[]; meta: ReturnType<typeof getState>["meta"]; queue: { waiting: string[] }; width: number }) {
   const stats = useMemo(() => {
     const out: Record<string, { calls: number; fails: number; trunc: number }> = {};
     for (const it of items) {
@@ -532,7 +639,7 @@ function Rail({ items, meta, queue }: { items: Item[]; meta: ReturnType<typeof g
   const win = meta?.contextWindow ?? 200000;
 
   return (
-    <aside class="rail">
+    <aside class="rail" style={{ width: `${width}px`, flex: `0 0 ${width}px` }}>
       <div class="phead">RESOURCES</div>
       <div class="panel">
         <div class="ctx-top">
@@ -727,19 +834,21 @@ function ThemeDeck({ current, onPick, onClose }: { current: ThemeId; onPick: (id
 
 /* ------------------------------------------------------------------ mcp */
 function McpPanel() {
-  const [data, setData] = useState<{ servers: McpServer[]; paths: { global: string; project: string }; exists: { global: boolean; project: boolean }; totals: { servers: number; connected: number; tools: number } } | null>(null);
+  const [data, setData] = useState<McpConfig | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [showTools, setShowTools] = useState<Record<string, boolean>>({});
   const [name, setName] = useState("");
   const [command, setCommand] = useState("");
   const [busy, setBusy] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const [connectNote, setConnectNote] = useState<string | null>(null);
 
   const load = () =>
     api
       .mcp()
       .then((d) => {
-        setData(d as any);
+        setData(d);
         setErr(null);
       })
       .catch((e) => setErr(e.message));
@@ -777,6 +886,42 @@ function McpPanel() {
           <Icon name="status-fail" size={13} /> {err}
         </div>
       ) : null}
+
+      {data && !data.bound ? (
+        <div class="mcp-connect">
+          <div class="cc-txt">
+            <b>MCP NOT CONNECTED.</b> {data.servers.length} servers configured, 0 tools loaded.
+            Connecting binds them into this session — that is what costs a few seconds at startup,
+            so it is your call.
+          </div>
+          <BarButton
+            tone="ok"
+            label={connecting ? "CONNECTING…" : "CONNECT"}
+            icon="act-reload"
+            disabled={connecting}
+            onClick={async () => {
+              setConnecting(true);
+              setConnectNote(null);
+              try {
+                const r = await api.mcpConnect();
+                setData(r);
+                setConnectNote(
+                  r.pending
+                    ? `connected ${r.totals.connected}/${r.totals.servers} in ${r.connectMs}ms — the rest reported no tools`
+                    : `${r.totals.connected} servers · ${r.totals.tools} tools in ${r.connectMs}ms`,
+                );
+              } catch (e) {
+                setErr((e as Error).message);
+              } finally {
+                setConnecting(false);
+              }
+            }}
+          />
+          {connecting ? <span class="cc-wait">this can take a few seconds (stdio servers spawn a process)</span> : null}
+        </div>
+      ) : null}
+
+      {connectNote ? <div class="pv-note" style={{ color: "var(--cyan)", marginBottom: "8px" }}>{connectNote}</div> : null}
 
       {(data?.servers ?? []).map((m) => {
         const expanded = open === m.name;
@@ -1277,50 +1422,172 @@ function SkillsPanel({ meta, policy }: { meta: ReturnType<typeof getState>["meta
 }
 
 /* ------------------------------------------------------------- settings */
-function SettingsPanel({ items, meta, policy }: { items: Item[]; meta: ReturnType<typeof getState>["meta"]; policy: string }) {
-  const stats = useMemo(() => {
-    const out: Record<string, { calls: number; fails: number; ms: number }> = {};
-    for (const it of items) {
-      if (it.kind !== "tool") continue;
-      out[it.name] ||= { calls: 0, fails: 0, ms: 0 };
-      out[it.name].calls++;
-      if (it.status === "error") out[it.name].fails++;
-      out[it.name].ms += it.ms ?? 0;
-    }
-    return out;
-  }, [items]);
+const SHORTCUTS: [string, string][] = [
+  ["⌘K / Ctrl K", "focus the composer"],
+  ["ENTER", "send (steer while running)"],
+  ["SHIFT+ENTER", "newline"],
+  ["ESC", "stop the current run"],
+  ["⌘B / Ctrl B", "collapse or expand the left rail"],
+  ["⌘⇧B / Ctrl ⇧B", "collapse or expand the resources rail"],
+];
+
+function SettingsPanel({
+  items,
+  meta,
+  policy,
+  theme,
+  onTheme,
+}: {
+  items: Item[];
+  meta: ReturnType<typeof getState>["meta"];
+  policy: string;
+  theme: ThemeId;
+  onTheme: (id: ThemeId) => void;
+}) {
+  const [sys, setSys] = useState<SystemInfo | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+  const [, force] = useState(0);
+  const prefs = getSettings();
+
+  useEffect(() => subscribeSettings(() => force((n) => n + 1)), []);
+  useEffect(() => {
+    api.system().then(setSys).catch(() => {});
+  }, []);
+
+  const flash = (m: string) => {
+    setNote(m);
+    setTimeout(() => setNote(null), 1400);
+  };
+
+  const row = (k: string, v: string, acts?: any) => (
+    <div class="set-row" key={k}>
+      <span class="k">{k}</span>
+      <span class="v" title={v}>
+        {v}
+      </span>
+      <span class="a">{acts}</span>
+    </div>
+  );
+
+  const copy = (text: string, label: string) =>
+    navigator.clipboard?.writeText(text).then(
+      () => flash(`copied ${label}`),
+      () => flash("clipboard blocked"),
+    );
 
   return (
     <div class="pv">
-      <div class="pv-title">SETTINGS</div>
-      <div class="pv-sub">Runtime of the active session, read from the live session rather than from config files.</div>
+      <div class="pv-title">{t("set.title")}</div>
+      <div class="pv-sub">{t("set.note")}</div>
 
-      <div class="pv-row"><div class="st" style={{ background: "var(--cyan)" }} /><div class="k">MODEL</div><div class="v">{meta?.model ?? "—"}</div><div class="n" /></div>
-      <div class="pv-row"><div class="st" style={{ background: "var(--cyan)" }} /><div class="k">THINKING</div><div class="v">{meta?.thinking ?? "—"}</div><div class="n" /></div>
-      <div class="pv-row"><div class="st" style={{ background: "var(--cyan)" }} /><div class="k">CWD</div><div class="v">{shortPath(meta?.cwd ?? "")}</div><div class="n" /></div>
-      <div class="pv-row"><div class="st" style={{ background: "var(--cyan)" }} /><div class="k">SESSION</div><div class="v">{meta?.path ? shortPath(meta.path) : "unsaved"}</div><div class="n" /></div>
+      <div class="set-section">{t("set.appearance")}</div>
 
-      <div class="pv-title" style={{ fontSize: "13px", marginTop: "18px" }}>APPROVAL POLICY</div>
+      <div class="set-block">
+        <span class="lb">{t("set.theme")}</span>
+        <div class="set-themes">
+          {THEMES.map((th) => (
+            <button
+              type="button"
+              key={th.id}
+              class="theme-opt mini"
+              aria-selected={theme === th.id ? "true" : "false"}
+              onClick={() => onTheme(th.id)}
+            >
+              <span class="sw">
+                {th.swatch.map((c) => (
+                  <i key={c} style={{ background: c }} />
+                ))}
+              </span>
+              <span class="nm">{th.short}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div class="set-block">
+        <span class="lb">{t("set.scale")}</span>
+        <div class="seg small">
+          {([0.9, 1, 1.1] as const).map((v) => (
+            <button type="button" key={v} aria-pressed={prefs.scale === v ? "true" : "false"} onClick={() => setSettings({ scale: v })}>
+              {Math.round(v * 100)}%
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div class="set-block">
+        <span class="lb">{t("set.motion")}</span>
+        <div class="seg small">
+          <button type="button" aria-pressed={prefs.motion === "system" ? "true" : "false"} onClick={() => setSettings({ motion: "system" })}>
+            SYSTEM
+          </button>
+          <button type="button" aria-pressed={prefs.motion === "reduced" ? "true" : "false"} onClick={() => setSettings({ motion: "reduced" })}>
+            REDUCED
+          </button>
+        </div>
+      </div>
+
+      <div class="set-block">
+        <span class="lb">{t("set.locale")}</span>
+        <div class="seg small">
+          <button type="button" aria-pressed={prefs.locale === "en" ? "true" : "false"} onClick={() => setSettings({ locale: "en" })}>
+            EN
+          </button>
+          <button type="button" aria-pressed={prefs.locale === "zh" ? "true" : "false"} onClick={() => setSettings({ locale: "zh" })}>
+            中文
+          </button>
+        </div>
+      </div>
+
+      <div class="set-section">{t("set.runtime")}</div>
+      {row(
+        "PI SDK",
+        sys?.sdk ? shortPath(sys.sdk) : "—",
+        <>
+          <button type="button" class="pv-btn ghost" onClick={() => sys?.sdk && copy(sys.sdk, "sdk path")}>COPY</button>
+          <button type="button" class="pv-btn ghost" onClick={() => sys?.sdk && api.openPath(sys.sdk, "reveal").catch(() => {})}>REVEAL</button>
+        </>,
+      )}
+      {row("VERSION", `${sys?.piVersion ?? "—"} · node ${sys?.node ?? "—"}`)}
+      {row("PLATFORM", sys?.platform ?? "—")}
+      {row(
+        "AGENT DIR",
+        sys?.agentDir ? shortPath(sys.agentDir) : "—",
+        <>
+          <button type="button" class="pv-btn ghost" onClick={() => sys?.agentDir && copy(sys.agentDir, "agent dir")}>COPY</button>
+          <button type="button" class="pv-btn ghost" onClick={() => sys?.agentDir && api.openPath(sys.agentDir, "reveal").catch(() => {})}>REVEAL</button>
+        </>,
+      )}
+      {row("WORKSPACE", sys?.cwd ? shortPath(sys.cwd) : "—")}
+      {row("SERVER", `127.0.0.1:${sys?.port ?? "—"} · MCP ${sys?.mcpEnabled ? "on" : "off"}`)}
+
+      <div class="set-section">{t("set.keys")}</div>
+      <div class="set-keys">
+        {SHORTCUTS.map(([k, d]) => (
+          <div class="set-key" key={k}>
+            <kbd>{k}</kbd>
+            <span>{d}</span>
+          </div>
+        ))}
+      </div>
+
+      <div class="set-section">{t("set.policy")}</div>
       <div style={{ display: "flex", gap: "var(--gap)", alignItems: "center", marginBottom: "10px" }}>
         {(["off", "risky", "all"] as const).map((m) => (
           <BarButton key={m} label={m.toUpperCase()} tone={policy === m ? "ok" : "quiet"} onClick={() => actions.policy(m)} />
         ))}
-        <span style={{ font: "400 11px/1.6 var(--mono)", color: "var(--g2)" }}>
-          risky = bash / write / edit · pending calls are released on abort
-        </span>
+        <span class="pv-note">risky = bash / write / edit · pending calls are released on abort</span>
       </div>
 
-      <div class="pv-title" style={{ fontSize: "13px", marginTop: "10px" }}>TOOL LOADOUT / {meta?.tools.length ?? 0}</div>
-      {(meta?.tools ?? []).map((n) => (
-        <div class="pv-row" key={n} style={{ minHeight: "36px" }}>
-          <div class="st" />
-          <div class="k">{n.toUpperCase()}</div>
-          <div class="v">
-            {stats[n]?.calls ?? 0} calls · {stats[n]?.fails ?? 0} failed
-          </div>
-          <div class="n">{stats[n]?.ms ? `${Math.round(stats[n].ms)}ms` : "—"}</div>
-        </div>
-      ))}
+      <div class="set-section">{t("set.tools")} / {meta?.tools.length ?? 0}</div>
+      <div class="set-tools">
+        {(meta?.tools ?? []).map((n) => (
+          <span class="set-tool" key={n}>{n}</span>
+        ))}
+      </div>
+
+      {note ? <div class="ft-note" style={{ marginTop: "10px" }}>{note}</div> : null}
     </div>
   );
 }
+

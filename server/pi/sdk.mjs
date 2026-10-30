@@ -9,6 +9,10 @@ const CANDIDATES = [
 ].filter(Boolean);
 
 let cached;
+let loadedFrom = null;
+
+/** Which specifier actually resolved — the settings panel shows it. */
+export const sdkSpec = () => loadedFrom;
 
 export async function loadSdk() {
   if (cached) return cached;
@@ -16,6 +20,7 @@ export async function loadSdk() {
   for (const spec of CANDIDATES) {
     try {
       cached = await import(spec);
+      loadedFrom = spec;
       return cached;
     } catch (e) {
       tried.push(`${spec}: ${e.message}`);

@@ -82,6 +82,17 @@ PLAN.md            milestone plan (M0..M8)
 - `/?craft` — the primitive sheet (elbows, motion, icons, form language, themes),
   i.e. the visual contract on one page.
 
+## Keyboard
+
+| keys | action |
+|---|---|
+| `⌘K` / `Ctrl K` | focus the composer |
+| `Enter` | send (steers while a run is active) |
+| `Shift+Enter` | newline |
+| `Esc` | stop the current run |
+| `⌘B` | collapse / expand the left rail (64px icon rail when collapsed) |
+| `⌘⇧B` | collapse / expand the resources rail |
+
 ## Non-obvious behaviour
 
 - **One run at a time.** A second prompt queues and starts when the slot frees. Prompts aimed at the

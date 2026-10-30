@@ -132,6 +132,18 @@ export type SkillRow = {
   bytes: number | null;
 };
 
+export type SystemInfo = {
+  node: string;
+  platform: string;
+  piVersion: string | null;
+  sdk: string | null;
+  agentDir: string;
+  cwd: string;
+  port: number;
+  mcpEnabled: boolean;
+  approvals: { policy: string; pending: number; always: string[]; timeoutMs: number };
+};
+
 export type SkillsResult = {
   available: boolean;
   skills: SkillRow[];
@@ -185,6 +197,7 @@ export type McpServer = {
 
 export type McpConfig = {
   servers: McpServer[];
+  bound: boolean;
   totals: { servers: number; connected: number; enabled: number; tools: number };
   paths: { global: string; project: string };
   exists: { global: boolean; project: boolean };
@@ -225,6 +238,7 @@ export const api = {
     post<{ thinking: string; requested: string; clamped: boolean }>("/api/thinking", { level }),
   setModel: (provider: string, model: string) => post<{ modelId: string }>("/api/model", { provider, model }),
   models: () => call<{ current: string; models: ModelInfo[] }>("/api/models"),
+  system: () => call<SystemInfo>("/api/system"),
   skills: () => call<SkillsResult>("/api/skills"),
   reloadSkills: () => post<SkillsResult>("/api/skills", { op: "reload" }),
   providers: () => call<ProvidersResult>("/api/providers"),
@@ -242,6 +256,7 @@ export const api = {
   mcpAdd: (payload: { name: string; command?: string; args?: string; url?: string; scope?: string }) =>
     post<unknown>("/api/mcp", { op: "add", ...payload }),
   mcpRemove: (name: string) => post<unknown>("/api/mcp", { op: "remove", name }),
+  mcpConnect: () => post<McpConfig & { connectMs: number; pending: boolean }>("/api/mcp", { op: "connect" }),
   tree: (path?: string) => call<TreeResult>(`/api/tree${path ? `?path=${encodeURIComponent(path)}` : ""}`),
   openPath: (path: string, mode: "editor" | "reveal" | "default" = "editor") =>
     post<{ cmd: string; args: string[] }>("/api/open", { path, mode }),
