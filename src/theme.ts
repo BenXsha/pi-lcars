@@ -1,4 +1,4 @@
-export type ThemeId = "tng" | "voy" | "ds9" | "kelvin" | "picard" | "hull" | "mono";
+export type ThemeId = "tng" | "voy" | "ds9" | "kelvin" | "picard" | "hull" | "grid" | "mono";
 
 export type ThemeMeta = {
   id: ThemeId;
@@ -52,6 +52,13 @@ export const THEMES: ThemeMeta[] = [
     short: "HULL",
     note: "取自舰体静帧：钢蓝灰主色 + 冰白高光，铜光只留给告警",
     swatch: ["#9fb2c8", "#a9cfe3", "#7d8fb3", "#c07a63"],
+  },
+  {
+    id: "grid",
+    name: "GRID / NEON",
+    short: "GRID",
+    note: "赛博朋克：紫黑底 + 霓虹洋红焦点 + 电青运行态 + 酸性黄读数",
+    swatch: ["#ff4fa3", "#4fd6e4", "#c79bff", "#d8e44e"],
   },
   {
     id: "mono",

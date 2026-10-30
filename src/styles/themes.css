@@ -135,6 +135,29 @@
   --bg: #030507;
 }
 
+/* ---------- GRID / cyberpunk ----------
+   Neon on violet-black: magenta focus, electric cyan for running tools, acid
+   yellow metadata, hot coral for alerts. Saturation is high but every block is
+   lifted until black type clears 4.5:1 — the neon reads as signal, not noise. */
+[data-theme="grid"] {
+  --orange: #ff4fa3; /* focus: neon magenta */
+  --amber: #d8e44e; /* secondary metalabels: acid yellow */
+  --tang: #4fd6e4; /* tool running: electric cyan */
+  --tomato: #ff6b4a; /* alert: hot coral */
+  --lilac: #c79bff; /* memory / context: violet */
+  --lav: #9b8cff; /* subagents: periwinkle */
+  --ice: #a8f0ff; /* read-only refs: pale cyan */
+  --moon: #cbe86b; /* plan / pending: acid lime */
+  --cyan: #63f2c8; /* system / ok: neon teal */
+
+  --w: #f2ecff;
+  --g3: #a99ac9;
+  --g2: #7f6fa6;
+  --g1: #1e1334;
+  --g0: #0d0718;
+  --bg: #05010a;
+}
+
 /* ---------- MONO / LCARS 47 — desaturated neutrals + one ice accent ------ */
 [data-theme="mono"] {
   --orange: #e8e8e8; /* focus is white, not a hue */
