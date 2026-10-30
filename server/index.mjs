@@ -16,6 +16,7 @@ import { loadSdk, agentDir, sdkSpec } from "./pi/sdk.mjs";
 import { Approvals } from "./pi/approval.mjs";
 import { createQueue } from "./pi/queue.mjs";
 import { Registry } from "./pi/registry.mjs";
+import { Dialogs } from "./pi/dialogs.mjs";
 import { now, summaryOf } from "./pi/format.mjs";
 import { mcpStatus, setEnabled, addServer, removeServer } from "./pi/mcpConfig.mjs";
 import { listTree, openPath, readTextFile, streamFile } from "./pi/fs.mjs";
@@ -97,6 +98,7 @@ const queue = createQueue({
     }
   },
 });
+const dialogs = new Dialogs({ timeoutMs: Number(process.env.LCARS_ASK_TIMEOUT || 300_000) });
 const registry = new Registry({
   sdk,
   agentDir: agentDir(),
@@ -107,6 +109,7 @@ const registry = new Registry({
   trustProject: TRUST,
   mcp: process.env.LCARS_MCP !== "0",
 });
+registry.dialogs = dialogs;
 
 const payload = (entry) => ({
   ...registry.bootstrap(),
@@ -191,6 +194,10 @@ const routes = {
     if (!entry) return fail(res, 404, "no session");
     const text = String(b.text || "").trim();
     if (!text) return fail(res, 400, "empty prompt");
+    // dialog-based tools (ask_user_question) and MCP tools only exist once the
+    // extensions are bound; do it before the first turn rather than at boot
+    if (!entry.bound) await entry.bind?.().catch(() => {});
+
     const steerable = queue.runningId === entry.id;
     // running but not the queue's current job (settling / aborting) → reject
     if (entry.meta.running && !steerable) return fail(res, 409, "session is busy, try again in a moment");
@@ -244,6 +251,13 @@ const routes = {
     }
     entry.pushMeta();
     ok(res, { ok: true });
+  },
+
+  "POST /api/answer": async (req, res) => {
+    const b = await body(req);
+    const okd = dialogs.answer(String(b.id || ""), b.value === undefined ? null : b.value);
+    if (!okd) return fail(res, 404, "no such pending question", { code: "E_NO_DIALOG" });
+    ok(res, { answered: true });
   },
 
   "POST /api/approve": async (req, res) => {

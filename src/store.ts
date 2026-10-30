@@ -175,6 +175,9 @@ export const actions = {
   async abort() {
     await withError(() => api.abort());
   },
+  async answer(id: string, value: string | null) {
+    await withError(() => api.answer(id, value));
+  },
   async approve(id: string, decision: "approve" | "deny" | "always") {
     await withError(() => api.approve(id, decision));
   },

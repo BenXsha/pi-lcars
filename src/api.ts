@@ -29,6 +29,18 @@ export type Item =
       agent?: AgentMeta;
       ts: number;
     }
+  | {
+      kind: "ask";
+      id: string;
+      mode: "select" | "input" | "confirm";
+      title: string;
+      options?: string[];
+      placeholder?: string;
+      message?: string;
+      status: "pending" | "answered" | "cancelled" | "timeout";
+      value?: string;
+      ts: number;
+    }
   | { kind: "notice"; id: string; tone?: "info" | "warn" | "error"; label: string; text: string; ts: number }
   | {
       kind: "approval";
@@ -247,6 +259,7 @@ export const api = {
   remove: (id: string) => post<Bootstrap>("/api/session", { op: "delete", id }),
   prompt: (text: string) => post<{ mode: string }>("/api/prompt", { text }),
   abort: () => post<unknown>("/api/abort", {}),
+  answer: (id: string, value: string | null) => post<{ answered: boolean }>("/api/answer", { id, value }),
   approve: (id: string, decision: "approve" | "deny" | "always") => post<unknown>("/api/approve", { id, decision }),
   policy: (mode: "off" | "risky" | "all") => post<{ policy: string }>("/api/policy", { mode }),
   thinking: (level: string) =>

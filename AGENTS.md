@@ -404,6 +404,25 @@ Codex 的做法是：**工作区在你开 session 时就定了，之后不可变
 - 语言只翻**界面外壳**（导航、按钮、输入提示、设置面板），消息与工具输出保持原文，
   面板底部明确写出这一点；新增文案先加 `i18n.ts` 的 key，不要在组件里写死中英文。
 
+### 7.6k 扩展对话框（ask_user_question 等）
+
+`@juicesharp/rpiv-ask-user-question` 的 `execute()` 第一行就是 `if (!ctx.hasUI) return rejectWithoutUi()`，
+而且它的 reconciler 在 `before_agent_start` 里**看到 `hasUI === false` 会把工具从 active 集合里摘掉**。
+所以绑定扩展时不能图省事：
+
+- `bindExtensions` 必须传 `mode: "rpc"` **并且** 带 `uiContext`（`server/pi/dialogs.mjs`）。
+  传 `{mode:"print"}` / 不传 uiContext → `hasUI=false` → 工具直接消失，模型会说"没有这个工具"。
+- `uiContext` 只需要 `select / confirm / input`（包内的 RPC walker 就用这三个），其余方法给 no-op。
+  `custom()` 返回 `undefined` 是有意的：浏览器没有 overlay，让包自己走 dialog walker。
+- 每次 dialog 变成一条 `kind:"ask"` 的 item（`mode/title/options/placeholder`），
+  用户选择 → `POST /api/answer {id, value}` → 解析 Promise → 工具继续执行并写回 toolResult。
+- `select` 的返回值可以是**选项原文**，也可以是**自由文本**（包把非选项文本当作"自己的答案"），
+  所以块里既有选项按钮，也可以以后加输入框；取消 = 传 `null`，包会当作 Esc 并把"用户拒绝"告诉模型。
+- 绑定时机：**第一次 prompt 之前**自动 `entry.bind()`（顺带把 MCP 工具注册进来），
+  不在 boot 时绑 —— 那会拖慢会话创建。
+- 注意 `tool_search` 会重写 active tool set，实测在一次搜索后 `ask_user_question` 会被挤出列表；
+  这是 pi 扩展行为，不是本项目的 bug，写在这里免得下次误判。
+
 ### 7.6j 消息动作：复制 / 引用 / 撤回 / 排队
 
 **每条消息（用户与助手）悬停出三个动作**，绝对定位在行右上，不占静态空间：

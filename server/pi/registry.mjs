@@ -24,6 +24,7 @@ export class Registry {
     this.sessionDir = sessionDir;
     this.trustProject = trustProject;
     this.mcp = mcp;
+    this.dialogs = null; // wired by the server after construction
     /** @type {Map<string, any>} */
     this.sessions = new Map();
     this.activeId = null;
@@ -168,10 +169,15 @@ export class Registry {
     // session_start, and that costs seconds. The operator starts it from the
     // MCP panel instead (entry.bind()).
     entry.bound = false;
+    // Bind lazily (MCP costs seconds at session_start), but always through the
+    // dialog-capable uiContext. With `mode: "print"` and no uiContext,
+    // extensions see hasUI === false — and rpiv-ask-user-question then STRIPS
+    // ask_user_question from the active tool set. `mode: "rpc"` + select/input
+    // is the package's documented headless path.
     entry.bind = async () => {
       if (entry.bound) return { bound: true, ms: 0, already: true };
       const t0 = Date.now();
-      await entry.session.bindExtensions?.({ mode: "print" });
+      await entry.session.bindExtensions?.({ mode: "rpc", uiContext: this.dialogs?.context(entry) });
       entry.bound = true;
       entry.pushMeta();
       return { bound: true, ms: Date.now() - t0 };
@@ -266,7 +272,7 @@ export class Registry {
     entry.session = session;
     entry.bound = false;
     try {
-      await session.bindExtensions?.({ mode: "print" });
+      await session.bindExtensions?.({ mode: "rpc", uiContext: this.dialogs?.context(entry) });
       entry.bound = true;
     } catch {
       /* extensions are optional */
@@ -339,6 +345,7 @@ export class Registry {
     if (!entry) throw httpError(404, "E_NO_SESSION", "unknown session");
     this.queue.cancel(id);
     this.approvals.denyAll(entry, "deny");
+    this.dialogs?.cancelFor(entry);
     try {
       entry.session?.dispose();
     } catch {}

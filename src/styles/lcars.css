@@ -2107,3 +2107,59 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
   letter-spacing: 0.1em;
   color: var(--g2);
 }
+
+/* ============================================================
+   extension dialog (ask_user_question and friends)
+   ============================================================ */
+.ask {
+  display: grid;
+  grid-template-columns: 4px minmax(0, 1fr);
+  gap: var(--gap);
+  align-items: stretch;
+  margin: var(--seam) 0;
+}
+.ask > .st { background: var(--lav); border-radius: var(--r-pill) 0 0 var(--r-pill); }
+.ask[data-state="answered"] > .st { background: var(--cyan); }
+.ask[data-state="cancelled"] > .st,
+.ask[data-state="timeout"] > .st { background: var(--g1); }
+.ask .ab {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 14px;
+  background: var(--g0);
+  border-radius: 0 var(--r-1) var(--r-1) 0;
+}
+.ask .ab-hd { display: flex; align-items: center; gap: 10px; }
+.ask .ab-tag { font: 700 10.5px/1 var(--din); letter-spacing: 0.16em; color: var(--lav); }
+.ask[data-state="answered"] .ab-tag { color: var(--cyan); }
+.ask .ab-mode { font: 700 9px/1 var(--din); letter-spacing: 0.12em; color: var(--g2); }
+.ask .ab-title { font: 400 14px/1.5 var(--text); color: var(--w); white-space: pre-wrap; }
+.ask .ab-msg { font: 400 12px/1.6 var(--mono); color: var(--g3); white-space: pre-wrap; }
+.ask .ab-opts { display: flex; flex-wrap: wrap; gap: 4px; }
+.ask .ab-opt {
+  font: 400 12px/1.4 var(--text);
+  color: var(--w);
+  background: var(--g1);
+  padding: 6px 10px;
+  border-radius: 0 var(--r-1) var(--r-1) 0;
+  text-align: left;
+}
+.ask .ab-opt:hover { background: var(--lav); color: #000; }
+.ask .ab-opt.ghost { background: transparent; color: var(--g3); }
+.ask .ab-opt.ghost:hover { background: var(--tomato); color: #000; }
+.ask .ab-opt:disabled { opacity: 0.4; }
+.ask .ab-in { display: flex; gap: 4px; }
+.ask .ab-in input {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: #000;
+  border: 0;
+  border-bottom: 2px solid var(--g2);
+  padding: 6px 8px;
+  font: 400 12.5px/1.4 var(--mono);
+  color: var(--w);
+  outline: none;
+}
+.ask .ab-in input:focus { border-bottom-color: var(--orange); }
+.ask .ab-res { font: 400 12px/1.5 var(--mono); color: var(--cyan); white-space: pre-wrap; }

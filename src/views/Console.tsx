@@ -597,6 +597,69 @@ function Sidenav({
   );
 }
 
+/* ------------------------------------------------------------------ ask */
+/** A blocked extension dialog (select / confirm / input) rendered inline. */
+function AskBlock({ item }: { item: Extract<Item, { kind: "ask" }> }) {
+  const [text, setText] = useState("");
+  const pending = item.status === "pending";
+
+  return (
+    <div class="ask" data-state={item.status}>
+      <span class="st" />
+      <div class="ab">
+        <div class="ab-hd">
+          <span class="ab-tag">{pending ? "WAITING FOR YOU" : "ANSWERED"}</span>
+          <span class="ab-mode">{item.mode.toUpperCase()}</span>
+        </div>
+        <div class="ab-title">{item.title}</div>
+        {item.message ? <div class="ab-msg">{item.message}</div> : null}
+
+        {pending ? (
+          item.mode === "select" ? (
+            <div class="ab-opts">
+              {(item.options ?? []).map((opt) => (
+                <button type="button" key={opt} class="ab-opt" onClick={() => actions.answer(item.id, opt)}>
+                  {opt}
+                </button>
+              ))}
+              <button type="button" class="ab-opt ghost" onClick={() => actions.answer(item.id, null)}>
+                SKIP / CANCEL
+              </button>
+            </div>
+          ) : item.mode === "confirm" ? (
+            <div class="ab-opts">
+              <button type="button" class="ab-opt" onClick={() => actions.answer(item.id, "Yes")}>
+                YES
+              </button>
+              <button type="button" class="ab-opt" onClick={() => actions.answer(item.id, "No")}>
+                NO
+              </button>
+            </div>
+          ) : (
+            <div class="ab-in">
+              <input
+                value={text}
+                placeholder={item.placeholder ?? "type an answer…"}
+                onInput={(e) => setText((e.target as HTMLInputElement).value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && text.trim()) actions.answer(item.id, text.trim());
+                }}
+              />
+              <button type="button" class="ab-opt" disabled={!text.trim()} onClick={() => actions.answer(item.id, text.trim())}>
+                SEND
+              </button>
+            </div>
+          )
+        ) : (
+          <div class="ab-res">
+            {item.status === "cancelled" ? "dismissed" : item.status === "timeout" ? "timed out" : item.value}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ----------------------------------------------------------- transcript */
 function Transcript({
   items,
@@ -702,6 +765,14 @@ function Transcript({
                 expanded={open[it.id] ?? false}
                 onToggle={() => setOpen((o) => ({ ...o, [it.id]: !o[it.id] }))}
               />
+            </div>
+          );
+        }
+
+        if (it.kind === "ask") {
+          return (
+            <div class={cls} key={it.id} data-id={it.id}>
+              <AskBlock item={it} />
             </div>
           );
         }
