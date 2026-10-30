@@ -50,5 +50,9 @@
     "typescript": "^7.0.2",
     "vite": "^8.3.5"
   },
-  "homepage": "https://gitee.com/benshawn/pi-lcars"
+  "homepage": "https://gitee.com/benshawn/pi-lcars",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
+  }
 }
