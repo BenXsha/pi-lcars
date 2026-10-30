@@ -2529,18 +2529,22 @@ function TreePanel({ onClose, onSwitch }: { onClose: () => void; onSwitch: () =>
               style={{ "--d": `${shownDepth.get(n.id) ?? 0}` } as Record<string, string>}
               onClick={() => setSelected(n.id)}
             >
-              <span class="spine" />
-              <span class="seq">{String(seqOf.get(n.id) ?? 0).padStart(3, "0")}</span>
-              <span class="kd">{n.kind === "toolResult" ? "TOOL" : n.kind.toUpperCase()}</span>
-              <span class="lb" title={n.label}>
-                {n.label || "—"}
+              <span class="cap">
+                <span class="seq">{String(seqOf.get(n.id) ?? 0).padStart(3, "0")}</span>
+                <span class="kd">{n.kind === "toolResult" ? "TOOL" : n.kind.toUpperCase()}</span>
               </span>
-              <span class="fork">
+              <span class="body">
+                <span class="lb" title={n.label}>
+                  {n.label || "—"}
+                </span>
+              </span>
+              <span class="tl">
+                <span class="ts">{clock(n.ts)}</span>
                 {total > 1 ? (
-                  <>
+                  <span class="fork">
                     <button
                       type="button"
-                      class="pg"
+                      class="go pg"
                       title="previous version"
                       disabled={index <= 1}
                       onClick={(e) => {
@@ -2556,7 +2560,7 @@ function TreePanel({ onClose, onSwitch }: { onClose: () => void; onSwitch: () =>
                     </span>
                     <button
                       type="button"
-                      class="pg"
+                      class="go pg"
                       title="next version"
                       disabled={index >= total}
                       onClick={(e) => {
@@ -2567,34 +2571,32 @@ function TreePanel({ onClose, onSwitch }: { onClose: () => void; onSwitch: () =>
                     >
                       ›
                     </button>
-                  </>
+                  </span>
                 ) : null}
-              </span>
-              <span class="ts">{clock(n.ts)}</span>
-              <span class="cf">
                 {confirm === n.id ? (
-                  <>
+                  <span class="cf">
                     <button
                       type="button"
-                      class="pv-btn"
+                      class="go wide"
                       onClick={async () => {
                         setConfirm(null);
                         await actions.goto(n.id);
                         onSwitch();
                       }}
                     >
-                      SWITCH HERE
+                      SWITCH
                     </button>
-                    <button type="button" class="pv-btn ghost" onClick={() => setConfirm(null)}>
-                      CANCEL
+                    <button type="button" class="go" title="cancel" onClick={() => setConfirm(null)}>
+                      ×
                     </button>
-                  </>
+                  </span>
                 ) : n.current ? (
                   <span class="cur">HEAD</span>
                 ) : (
                   <button
                     type="button"
-                    class="pv-btn ghost"
+                    class="go"
+                    title="switch the conversation here"
                     onClick={(e) => {
                       e.stopPropagation();
                       setConfirm(n.id);
