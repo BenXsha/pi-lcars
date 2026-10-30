@@ -66,6 +66,50 @@
   --bg: #070604;
 }
 
+/* ---------- KELVIN / Into Darkness + Beyond (2013 · 2016) ----------
+   The Kelvin-timeline UI is colder than Okuda's: near-black blue-grey panels,
+   ice-white type, amber highlights instead of orange, coral for alerts. */
+[data-theme="kelvin"] {
+  --orange: #ffb25a; /* focus / operator: warm amber, not Okuda orange */
+  --amber: #cfe0f5; /* secondary metalabels: ice white */
+  --tang: #f2a35c; /* tool running */
+  --tomato: #ff7a6b; /* error / approval */
+  --lilac: #a9b7d8; /* memory / context */
+  --lav: #8fb6e8; /* subagents */
+  --ice: #a9d4ff; /* read-only refs */
+  --moon: #d6dce8; /* plan / pending */
+  --cyan: #7fd9d2; /* system / ok: mint */
+
+  --w: #f4f7fc;
+  --g3: #9aa7bd;
+  --g2: #74809a;
+  --g1: #1a2433;
+  --g0: #0c1420;
+  --bg: #04070c;
+}
+
+/* ---------- PICARD / 25th century (S3, 2023) ----------
+   Twisted Media's S3 pass plus the LCARS revival: slate panels, bright cyan
+   focus, coral alert, ghost-grey metadata. */
+[data-theme="picard"] {
+  --orange: #41c4f7; /* focus: bright cyan-blue */
+  --amber: #d2d5df; /* ghost grey metalabels */
+  --tang: #37a6d1; /* tool running */
+  --tomato: #ff6753; /* coral alert */
+  --lilac: #9ea5ba; /* memory */
+  --lav: #8a93ad; /* subagents */
+  --ice: #9fd0ee; /* read-only refs */
+  --moon: #c7cbd8; /* pending */
+  --cyan: #6fd3c8; /* system: sea green */
+
+  --w: #f3f4f7;
+  --g3: #9ea5ba;
+  --g2: #78809a;
+  --g1: #1b2430;
+  --g0: #101720;
+  --bg: #05080c;
+}
+
 /* ---------- MONO / LCARS 47 — desaturated neutrals + one ice accent ------ */
 [data-theme="mono"] {
   --orange: #e8e8e8; /* focus is white, not a hue */

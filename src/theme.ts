@@ -1,4 +1,4 @@
-export type ThemeId = "tng" | "voy" | "ds9" | "mono";
+export type ThemeId = "tng" | "voy" | "ds9" | "kelvin" | "picard" | "mono";
 
 export type ThemeMeta = {
   id: ThemeId;
@@ -31,6 +31,20 @@ export const THEMES: ThemeMeta[] = [
     short: "DS9",
     note: "30° 青铜，低明度",
     swatch: ["#e8a33d", "#c2c08a", "#a9a0c9", "#9fc2b8"],
+  },
+  {
+    id: "kelvin",
+    name: "KELVIN / FILMS",
+    short: "KELVIN",
+    note: "2013 · 2016 两部电影：冰白文字 + 琥珀高光，钢蓝底",
+    swatch: ["#ffb25a", "#a9d4ff", "#8fb6e8", "#7fd9d2"],
+  },
+  {
+    id: "picard",
+    name: "PICARD / 25TH",
+    short: "PICARD",
+    note: "S3 复兴版 LCARS：石板底 + 亮青焦点 + 珊瑚告警",
+    swatch: ["#41c4f7", "#d2d5df", "#8a93ad", "#ff6753"],
   },
   {
     id: "mono",
