@@ -317,6 +317,19 @@ LCARS 的左轨**从不留纯黑空洞**：内容排不满时，纵向剩余由*
   一旦列表要滚动（`scrollHeight > clientHeight`，由 `ResizeObserver` 判定 → `data-cramped`）
   就**整块隐藏**，避免露出被裁一半的条。
 
+### 7.6c-0 工作区切换（会话级，参考 Codex 的模型）
+
+Codex 的做法是：**工作区在你开 session 时就定了，之后不可变**；文件树、diff、工具路径全部以它为根；
+换工作区 = 开新 session，并且会显式告诉你"这是新会话"。本地照此实现：
+
+- **cwd 是会话属性**，运行中不可改（pi 的 context 与工具作用域都绑在 cwd 上）。UI 上明确标注 `this session's workspace (fixed)`。
+- **两段式：预览 → 提交**。打开 WORKSPACE deck 即切到 FILES 模式；浏览目录 = 文件树同步跟着走（`PREVIEW` 徽标 + 头部路径变 amber），
+  但**不会**动当前会话。确认了才点 `START SESSION HERE` 建新会话。
+- **联动是双向的**：deck 里的目录点击驱动文件树根；文件树头部的 `USE` 按钮 / 路径也能回到 deck。
+- **提交后的反馈**：文件树保留在新工作区、显示 `workspace → ~/x · new session`，工具栏 WORKSPACE chip 同步更新，
+  deck 自动关闭、PREVIEW 徽标消失。会话列表里多出一条（新会话）。
+- **RECENT** 列出已有会话的 cwd 去重（最多 4 个），当前会话的用橙色描边标出。
+
 ### 7.6c 工作区文件树（侧栏 FILES 模式）
 
 侧栏在会话列表上方有一个 `SESSIONS / FILES` 二段开关，切到 FILES 就是工作区目录树 ——

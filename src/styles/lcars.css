@@ -1818,3 +1818,40 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
   align-items: stretch;
 }
 .rail.is-collapsed .pane-foot { margin-bottom: 8px; }
+
+/* workspace preview in the file tree */
+.ft-hd[data-preview="1"] span { color: var(--amber); }
+.ft-preview {
+  font: 700 9.5px/1.4 var(--din);
+  letter-spacing: 0.14em;
+  color: var(--amber);
+  padding: 0 8px 3px;
+}
+.ft-commit {
+  font: 700 9px/1 var(--din);
+  letter-spacing: 0.12em;
+  padding: 4px 7px;
+  background: var(--orange);
+  color: #000;
+  border-radius: var(--r-1);
+}
+.ft-commit:hover { filter: brightness(1.12); }
+
+/* workspace deck: path line, recent chips */
+.ws-path { font: 400 11.5px/1.6 var(--mono); color: var(--w); padding: 0 0 2px 2px; }
+.ws-path span { color: var(--g3); margin-left: 8px; }
+.ws-recent { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; padding: 2px 0 4px; }
+.ws-recent .lb { font: 700 9px/1 var(--din); letter-spacing: 0.14em; color: var(--g2); margin-right: 4px; }
+.ws-chip {
+  font: 400 10.5px/1.3 var(--mono);
+  color: var(--g3);
+  background: var(--g0);
+  padding: 3px 7px;
+  border-radius: var(--r-1);
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ws-chip:hover { color: var(--w); background: var(--g1); }
+.ws-chip[data-current="1"] { color: var(--orange); box-shadow: inset 0 0 0 1px var(--orange); }

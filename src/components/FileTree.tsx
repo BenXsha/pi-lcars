@@ -6,7 +6,18 @@ const fmtSize = (n: number | null) =>
   n == null ? "" : n < 1024 ? `${n}B` : n < 1024 * 1024 ? `${Math.round(n / 1024)}K` : `${(n / 1048576).toFixed(1)}M`;
 
 /** Lazy workspace tree: folders load on first expand, files hand off to the OS. */
-export function FileTree({ root }: { root: string }) {
+export function FileTree({
+  root,
+  preview = false,
+  notice,
+  onPickWorkspace,
+}: {
+  root: string;
+  /** browsing a candidate workspace from the shelf deck */
+  preview?: boolean;
+  notice?: string | null;
+  onPickWorkspace?: () => void;
+}) {
   const [children, setChildren] = useState<Record<string, TreeEntry[]>>({});
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState<string | null>(null);
@@ -136,12 +147,20 @@ export function FileTree({ root }: { root: string }) {
 
   return (
     <div class="ft">
-      <div class="ft-hd">
+      <div class="ft-hd" data-preview={preview ? "1" : "0"}>
         <span>{root.replace(/^\/Users\/[^/]+/, "~") || "workspace"}</span>
-        <button type="button" class="ft-refresh" title="Reload" onClick={() => load("")}>
-          <Icon name="act-reload" size={10} />
-        </button>
+        {preview ? (
+          <button type="button" class="ft-commit" title="Start a session here" onClick={onPickWorkspace}>
+            USE
+          </button>
+        ) : (
+          <button type="button" class="ft-refresh" title="Reload" onClick={() => load("")}>
+            <Icon name="act-reload" size={10} />
+          </button>
+        )}
       </div>
+      {preview ? <div class="ft-preview">PREVIEW · not this session's workspace</div> : null}
+      {notice ? <div class="ft-note">{notice}</div> : null}
       <div class="ft-scroll">{rows("", 0)}</div>
       {note ? <div class="ft-note">{note}</div> : null}
       {err ? <div class="ft-err">{err}</div> : null}

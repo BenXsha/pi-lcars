@@ -105,6 +105,9 @@ export function Console() {
   const s = useStore();
   const [view, setView] = useState<View>("session");
   const [deck, setDeck] = useState<null | "cwd" | "model" | "think">(null);
+  const [sideMode, setSideMode] = useState<"sessions" | "files">("sessions");
+  const [previewCwd, setPreviewCwd] = useState<string | null>(null);
+  const [flash, setFlash] = useState<string | null>(null);
   const [panes, setPanes] = useState(() => {
     const read = (k: string) => {
       try {
@@ -150,7 +153,21 @@ export function Console() {
 
   return (
     <div class="app" data-left={panes.left ? "1" : "0"} data-right={panes.right ? "1" : "0"}>
-      <Sidenav sessions={s.sessions} activeId={s.activeId} view={view} onView={setView} cwd={meta?.cwd ?? ""} col={col} collapsed={!panes.left} onToggle={() => setPanes((p) => ({ ...p, left: !p.left }))} />
+      <Sidenav
+        sessions={s.sessions}
+        activeId={s.activeId}
+        view={view}
+        onView={setView}
+        cwd={meta?.cwd ?? ""}
+        col={col}
+        collapsed={!panes.left}
+        onToggle={() => setPanes((p) => ({ ...p, left: !p.left }))}
+        mode={sideMode}
+        onMode={setSideMode}
+        previewCwd={previewCwd}
+        flash={flash}
+        onPickWorkspace={() => previewCwd && setDeck("cwd")}
+      />
 
       <div class="main">
         <Shelf
@@ -164,7 +181,12 @@ export function Console() {
                 label="WORKSPACE"
                 value={shortPath(meta.cwd)}
                 open={deck === "cwd"}
-                onClick={() => setDeck(deck === "cwd" ? null : "cwd")}
+                onClick={() => {
+                  const next = deck === "cwd" ? null : "cwd";
+                  setDeck(next);
+                  setSideMode(next ? "files" : sideMode);
+                  setPreviewCwd(next ? meta?.cwd ?? null : null);
+                }}
               />
               <ControlChip
                 icon="fld-model"
@@ -188,7 +210,26 @@ export function Console() {
           <span class="shelf-tag">{view === "session" ? "MISSION LOG" : view.toUpperCase()}</span>
         </Shelf>
 
-        {deck === "cwd" ? <CwdDeck meta={meta} onClose={() => setDeck(null)} /> : null}
+        {deck === "cwd" ? (
+          <CwdDeck
+            currentCwd={meta?.cwd ?? ""}
+            preview={previewCwd ?? meta?.cwd ?? ""}
+            onPreview={setPreviewCwd}
+            recents={[...new Set(s.sessions.map((x) => x.cwd))].filter(Boolean).slice(0, 4)}
+            onUse={async (path) => {
+              await actions.newSession(path);
+              setDeck(null);
+              setPreviewCwd(null);
+              setSideMode("files");
+              setFlash(`workspace → ${shortPath(path)} · new session`);
+              setTimeout(() => setFlash(null), 3200);
+            }}
+            onClose={() => {
+              setDeck(null);
+              setPreviewCwd(null);
+            }}
+          />
+        ) : null}
         {deck === "model" ? <ModelDeck current={meta?.modelId} onClose={() => setDeck(null)} /> : null}
         {deck === "think" ? <ThinkDeck current={meta?.thinking} onClose={() => setDeck(null)} /> : null}
 
@@ -303,6 +344,11 @@ function Sidenav({
   col,
   collapsed,
   onToggle,
+  mode,
+  onMode,
+  previewCwd,
+  flash,
+  onPickWorkspace,
 }: {
   sessions: { id: string; name?: string; title?: string | null; items: number; running: boolean; queued: boolean; lastTs: number | null; pending: boolean; modelId: string; cwd: string }[];
   activeId: string | null;
@@ -312,11 +358,15 @@ function Sidenav({
   col: number;
   collapsed: boolean;
   onToggle: () => void;
+  mode: "sessions" | "files";
+  onMode: (m: "sessions" | "files") => void;
+  previewCwd: string | null;
+  flash: string | null;
+  onPickWorkspace: () => void;
 }) {
   const sorted = [...sessions].sort((a, b) => (b.lastTs ?? 0) - (a.lastTs ?? 0));
   const listRef = useRef<HTMLDivElement>(null);
   const [cramped, setCramped] = useState(false);
-  const [mode, setMode] = useState<"sessions" | "files">("sessions");
 
   useEffect(() => {
     const el = listRef.current;
@@ -345,15 +395,22 @@ function Sidenav({
       </TopCap>
 
       <div class="lseg" role="tablist" style={collapsed ? { display: "none" } : undefined}>
-        <button type="button" aria-selected={mode === "sessions" ? "true" : "false"} onClick={() => setMode("sessions")}>
+        <button type="button" aria-selected={mode === "sessions" ? "true" : "false"} onClick={() => onMode("sessions")}>
           {t("side.sessions")}
         </button>
-        <button type="button" aria-selected={mode === "files" ? "true" : "false"} onClick={() => setMode("files")}>
+        <button type="button" aria-selected={mode === "files" ? "true" : "false"} onClick={() => onMode("files")}>
           {t("side.files")}
         </button>
       </div>
 
-      {mode === "files" && !collapsed ? <FileTree root={cwd} /> : null}
+      {mode === "files" && !collapsed ? (
+        <FileTree
+          root={previewCwd ?? cwd}
+          preview={!!previewCwd && previewCwd !== cwd}
+          notice={flash}
+          onPickWorkspace={onPickWorkspace}
+        />
+      ) : null}
 
       <button
         type="button"
@@ -758,48 +815,78 @@ function Rail({
 }
 
 /* ----------------------------------------------------------------- decks */
-function CwdDeck({ meta, onClose }: { meta: ReturnType<typeof getState>["meta"]; onClose: () => void }) {
+function CwdDeck({
+  currentCwd,
+  preview,
+  onPreview,
+  recents,
+  onUse,
+  onClose,
+}: {
+  currentCwd: string;
+  preview: string;
+  onPreview: (path: string) => void;
+  recents: string[];
+  onUse: (path: string) => void;
+  onClose: () => void;
+}) {
   const [data, setData] = useState<{ path: string; parent: string | null; dirs: DirEntry[] } | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
-  const load = (path?: string) =>
+  const load = (path: string) =>
     api
       .fs(path)
       .then((d) => {
         setData(d);
+        onPreview(d.path);
         setErr(null);
       })
       .catch((e) => setErr(e.message));
 
   useEffect(() => {
-    load(meta?.cwd);
-  }, []);
+    load(preview || currentCwd);
+  }, [currentCwd]);
+
+  const same = data?.path === currentCwd;
 
   return (
     <Deck
       label="WORKSPACE"
-      sub="APPLIES TO NEW SESSIONS"
+      sub={same ? "CURRENT SESSION" : "NEW SESSION ONLY"}
       actions={
         <>
           <BarButton tone="quiet" label="UP" icon="act-expand" disabled={!data?.parent} onClick={() => data?.parent && load(data.parent)} />
-          <BarButton
-            tone="ok"
-            label="NEW SESSION"
-            icon="act-new"
-            onClick={async () => {
-              await actions.newSession(data?.path ?? meta?.cwd);
-              onClose();
-            }}
-          />
+          <BarButton tone="quiet" label="CANCEL" icon="act-close" onClick={onClose} />
+          <BarButton tone="ok" label={same ? "CURRENT" : "START SESSION HERE"} icon="act-new" disabled={!data || same} onClick={() => data && onUse(data.path)} />
         </>
       }
     >
-      <div style={{ font: "400 12px/1.6 var(--mono)", color: "var(--g3)", padding: "0 0 2px 2px" }}>
-        {shortPath(data?.path ?? meta?.cwd ?? "")} <span style={{ color: "var(--g2)" }}>· current session keeps its cwd (read-only)</span>
+      <div class="ws-path">
+        {shortPath(data?.path ?? preview ?? currentCwd)}
+        <span>{same ? "· this session's workspace (fixed)" : "· the file tree follows this preview"}</span>
       </div>
       {err ? <div style={{ font: "400 11px/1.5 var(--mono)", color: "var(--tomato)" }}>{err}</div> : null}
+
+      {(recents ?? []).length ? (
+        <div class="ws-recent">
+          <span class="lb">RECENT</span>
+          {recents.map((c) => (
+            <button type="button" key={c} class="ws-chip" data-current={c === currentCwd ? "1" : "0"} onClick={() => load(c)}>
+              {shortPath(c).split("/").slice(-2).join("/")}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       {(data?.dirs ?? []).slice(0, 7).map((d) => (
-        <PickRow key={d.path} icon="fld-path" name={d.name} meta={d.items != null ? `${d.items} items` : ""} onClick={() => load(d.path)} />
+        <PickRow
+          key={d.path}
+          icon="fld-path"
+          name={d.name}
+          meta={`${d.items != null ? `${d.items} items` : ""}${d.path === currentCwd ? " · current" : ""}`}
+          selected={d.path === currentCwd}
+          onClick={() => load(d.path)}
+        />
       ))}
     </Deck>
   );
