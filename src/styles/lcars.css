@@ -2306,3 +2306,28 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 .sum .sb-hd .rs { font: 700 9px/1 var(--din); letter-spacing: 0.12em; color: var(--g2); }
 .sum .sb-hd .pv-btn { margin-left: auto; }
 .sum .body { max-height: 42vh; overflow: auto; padding-top: 4px; scrollbar-width: thin; scrollbar-color: var(--g1) transparent; }
+
+/* ============================================================
+   branch tree
+   ============================================================ */
+.tv { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 2px; padding: 2px 8px 8px; }
+.tv-body { flex: 1 1 auto; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 1px; scrollbar-width: thin; scrollbar-color: var(--g1) transparent; }
+.trow2 {
+  display: grid;
+  grid-template-columns: 3px 64px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  min-height: 26px;
+  padding-right: 4px;
+  border-radius: 0 var(--r-1) var(--r-1) 0;
+  opacity: 0.55;
+}
+.trow2[data-path="1"] { opacity: 0.85; }
+.trow2[data-current="1"] { opacity: 1; background: var(--g1); box-shadow: inset 2px 0 0 var(--orange); }
+.trow2:hover { opacity: 1; background: var(--g0); }
+.trow2[data-confirm="1"] { opacity: 1; background: color-mix(in srgb, var(--orange) 16%, #000); }
+.trow2 .spine { height: 18px; border-radius: var(--r-pill); }
+.trow2 .kd { font: 700 9px/1.3 var(--din); letter-spacing: 0.1em; color: var(--g3); }
+.trow2 .lb { font: 400 11.5px/1.45 var(--mono); color: var(--w); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trow2 .cf { display: flex; gap: 2px; align-items: center; }
+.trow2 .cur { font: 700 9px/1 var(--din); letter-spacing: 0.12em; color: #000; background: var(--orange); padding: 3px 5px; border-radius: var(--r-1); }

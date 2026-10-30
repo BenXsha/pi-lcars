@@ -241,25 +241,12 @@ export class Registry {
   }
 
   /**
-   * Rewind to just before exchange `turn` (1-based user message), then rebuild
-   * the live session from the branched transcript. pi is append-only, so this
-   * is the honest way to "unsend": branch the manager, recreate the session.
+   * pi is append-only: moving the leaf is `manager.branch(id)`, and the live
+   * session must then be recreated from the branched transcript. Both rewind
+   * and goto go through here.
    */
-  async rewind(id, turn) {
-    const entry = this.get(id);
-    if (!entry) throw httpError(404, "E_NO_SESSION", "unknown session");
-    if (entry.meta.running) throw httpError(409, "E_BUSY", "stop the run before rewinding");
-
+  async #rebuild(entry) {
     const manager = entry.manager;
-    const messages = manager.getEntries().filter((e) => e.type === "message");
-    const users = messages.filter((e) => e.message?.role === "user");
-    const target = users[Number(turn) - 1];
-    if (!target) throw httpError(400, "E_TURN", `no exchange ${turn}`);
-    const idx = messages.findIndex((e) => e.id === target.id);
-    if (idx <= 0) throw httpError(409, "E_FIRST", "the first exchange has nothing before it to rewind to");
-
-    manager.branch(messages[idx - 1].id);
-
     const { createAgentSession } = this.sdk;
     try {
       entry.session.dispose();
@@ -279,7 +266,6 @@ export class Registry {
     }
     session.subscribe((ev) => applyEvent(entry, ev));
 
-    // rebuild the transcript from what survived the branch
     entry.items = [];
     entry.byId = new Map();
     entry.cur = null;
@@ -323,12 +309,104 @@ export class Registry {
           output: out,
           ts: m.timestamp,
         });
+      } else if (m.role === "compactionSummary") {
+        push({
+          kind: "summary",
+          id: `sm${m.timestamp}-${++n}`,
+          summary: m.summary ?? "",
+          tokensBefore: m.tokensBefore ?? null,
+          tokensAfter: null,
+          reason: "restored",
+          ts: m.timestamp,
+        });
       }
     }
 
     this.refreshMeta(entry);
     this.sink({ seq: nextSeq(), sessionId: entry.id, e: "items", items: entry.items });
     return entry;
+  }
+
+  async rewind(id, turn) {
+    const entry = this.get(id);
+    if (!entry) throw httpError(404, "E_NO_SESSION", "unknown session");
+    if (entry.meta.running) throw httpError(409, "E_BUSY", "stop the run before rewinding");
+
+    const manager = entry.manager;
+    const messages = manager.getEntries().filter((e) => e.type === "message");
+    const users = messages.filter((e) => e.message?.role === "user");
+    const target = users[Number(turn) - 1];
+    if (!target) throw httpError(400, "E_TURN", `no exchange ${turn}`);
+    const idx = messages.findIndex((e) => e.id === target.id);
+    if (idx <= 0) throw httpError(409, "E_FIRST", "the first exchange has nothing before it to rewind to");
+
+    manager.branch(messages[idx - 1].id);
+    return this.#rebuild(entry);
+  }
+
+  /** Move the leaf to an arbitrary entry (tree navigation). */
+  async goto(id, entryId) {
+    const entry = this.get(id);
+    if (!entry) throw httpError(404, "E_NO_SESSION", "unknown session");
+    if (entry.meta.running) throw httpError(409, "E_BUSY", "stop the run before switching branches");
+    const exists = entry.manager.getEntries().some((e) => e.id === entryId);
+    if (!exists) throw httpError(404, "E_ENTRY", "unknown entry");
+    entry.manager.branch(entryId);
+    return this.#rebuild(entry);
+  }
+
+  /** The session's entry graph, flattened for rendering.
+   *  Bookkeeping entries (model_change, thinking_level_change, system,
+   *  context_edit, usage) are structural noise to a reader, so they are hidden
+   *  and their children are lifted to the nearest visible ancestor. */
+  tree(id) {
+    const entry = this.get(id);
+    if (!entry) throw httpError(404, "E_NO_SESSION", "unknown session");
+    const leaf = entry.manager.getLeafId?.() ?? null;
+    const flat = [];
+    const visibleKinds = new Set(["user", "assistant", "toolResult", "compaction", "branch_summary", "custom"]);
+
+    const describe = (e) => {
+      if (e.type === "message") {
+        const m = e.message ?? {};
+        const text = textOf(m.content);
+        if (m.role === "toolResult") return { kind: "toolResult", label: m.toolName ?? "tool" };
+        if (m.role === "assistant") return { kind: "assistant", label: text || (m.content ?? []).some((c) => c?.type === "toolCall") ? text || "tool calls" : "" };
+        return { kind: m.role ?? "message", label: text };
+      }
+      if (e.type === "compaction") return { kind: "compaction", label: "context compacted" };
+      if (e.type === "branch_summary") return { kind: "branch_summary", label: e.summary ?? "branch summary" };
+      if (e.type === "custom") return { kind: "custom", label: textOf(e.content) || e.customType || "custom" };
+      return null;
+    };
+
+    const walk = (node, depth, visibleParent) => {
+      const e = node.entry;
+      const d = describe(e);
+      const isVisible = !!d && visibleKinds.has(d.kind);
+      if (isVisible) {
+        flat.push({
+          id: e.id,
+          parentId: visibleParent,
+          depth,
+          kind: d.kind,
+          label: String(d.label ?? "").replace(/\s+/g, " ").slice(0, 120),
+          ts: e.timestamp,
+          current: e.id === leaf,
+          isLeafPath: false,
+        });
+      }
+      for (const c of node.children ?? []) walk(c, isVisible ? depth + 1 : depth, isVisible ? e.id : visibleParent);
+    };
+    for (const n of entry.manager.getTree?.() ?? []) walk(n, 0, null);
+
+    const byId = new Map(flat.map((n) => [n.id, n]));
+    let cur = leaf ? byId.get(leaf) : null;
+    while (cur) {
+      cur.isLeafPath = true;
+      cur = cur.parentId ? byId.get(cur.parentId) : null;
+    }
+    return { count: flat.length, leaf, nodes: flat };
   }
 
   async rename(id, name) {

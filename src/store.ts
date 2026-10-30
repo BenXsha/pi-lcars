@@ -175,6 +175,11 @@ export const actions = {
   async abort() {
     await withError(() => api.abort());
   },
+  async goto(entryId: string) {
+    const b = await withError(() => api.goto(entryId));
+    if (b) setBootstrap(b);
+    return b;
+  },
   async compact() {
     await withError(() => api.compact());
   },

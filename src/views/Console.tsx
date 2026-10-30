@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import type { DiffData, DirEntry, HistoryResult, Item, McpConfig, McpServer, ModelInfo, ProviderRow, ProvidersResult, SkillsResult, SystemInfo } from "../api";
+import type { DiffData, DirEntry, HistoryResult, TreeRow, Item, McpConfig, McpServer, ModelInfo, ProviderRow, ProvidersResult, SkillsResult, SystemInfo } from "../api";
 import { api } from "../api";
 import { actions, connect, getState, subscribe } from "../store";
 import { THEMES, appliedTheme, applyTheme, type ThemeId } from "../theme";
@@ -132,6 +132,7 @@ export function Console() {
   const [sideMode, setSideMode] = useState<"sessions" | "files">("sessions");
   const [previewCwd, setPreviewCwd] = useState<string | null>(null);
   const [viewer, setViewer] = useState<{ path: string; diff?: DiffData } | null>(null);
+  const [treeOpen, setTreeOpen] = useState(false);
   const [activeTurn, setActiveTurn] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
   const [panes, setPanes] = useState(() => {
@@ -296,6 +297,11 @@ export function Console() {
                   <span class={`badge ${meta?.running ? "moon" : "dim"}`}>{meta?.running ? "RUNNING" : "IDLE"}</span>
                 )}
                 <span class="badge ice">{countTools(s.items)} CALLS</span>
+                {view === "session" ? (
+                  <button type="button" class="badge dim" onClick={() => setTreeOpen(true)} title="Branch tree (⌘T)">
+                    TREE
+                  </button>
+                ) : null}
               </div>
             </div>
 
@@ -308,6 +314,14 @@ export function Console() {
 
             {viewer ? (
               <FileViewer path={viewer.path} diff={viewer.diff} onClose={() => setViewer(null)} />
+            ) : treeOpen ? (
+              <TreePanel
+                onClose={() => setTreeOpen(false)}
+                onSwitch={() => {
+                  setTreeOpen(false);
+                  setActiveTurn(null);
+                }}
+              />
             ) : (
             <div class="scroll" id="scroll">
               {view === "session" ? (
@@ -1886,6 +1900,83 @@ function ProvidersPanel({ meta }: { meta: ReturnType<typeof getState>["meta"] })
 
       <div class="pv-note" style={{ marginTop: "12px" }}>
         Session model: <code>{meta?.model ?? "—"}</code> · keys are masked on read and never sent back from the server
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ tree */
+function TreePanel({ onClose, onSwitch }: { onClose: () => void; onSwitch: () => void }) {
+  const [data, setData] = useState<{ count: number; leaf: string | null; nodes: TreeRow[] } | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<string | null>(null);
+
+  const load = () =>
+    api
+      .branchTree()
+      .then(setData)
+      .catch((e) => setErr(e.message));
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const kindTone = (k: string) =>
+    k === "user" ? "var(--orange)" : k === "assistant" ? "var(--w)" : k === "toolResult" ? "var(--tang)" : k === "compaction" ? "var(--moon)" : "var(--lav)";
+
+  return (
+    <div class="tv">
+      <div class="fv-hd">
+        <span class="st" />
+        <span class="nm">branch tree</span>
+        <span class="mt">{data ? `${data.count} ENTRIES` : "…"}</span>
+        <button type="button" class="pv-btn ghost" onClick={load}>
+          RELOAD
+        </button>
+        <button type="button" class="pv-btn" onClick={onClose}>
+          CLOSE
+        </button>
+      </div>
+
+      {err ? (
+        <div class="errbar">
+          <Icon name="status-fail" size={13} /> {err}
+        </div>
+      ) : null}
+
+      <div class="tv-body">
+        {data?.count === 0 ? <div class="pv-note">nothing in this session yet</div> : null}
+        {(data?.nodes ?? []).map((n) => (
+          <div class="trow2" key={n.id} data-current={n.current ? "1" : "0"} data-path={n.isLeafPath ? "1" : "0"} data-confirm={confirm === n.id ? "1" : "0"}>
+            <span class="spine" style={{ marginLeft: `${n.depth * 14}px`, background: kindTone(n.kind) }} />
+            <span class="kd">{n.kind === "toolResult" ? "TOOL" : n.kind.toUpperCase()}</span>
+            <span class="lb">{n.label || "—"}</span>
+            {confirm === n.id ? (
+              <span class="cf">
+                <button
+                  type="button"
+                  class="pv-btn"
+                  onClick={async () => {
+                    await actions.goto(n.id);
+                    onSwitch();
+                  }}
+                >
+                  SWITCH HERE
+                </button>
+                <button type="button" class="pv-btn ghost" onClick={() => setConfirm(null)}>
+                  CANCEL
+                </button>
+              </span>
+            ) : (
+              <span class="cf">
+                {n.current ? <span class="cur">HEAD</span> : null}
+                <button type="button" class="pv-btn ghost" onClick={() => setConfirm(n.id)}>
+                  GO
+                </button>
+              </span>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );

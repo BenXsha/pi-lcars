@@ -161,6 +161,17 @@ export type SkillRow = {
   bytes: number | null;
 };
 
+export type TreeRow = {
+  id: string;
+  parentId: string | null;
+  depth: number;
+  kind: string;
+  label: string;
+  ts: string;
+  current: boolean;
+  isLeafPath: boolean;
+};
+
 export type HistoryRow = {
   path: string;
   id: string;
@@ -313,6 +324,8 @@ export const api = {
     call<HistoryResult>(`/api/history?q=${encodeURIComponent(q)}${refresh ? "&refresh=1" : ""}`),
   historyOp: (op: "rename" | "delete", payload: { path: string; name?: string }) => post<unknown>("/api/history", { op, ...payload }),
   forkPath: (path: string) => post<Bootstrap>("/api/session", { op: "fork", path }),
+  branchTree: () => post<{ count: number; leaf: string | null; nodes: TreeRow[] }>("/api/session", { op: "tree" }),
+  goto: (entryId: string) => post<Bootstrap>("/api/session", { op: "goto", entryId }),
   skills: () => call<SkillsResult>("/api/skills"),
   reloadSkills: () => post<SkillsResult>("/api/skills", { op: "reload" }),
   providers: () => call<ProvidersResult>("/api/providers"),

@@ -426,6 +426,20 @@ Codex 的做法是：**工作区在你开 session 时就定了，之后不可变
 - 注意 `tool_search` 会重写 active tool set，实测在一次搜索后 `ask_user_question` 会被挤出列表；
   这是 pi 扩展行为，不是本项目的 bug，写在这里免得下次误判。
 
+### 7.6o 分支树（TREE）
+
+TUI 的 `/tree` 对应物。服务端 `POST /api/session {op:"tree"}` 把 `manager.getTree()` 压平：**只留可读节点**
+（user / assistant / toolResult / compaction / branch_summary / custom），
+`model_change` / `thinking_level_change` / `system` / `context_edit` 这类记账条目隐藏，
+子节点上提到最近的可见祖先 —— 否则树里全是噪音。`depth` 按可见层级重新计算。
+
+- 每个节点标记 `current`（leaf）与 `isLeafPath`（root→leaf 路径），UI 靠这个做明暗：路径 0.85、其它 0.55、HEAD 全亮 + 橙脊。
+- `POST /api/session {op:"goto", entryId}` = `manager.branch(entryId)` + 重建 session。
+  **和 rewind 共用 `#rebuild()`**：dispose → 用同一 manager 重新 `createAgentSession` → 重绑扩展 →
+  从 `session.messages` 重建 items → 推 `{e:"items"}`。运行中拒绝（`409 E_BUSY`）。
+- 切换前必须二次确认（行内 `SWITCH HERE / CANCEL`）——它会把后续对话从当前视图移走。
+- 入口是 center header 的 `TREE` 徽标，视图与文件查看器同级（替换 transcript 列，composer 不动）。
+
 ### 7.6n 斜杠命令与压缩摘要
 
 **斜杠命令只列真正能跑的**：

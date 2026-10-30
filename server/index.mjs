@@ -180,6 +180,11 @@ const routes = {
         ok(res, { started: true });
         break;
       }
+      case "goto":
+        entry = await registry.goto(b.id ?? registry.activeId, b.entryId);
+        break;
+      case "tree":
+        return ok(res, registry.tree(b.id ?? registry.activeId));
       case "rewind":
         entry = await registry.rewind(b.id ?? registry.activeId, b.turn);
         break;
