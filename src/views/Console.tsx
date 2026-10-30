@@ -104,7 +104,7 @@ function useStore() {
 export function Console() {
   const s = useStore();
   const [view, setView] = useState<View>("session");
-  const [deck, setDeck] = useState<null | "cwd" | "model" | "think" | "theme">(null);
+  const [deck, setDeck] = useState<null | "cwd" | "model" | "think">(null);
   const [panes, setPanes] = useState(() => {
     const read = (k: string) => {
       try {
@@ -155,7 +155,7 @@ export function Console() {
       <div class="main">
         <Shelf
           brand=""
-          tag={view === "session" ? "MISSION LOG" : view.toUpperCase()}
+          tag=""
           left={
             <button
               type="button"
@@ -164,7 +164,7 @@ export function Console() {
               aria-pressed={panes.left ? "true" : "false"}
               onClick={() => setPanes((p) => ({ ...p, left: !p.left }))}
             >
-              <Icon name={panes.left ? "act-collapse" : "act-expand"} size={11} />
+              <Icon name={panes.left ? "pane-collapse-left" : "pane-collapse-right"} size={12} />
             </button>
           }
         >
@@ -192,19 +192,11 @@ export function Console() {
                 open={deck === "think"}
                 onClick={() => setDeck(deck === "think" ? null : "think")}
               />
-              <ControlChip icon="station-context" label="CTX" value={`${meta.contextPct}%`} />
-              <ControlChip
-                icon="act-theme"
-                label="THEME"
-                value={THEMES.find((t) => t.id === theme)?.short ?? "TNG"}
-                open={deck === "theme"}
-                title="Switch palette"
-                onClick={() => setDeck(deck === "theme" ? null : "theme")}
-              />
             </>
           ) : (
             <span style={{ font: "700 11px/1 var(--din)", letterSpacing: "0.14em" }}>CONNECTING…</span>
           )}
+          <span class="shelf-tag">{view === "session" ? "MISSION LOG" : view.toUpperCase()}</span>
           <button
             type="button"
             class="pane-tgl"
@@ -212,16 +204,14 @@ export function Console() {
             aria-pressed={panes.right ? "true" : "false"}
             onClick={() => setPanes((p) => ({ ...p, right: !p.right }))}
           >
-            <Icon name={panes.right ? "act-collapse" : "act-expand"} size={11} />
+            <Icon name={panes.right ? "pane-collapse-right" : "pane-collapse-left"} size={12} />
           </button>
         </Shelf>
 
         {deck === "cwd" ? <CwdDeck meta={meta} onClose={() => setDeck(null)} /> : null}
         {deck === "model" ? <ModelDeck current={meta?.modelId} onClose={() => setDeck(null)} /> : null}
         {deck === "think" ? <ThinkDeck current={meta?.thinking} onClose={() => setDeck(null)} /> : null}
-        {deck === "theme" ? (
-          <ThemeDeck current={theme} onPick={(id) => { applyTheme(id); setTheme(id); }} onClose={() => setDeck(null)} />
-        ) : null}
+
 
         <div class="body">
           <main class="center">
@@ -338,8 +328,14 @@ function Sidenav({
           the column edge — collapsed included. Only its contents recentre. */}
       <TopCap w={col + 55} h={100} bar={44}>
         <span class={`cap-logo ${collapsed ? "is-mini" : ""}`}>
-          <Logo size={collapsed ? 74 : 72} />
+          <Logo size={collapsed ? 48 : 64} />
         </span>
+        {collapsed ? null : (
+          <span class="cap-text">
+            <b>Enterprise Agent Console</b>
+            <em>base on pi.agent</em>
+          </span>
+        )}
       </TopCap>
 
       <div class="lseg" role="tablist" style={collapsed ? { display: "none" } : undefined}>
@@ -818,32 +814,6 @@ function ThinkDeck({ current, onClose }: { current?: string; onClose: () => void
       <div style={{ font: "400 11px/1.6 var(--mono)", color: note ? "var(--amber)" : "var(--g2)", padding: "4px 2px 0" }}>
         {note ?? "off → THINKING rows disappear from the stream. switching mid-run applies to the next turn."}
       </div>
-    </Deck>
-  );
-}
-
-/* ----------------------------------------------------------------- theme */
-function ThemeDeck({ current, onPick, onClose }: { current: ThemeId; onPick: (id: ThemeId) => void; onClose: () => void }) {
-  return (
-    <Deck label="PALETTE" sub="INSTANT, PERSISTED" actions={<BarButton tone="quiet" label="CLOSE" icon="act-close" onClick={onClose} />}>
-      {THEMES.map((t) => (
-        <button
-          type="button"
-          class="theme-opt"
-          key={t.id}
-          aria-selected={t.id === current ? "true" : "false"}
-          onClick={() => onPick(t.id)}
-        >
-          <span class="sw">
-            {t.swatch.map((c) => (
-              <i key={c} style={{ background: c }} />
-            ))}
-          </span>
-          <span class="nm">{t.name}</span>
-          <span class="nt">{t.note}</span>
-          <span class="ck">{t.id === current ? <Icon name="status-ok" size={13} /> : null}</span>
-        </button>
-      ))}
     </Deck>
   );
 }

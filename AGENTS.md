@@ -371,6 +371,8 @@ LCARS 的左轨**从不留纯黑空洞**：内容排不满时，纵向剩余由*
 - **两侧都可折叠**，且不是"隐藏"：左栏折叠成 **64px 窄轨**，保留交互 —— 会话变成只剩大号编号的方块、
   NEW SESSION 只剩 `+`、导航只剩图标。**窄轨里所有东西都必须居中于 64px**（不是靠右）：
   图标项 `justify-content: center` 且去掉左右 padding，会话编号 `justify-self: center`。
+- 折叠图标用 `arrow-left-double-fill` / `arrow-right-double-fill`（双箭头在 12px 下比 sidebar-fold 更清楚），
+  右侧栏成对镜像使用。
   cap **任何状态都是 `col + 55`**：折叠时 cap 是 119 宽、凹口正好收在 64px 的列边界上，
   内圆角语言不能丢；只是里面的标记改以 32px（窄轨中心）对齐。shelf 左内距恒为 70px。
 - 快捷键：`⌘B / Ctrl B` 左栏、`⌘⇧B / Ctrl ⇧B` 右栏；**在输入框里也生效**（composer 没有占用这组绑定）。

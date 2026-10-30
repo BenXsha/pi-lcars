@@ -59,6 +59,8 @@ const MANIFEST = {
   "act-open": "external-link-fill",
   "act-close": "close-fill",
   "act-theme": "palette-fill",
+  "pane-collapse-left": "arrow-left-double-fill",
+  "pane-collapse-right": "arrow-right-double-fill",
   // config fields
   "fld-key": "key-2-fill",
   "fld-url": "links-fill",
