@@ -864,6 +864,26 @@ function Transcript({
   // the wipe short).
   const restored = useRef<Set<string> | null>(null);
   if (restored.current === null) restored.current = new Set(items.map((i) => i.id));
+  const [animating, setAnimating] = useState<Set<string>>(() => new Set());
+
+  useEffect(() => {
+    const fresh = items.filter((i) => !restored.current?.has(i.id)).map((i) => i.id);
+    if (!fresh.length) return;
+    for (const id of fresh) restored.current?.add(id);
+    setAnimating((prev) => {
+      const next = new Set(prev);
+      for (const id of fresh) next.add(id);
+      return next;
+    });
+  }, [items]);
+
+  const endAnimation = (id: string) =>
+    setAnimating((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
 
   if (!items.length) {
     return (
@@ -896,14 +916,14 @@ function Transcript({
         const prev = items[i - 1];
         const turn = it.kind === "user" || (it.kind === "assistant" && prev && prev.kind !== "assistant");
         const block = it.kind === "user" || it.kind === "assistant" || it.kind === "summary";
-        const animate = !restored.current?.has(it.id);
+        const animate = animating.has(it.id);
         const cls = `blk${turn ? " turn" : ""}${it.kind === "approval" ? " approval-blk" : ""}${
           animate ? (block ? " anim-wipe" : " anim-in") : ""
         }`;
 
         if (it.kind === "user") {
           return (
-            <div class={cls} key={it.id} data-id={it.id} data-turn="1">
+            <div class={cls} key={it.id} data-id={it.id} data-turn="1" onAnimationEnd={(e) => e.animationName === "wipe" && endAnimation(it.id)}>
               {it.skill ? <SkillBlock skill={it.skill} /> : null}
               <MessageRow
                 role="user"
@@ -922,7 +942,7 @@ function Transcript({
 
         if (it.kind === "assistant") {
           return (
-            <div class={cls} key={it.id} data-id={it.id}>
+            <div class={cls} key={it.id} data-id={it.id} onAnimationEnd={(e) => e.animationName === "wipe" && endAnimation(it.id)}>
               <MessageRow
                 role="assistant"
                 time=""
@@ -969,7 +989,7 @@ function Transcript({
 
         if (it.kind === "summary") {
           return (
-            <div class={cls} key={it.id} data-id={it.id}>
+            <div class={cls} key={it.id} data-id={it.id} onAnimationEnd={(e) => e.animationName === "wipe" && endAnimation(it.id)}>
               <SummaryBlock item={it} />
             </div>
           );
@@ -977,7 +997,7 @@ function Transcript({
 
         if (it.kind === "ask") {
           return (
-            <div class={cls} key={it.id} data-id={it.id}>
+            <div class={cls} key={it.id} data-id={it.id} onAnimationEnd={(e) => e.animationName === "wipe" && endAnimation(it.id)}>
               <AskBlock item={it} />
             </div>
           );
@@ -1102,6 +1122,7 @@ function Composer({ running, disabled, queue }: { running: boolean; disabled: bo
   }, [running]);
 
   const [focused, setFocused] = useState(false);
+  const composing = useRef(false);
   const chars = text.length;
 
   const queued = [...textList(queue?.steering), ...textList(queue?.followUp)];
@@ -1167,7 +1188,19 @@ function Composer({ running, disabled, queue }: { running: boolean; disabled: bo
             disabled={disabled}
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
-            onInput={(e) => setText((e.target as HTMLTextAreaElement).value)}
+            /* An IME (fcitx5/ibus) owns the text between compositionstart and
+               compositionend — rewriting `value` in that window fights the
+               input method, and committing with Space is the classic crash. */
+            onCompositionStart={() => {
+              composing.current = true;
+            }}
+            onCompositionEnd={(e) => {
+              composing.current = false;
+              setText((e.target as HTMLTextAreaElement).value);
+            }}
+            onInput={(e) => {
+              if (!composing.current) setText((e.target as HTMLTextAreaElement).value);
+            }}
             onKeyDown={(e) => {
               if (matches.length) {
                 if (e.key === "ArrowDown") {

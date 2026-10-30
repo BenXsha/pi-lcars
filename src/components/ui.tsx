@@ -513,7 +513,16 @@ export function FieldRow(props: {
                 style={FIELD_INPUT_STYLE}
                 type="text"
                 value={props.value}
-                onInput={(e) => props.onInput?.((e.target as HTMLInputElement).value)}
+                onCompositionStart={(e) => {
+                  e.currentTarget.dataset.composing = "1";
+                }}
+                onCompositionEnd={(e) => {
+                  delete e.currentTarget.dataset.composing;
+                  props.onInput?.(e.currentTarget.value);
+                }}
+                onInput={(e) => {
+                  if (!e.currentTarget.dataset.composing) props.onInput?.(e.currentTarget.value);
+                }}
               />
             )
           ) : (
@@ -556,7 +565,16 @@ export function FieldArea(props: {
           rows={props.rows ?? 3}
           placeholder={props.placeholder}
           spellcheck={false}
-          onInput={(e) => props.onInput?.((e.target as HTMLTextAreaElement).value)}
+          onCompositionStart={(e) => {
+            e.currentTarget.dataset.composing = "1";
+          }}
+          onCompositionEnd={(e) => {
+            delete e.currentTarget.dataset.composing;
+            props.onInput?.(e.currentTarget.value);
+          }}
+          onInput={(e) => {
+            if (!e.currentTarget.dataset.composing) props.onInput?.(e.currentTarget.value);
+          }}
         />
         {props.message ? (
           <span class="msg" data-tone={props.state === "error" ? "err" : props.state === "ok" ? "ok" : undefined}>

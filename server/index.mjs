@@ -42,6 +42,8 @@ let LOG = true;
 
 /* --------------------------------------------------------------- plumbing */
 const clients = new Set();
+/** last client-side faults, newest last — shown by /api/system */
+const clientErrorsRef = [];
 const sink = (msg) => {
   const line = `data: ${JSON.stringify(msg)}\n\n`;
   for (const res of clients) {
@@ -388,8 +390,21 @@ const routes = {
       cwd: CWD,
       port: PORT,
       mcpEnabled: process.env.LCARS_MCP !== "0",
+      clientErrors: clientErrorsRef.slice(-5),
       approvals: approvals.snapshot,
     });
+  },
+
+  /* the client panic surface reports here so the launcher terminal shows what
+     the browser hit — no DevTools needed on the user's side */
+  "POST /api/client-error": async (req, res) => {
+    const b = await body(req).catch(() => ({}));
+    const message = String(b?.message ?? "unknown").slice(0, 500);
+    const stack = String(b?.stack ?? "").split("\n").slice(0, 12).join("\n");
+    console.error(`[client] ${message}${stack ? `\n${stack}` : ""}`);
+    clientErrorsRef.push({ at: Date.now(), message });
+    if (clientErrorsRef.length > 20) clientErrorsRef.shift();
+    ok(res, { recorded: true });
   },
 
   "GET /api/commands": async (req, res) => {
@@ -672,6 +687,16 @@ const handler = async (req, res) => {
     res.writeHead(200, { "content-type": MIME[extname(file)] || "application/octet-stream" });
     res.end(buf);
   } catch {
+    /* A missing asset must NOT fall back to index.html: the browser would
+       receive HTML where it expects JS/CSS (a stale tab after a rebuild), fail
+       to parse it, and the screen goes white. Only extension-less routes get
+       the shell. */
+    const looksLikeAsset = extname(file) !== "" || url.pathname.startsWith("/assets/");
+    if (looksLikeAsset) {
+      res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
+      res.end(`not found: ${url.pathname}\n\nthe client was rebuilt — reload the page\n`);
+      return;
+    }
     try {
       const shell = await readFile(join(DIST, "index.html"));
       res.writeHead(200, { "content-type": MIME[".html"] });

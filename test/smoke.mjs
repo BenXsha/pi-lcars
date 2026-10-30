@@ -191,6 +191,11 @@ try {
   const badApprove = await post("/api/approve", { id: "ap-nope", decision: "approve" });
   check("approve rejects unknown", badApprove.status === 404);
   const badRoute = await get("/api/nope");
+  // a missing asset must be a 404, not the HTML shell (that turns a stale tab white)
+  const missing = await fetch(`${BASE}/assets/nope-${Date.now()}.js`);
+  const missingBody = await missing.text();
+  check("missing asset → 404, not HTML", missing.status === 404 && !missingBody.includes("<div id=\"root\">"), `${missing.status} ${missingBody.slice(0, 40)}`);
+
   check("unknown endpoint 404", badRoute.status === 404);
 
   /* ---------------- sse ---------------- */

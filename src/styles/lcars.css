@@ -100,7 +100,7 @@ button { cursor: pointer; }
   gap: var(--gap);
   padding: 0 var(--seam) var(--seam) var(--seam);
   background: var(--bg);
-  animation: wipe-down var(--t-2) var(--ease) both;
+  animation: wipe-down var(--t-2) var(--ease) backwards;
 }
 .deck > .dk-lb {
   flex: 0 0 132px;
@@ -449,9 +449,9 @@ button { cursor: pointer; }
 @keyframes swap { 0%, 45% { opacity: 0; } 46%, 100% { opacity: 1; } }
 @keyframes busy { 0% { transform: translateX(0); } 100% { transform: translateX(200%); } }
 
-.anim-wipe { animation: wipe var(--t-2) var(--ease) both; }
-.anim-wipe-down { animation: wipe-down var(--t-2) var(--ease) both; }
-.anim-in { animation: wipe var(--t-1) var(--ease) both; }
+.anim-wipe { animation: wipe var(--t-2) var(--ease) backwards; }
+.anim-wipe-down { animation: wipe-down var(--t-2) var(--ease) backwards; }
+.anim-in { animation: wipe var(--t-1) var(--ease) backwards; }
 .anim-swap { animation: swap var(--t-1) steps(1, end); }
 .anim-pulse { animation: pulse 300ms var(--ease) 2; }
 .anim-blink { animation: blink 1s steps(1) infinite; }
@@ -2554,7 +2554,51 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
   background: none;
   color: var(--w);
   font: 12.5px/1.75 var(--mono);
-  field-sizing: content; /* progressive: grows with content where supported */
 }
 .field[data-area="1"] > .fc textarea::placeholder { color: var(--g3); }
 .form-note[data-err="1"] { color: var(--tomato); }
+
+/* ------------------------------------------------------------------ panic */
+/* A crash replaces the console with a fault report — never a blank screen. */
+.panic { display: flex; flex-direction: column; gap: 8px; padding: 24px; max-width: 920px; }
+.panic-head { display: flex; align-items: center; gap: 10px; }
+.panic-head .st { width: 8px; height: 28px; background: var(--tomato); border-radius: var(--r-pill); }
+.panic-head .ttl { font: 700 28px/1 var(--din); letter-spacing: 0.02em; color: var(--tomato); }
+.panic-msg { font: 400 16px/1.6 var(--text); color: var(--w); padding-left: 18px; overflow-wrap: anywhere; }
+.panic-sub {
+  font: 700 11px/1 var(--din);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--amber);
+  padding-left: 18px;
+}
+.panic-stack {
+  margin: 0;
+  padding: 12px 16px;
+  background: var(--g0);
+  box-shadow: inset 4px 0 0 var(--tomato);
+  font: 400 12px/1.8 var(--mono);
+  color: var(--g3);
+  max-height: 46vh;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+.panic-actions { display: flex; gap: 8px; padding-left: 18px; }
+.panic-actions button {
+  padding: 8px 14px;
+  background: var(--g1);
+  color: var(--w);
+  font: 700 11px/1 var(--din);
+  letter-spacing: 0.14em;
+  border-radius: 0 var(--r-1) var(--r-1) 0;
+}
+.panic-actions button:hover { background: var(--orange); color: #000; }
+
+/* `?nomotion` — diagnostic switch: no animations at all, for bisecting a
+   renderer fault without rebuilding the bundle. */
+html[data-motion="off"] *,
+html[data-motion="off"] *::before,
+html[data-motion="off"] *::after {
+  animation: none !important;
+  transition: none !important;
+}

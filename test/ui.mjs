@@ -133,6 +133,7 @@ try {
     server.on("exit", (code) => reject(new Error(`server exited ${code}\n${err}`)));
   });
   check("launcher handshake", !!handshake?.url, handshake?.url);
+  const base = process.env.UI_BASE || handshake.url;
 
   /* -------------------------------------------------------- 2. browser */
   browser = spawn(
@@ -169,6 +170,12 @@ try {
   // UI_BASE lets the harness run against `vite` (unminified stacks) instead of dist
   await cdp.send("Page.navigate", { url: process.env.UI_BASE || handshake.url });
   await sleep(1500);
+
+  /** JSON GET against the console's own API */
+  const get = async (url) => {
+    const r = await fetch(url);
+    return { status: r.status, body: await r.json().catch(() => null) };
+  };
 
   const evaluate = async (expression) => {
     const r = await cdp.send("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true });
@@ -385,6 +392,20 @@ try {
     .map((e) => e.params.entry.text);
   check("no uncaught exceptions", errors.length === 0, errors.slice(0, 2).join(" | "));
   check("no console errors", logged.length === 0, logged.slice(0, 2).join(" | "));
+
+  /* -------------------------- 11. a crash surfaces, and reports to the server */
+  await cdp.send("Page.navigate", { url: process.env.UI_BASE || handshake.url });
+  await sleep(2200);
+  await evaluate(`window.dispatchEvent(new ErrorEvent('error', { message: 'probe fault', error: new Error('probe fault') }))`);
+  await sleep(500);
+  check("a crash paints a fault report", await exists(".panic"), await evaluate(`document.querySelector('.panic-msg')?.textContent ?? ''`));
+  check("the fault report keeps the stack", await exists(".panic-stack"));
+  const recorded = await get(`${base}/api/system`);
+  check(
+    "the fault reaches the server",
+    (recorded.body?.data?.clientErrors ?? []).some((e) => /probe fault/.test(e.message)),
+    JSON.stringify(recorded.body?.data?.clientErrors?.slice(-1)),
+  );
 } catch (e) {
   check("ui harness", false, e.message);
 } finally {
