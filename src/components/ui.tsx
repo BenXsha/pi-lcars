@@ -213,6 +213,7 @@ export function ToolStrip(props: {
   ms?: number;
   count?: number;
   truncated?: boolean;
+  exitCode?: number;
   diff?: DiffData;
   onOpenDiff?: () => void;
   children?: SubCall[];
@@ -234,7 +235,9 @@ export function ToolStrip(props: {
   const kids = props.children ?? [];
   const visibleKids = props.expanded ? kids : kids.slice(0, 6);
   const hiddenKids = kids.length - visibleKids.length;
-  const canToggle = !!props.onToggle && (hidden > 0 || hiddenDiff > 0 || hiddenKids > 0 || argsLong);
+  // `hidden` collapses to 0 once expanded, so `expanded` must keep the control
+  // alive — otherwise the row can only ever open (it used to be one-way).
+  const canToggle = !!props.onToggle && (!!props.expanded || hidden > 0 || hiddenDiff > 0 || hiddenKids > 0 || argsLong);
 
   return (
     <div class="tool" data-state={state} data-expanded={props.expanded ? "1" : "0"} data-toggle={canToggle ? "1" : "0"}>
@@ -247,7 +250,7 @@ export function ToolStrip(props: {
           title={props.expanded ? "Collapse output" : "Expand output"}
           onClick={props.onToggle}
         >
-          <Icon name={props.icon} size={12} />
+          <Icon name={props.icon} size={13} />
           <span class="lb">
             {props.name.toUpperCase()}
             {props.count && props.count > 1 ? <small>x{props.count}</small> : null}
@@ -255,14 +258,14 @@ export function ToolStrip(props: {
         </button>
       ) : (
         <div class="nm">
-          <Icon name={props.icon} size={12} />
+          <Icon name={props.icon} size={13} />
           <span class="lb">
             {props.name.toUpperCase()}
             {props.count && props.count > 1 ? <small>x{props.count}</small> : null}
           </span>
         </div>
       )}
-      <div class="bd">
+      <div class={`bd${props.expanded ? " anim-in" : ""}`} key={props.expanded ? "open" : "closed"}>
         <div class="args">{props.args}</div>
         {props.diff ? (
           <>
@@ -312,7 +315,7 @@ export function ToolStrip(props: {
             <i />
           </span>
         ) : state === "error" ? (
-          "EXIT 1"
+          props.exitCode != null ? `EXIT ${props.exitCode}` : "ERROR"
         ) : (
           <span>{props.ms != null ? (props.ms < 1000 ? `${Math.round(props.ms)}ms` : `${(props.ms / 1000).toFixed(2)}s`) : "—"}</span>
         )}
@@ -398,7 +401,9 @@ export function MessageRow(props: {
               <span class="th-lb">THINKING</span>
               <span class="th-words">{props.thinking.trim().split(/\s+/).length} W</span>
             </span>
-            <span class="th-body">{props.thinking}</span>
+            <span class={`th-body${props.thinkingOpen ? " anim-in" : ""}`} key={props.thinkingOpen ? "open" : "closed"}>
+              {props.thinking}
+            </span>
           </button>
         ) : null}
         {props.text ? (
@@ -592,10 +597,50 @@ function langFor(tool: string, args: string) {
   return langFromPath((args || "").split(" / ")[0]);
 }
 
+const HTML_ENTITIES: Record<string, string> = {
+  "&amp;": "&",
+  "&lt;": "<",
+  "&gt;": ">",
+  "&quot;": '"',
+  "&#x27;": "'",
+  "&#39;": "'",
+};
+
+const decodeEntities = (text: string) => text.replace(/&(?:amp|lt|gt|quot|#x27|#39);/g, (m) => HTML_ENTITIES[m] ?? m);
+
+/**
+ * highlight.js returns HTML; we turn it back into nodes instead of injecting it.
+ * The parser accepts exactly two shapes — `<span class="hljs-…">` and escaped
+ * text — so anything else in the string is dropped rather than rendered.
+ */
+function Highlighted({ html }: { html: string }) {
+  const out: ComponentChildren[] = [];
+  const stack: ComponentChildren[][] = [out];
+  const token = /<span class="(hljs-[^"]*)">|<\/span>|([^<]+)/g;
+  let match: RegExpExecArray | null;
+  while ((match = token.exec(html))) {
+    const [, cls, text] = match;
+    if (cls) {
+      const kids: ComponentChildren[] = [];
+      stack[stack.length - 1]?.push(<span class={cls}>{kids}</span>);
+      stack.push(kids);
+    } else if (text) {
+      stack[stack.length - 1]?.push(decodeEntities(text));
+    } else if (stack.length > 1) {
+      stack.pop(); // </span>
+    }
+  }
+  return <>{out}</>;
+}
+
 function OutputBlock({ text, tone, lang }: { text: string; tone: "out" | "err"; lang: string }) {
   const html = lang ? highlight(text, lang) : null;
   if (!html) return <div class={tone}>{text}</div>;
-  return <div class={`${tone} hljs`} dangerouslySetInnerHTML={{ __html: html }} />;
+  return (
+    <div class={`${tone} hljs`}>
+      <Highlighted html={html} />
+    </div>
+  );
 }
 
 export function flattenDiff(diff: DiffData): DiffRow[] {

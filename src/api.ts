@@ -31,6 +31,8 @@ export type Item =
       output?: string;
       errorText?: string;
       ms?: number;
+      /** bash's real exit status, when pi reports one */
+      exitCode?: number;
       truncated?: boolean;
       diff?: DiffData;
       children?: SubCall[];

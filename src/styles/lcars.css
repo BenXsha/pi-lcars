@@ -100,7 +100,7 @@ button { cursor: pointer; }
   gap: var(--gap);
   padding: 0 var(--seam) var(--seam) var(--seam);
   background: var(--bg);
-  animation: deck-in var(--t-2) var(--ease) both;
+  animation: wipe-down var(--t-2) var(--ease) both;
 }
 .deck > .dk-lb {
   flex: 0 0 132px;
@@ -195,7 +195,7 @@ button { cursor: pointer; }
   grid-template-columns: 4px var(--name) minmax(0, 1fr) var(--meta);
   gap: var(--gap);
   align-items: stretch;
-  min-height: 38px;
+  min-height: 36px;
 }
 .tool > .st { background: var(--cyan); border-radius: var(--r-pill) 0 0 var(--r-pill); }
 /* the icon lives inside the name block so the coloured strip stays unbroken */
@@ -213,13 +213,39 @@ button { cursor: pointer; }
   border-radius: 0 var(--r-1) var(--r-1) 0;
   overflow: hidden;
 }
-.tool > .nm small { font-size: 10.5px; letter-spacing: 0.04em; opacity: 0.7; }
-.tool > .bd { display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 6px 12px; min-width: 0; }
-.tool > .bd .args { font: 400 15px/2 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
-.tool > .bd .args { max-height: 2.8em; overflow: hidden; }
-.tool > .bd .out { font: 400 12.5px/2 var(--mono); color: var(--g3); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 2.8em; overflow: hidden; }
-.tool > .bd .err { font: 400 12.5px/2 var(--mono); color: var(--tang); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 4.2em; overflow: hidden; }
-.tool > .bd .warn { font: 400 12.5px/2 var(--mono); color: var(--amber); }
+.tool > .nm small { font: 700 11px/1 var(--din); letter-spacing: 0.06em; opacity: 0.72; font-variant-numeric: tabular-nums; }
+.tool > .bd { display: flex; flex-direction: column; justify-content: center; gap: 3px; padding: 6px 12px; min-width: 0; }
+/* args are metadata, not body copy: smaller than the output, dimmed */
+.tool > .bd .args {
+  font: 400 12.5px/1.9 var(--mono);
+  color: var(--g3);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 3.8em; /* exactly 2 lines — a mid-line clamp reads as a bug */
+  overflow: hidden;
+}
+.tool > .bd .out {
+  font: 400 12.5px/2 var(--mono);
+  color: var(--g3);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 4em; /* 2 lines */
+  overflow: hidden;
+}
+.tool > .bd .err {
+  font: 400 12.5px/2 var(--mono);
+  color: var(--tang);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 6em; /* 3 lines: the error text is the weight */
+  overflow: hidden;
+}
+.tool > .bd .warn {
+  font: 400 11.5px/1.9 var(--mono);
+  color: var(--amber);
+  box-shadow: inset 2px 0 0 var(--amber);
+  padding-left: 6px;
+}
 .tool > .mt {
   display: flex;
   align-items: center;
@@ -409,6 +435,17 @@ button { cursor: pointer; }
 @keyframes wipe-down { from { clip-path: inset(0 0 100% 0); } to { clip-path: inset(0 0 0 0); } }
 @keyframes deck-in { from { opacity: 0.2; } to { opacity: 1; } }
 @keyframes pulse { 50% { filter: brightness(1.5); } }
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
 @keyframes swap { 0%, 45% { opacity: 0; } 46%, 100% { opacity: 1; } }
 @keyframes busy { 0% { transform: translateX(0); } 100% { transform: translateX(200%); } }
 
@@ -1012,17 +1049,29 @@ button { cursor: pointer; }
 
 .tool > .bd .more {
   align-self: flex-start;
-  margin-top: 1px;
-  padding: 2px 0 0;
-  background: transparent;
+  margin-top: 2px;
+  padding: 3px 10px 3px 8px;
+  background: var(--g0);
+  border-radius: 0 var(--r-1) var(--r-1) 0;
+  box-shadow: inset 2px 0 0 var(--amber);
   font: 700 11px/1 var(--din);
   letter-spacing: 0.14em;
   color: var(--ice);
   text-align: left;
 }
-.tool > .bd .more:hover { color: var(--w); }
-.tool > .bd .more:focus-visible { color: var(--w); outline: 1px solid var(--ice); outline-offset: 2px; }
+.tool > .bd .more { color: var(--amber); }
+.tool > .bd .more:hover,
+.tool > .bd .more:focus-visible {
+  background: var(--amber);
+  color: #000;
+  box-shadow: none;
+}
 .tool[data-toggle="1"] > .bd { cursor: pointer; }
+/* the name block is the primary handle: it must look pressable */
+.tool[data-toggle="1"] > .nm { cursor: pointer; }
+.tool[data-toggle="1"]:hover > .nm { filter: brightness(1.14); }
+.tool > .nm:focus-visible { outline: none; box-shadow: inset 0 0 0 2px #000; }
+.tool[data-expanded="1"] > .nm { filter: brightness(1.08); }
 /* the name block doubles as the expand handle */
 button.nm {
   border: 0;
@@ -2483,6 +2532,15 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
   font: 400 11px/1.7 var(--mono);
   color: var(--g2);
 }
+
+/* the steered / queued marker under a user block */
+.steer-note {
+  margin: 2px 0 0 88px;
+  font: 700 11px/1.6 var(--din);
+  letter-spacing: 0.14em;
+  color: var(--moon);
+}
+.steer-note[data-tone="steer"] { color: var(--orange); }
 
 /* ------------------------------------------------- multi-line config fields */
 .field[data-area="1"] { min-height: 78px; align-items: stretch; }

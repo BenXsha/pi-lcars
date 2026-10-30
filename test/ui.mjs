@@ -213,6 +213,10 @@ try {
     check(`nav ${st.view}: header swaps`, (await h1()) === st.title, await h1());
     check(`nav ${st.view}: panel rendered`, await exists(st.marker));
     check(`nav ${st.view}: hash`, (await hash()) === `#${st.view}`, await hash());
+    if (st.view !== "session") {
+      const swapAnim = await evaluate(`getComputedStyle(document.querySelector('.anim-swap')).animationName`);
+      check(`nav ${st.view}: panel swaps in`, swapAnim === "swap", String(swapAnim));
+    }
     check(`nav ${st.view}: transcript replaced`, !(await inTranscript()));
   }
 
@@ -325,6 +329,8 @@ try {
   await click(".shelf .ctl");
   await sleep(400);
   check("model deck opens", await exists(".deck"));
+  const deckAnim = await evaluate(`getComputedStyle(document.querySelector('.deck')).animationName`);
+  check("deck opens with a block wipe, not a fade", deckAnim === "wipe-down", String(deckAnim));
   const deckRows = await evaluate(`[...document.querySelectorAll('.deck .opt')].map((el) => el.textContent.trim())`);
   check("model deck lists every available model", Array.isArray(deckRows) && deckRows.length > 0, `${deckRows?.length ?? 0} rows`);
   const grouped = await evaluate(`document.querySelectorAll('.deck .deck-grp').length`);

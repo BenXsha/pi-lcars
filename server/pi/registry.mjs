@@ -4,6 +4,15 @@ import { applyEvent } from "./stream.mjs";
 import { shortArgs, textOf } from "./format.mjs";
 import { httpError } from "./errors.mjs";
 
+/** Exit status from a persisted tool result: details first, then pi's own text. */
+function exitCodeOf(message) {
+  const details = message?.details;
+  if (typeof details?.exitCode === "number") return details.exitCode;
+  if (typeof details?.structuredContent?.exit_code === "number") return details.structuredContent.exit_code;
+  const match = /Command exited with code (\d+)/.exec(textOf(message?.content) ?? "");
+  return match ? Number(match[1]) : undefined;
+}
+
 let SEQ = 0;
 const nextSeq = () => ++SEQ;
 const MAX_ITEMS = 4000;
@@ -164,7 +173,7 @@ export class Registry {
       }
     }
     if (!model) {
-      console.warn("[session] no model resolved — run /login in pi, or pick one in PROVIDERS");
+      console.error("[session] no model resolved — run /login in pi, or pick one in PROVIDERS");
       return;
     }
     await session.setModel(model);
@@ -198,17 +207,15 @@ export class Registry {
         await entry.loader.reload({ resolveProjectTrust: async () => this.trustProject });
         entry.loaderSkills = (entry.loader.getSkills?.().skills ?? []).length;
       } catch (e) {
-        console.warn(`[loader] falling back to defaults: ${e.message}`);
+        console.error(`[loader] falling back to defaults: ${e.message}`);
         entry.loader = null;
         this.approvals.wired = false;
       }
     }
 
-    const { session } = await createAgentSession({
-      cwd,
-      sessionManager: manager,
-      ...(entry.loader ? { resourceLoader: entry.loader } : {}),
-    });
+    const options = { cwd, sessionManager: manager };
+    if (entry.loader) options.resourceLoader = entry.loader;
+    const { session } = await createAgentSession(options);
 
     entry.session = session;
     entry.path = manager.getSessionFile?.() ?? entry.path;
@@ -251,7 +258,7 @@ export class Registry {
       const recent = [...list].sort((a, b) => new Date(b.modified) - new Date(a.modified))[0];
       if (recent?.path) return this.open(recent.path);
     } catch (e) {
-      console.warn(`[boot] cannot scan sessions: ${e.message}`);
+      console.error(`[boot] cannot scan sessions: ${e.message}`);
     }
     return this.create({ cwd });
   }
@@ -304,11 +311,9 @@ export class Registry {
     try {
       entry.session.dispose();
     } catch {}
-    const { session } = await createAgentSession({
-      cwd: entry.cwd,
-      sessionManager: manager,
-      ...(entry.loader ? { resourceLoader: entry.loader } : {}),
-    });
+    const options = { cwd: entry.cwd, sessionManager: manager };
+    if (entry.loader) options.resourceLoader = entry.loader;
+    const { session } = await createAgentSession(options);
     entry.session = session;
     entry.bound = false;
     try {
@@ -360,6 +365,8 @@ export class Registry {
           args: call ? shortArgs(m.toolName, call.arguments) : "",
           status: m.isError ? "error" : "ok",
           output: out,
+          // persisted messages keep details; older ones only carry pi's own text
+          exitCode: exitCodeOf(m),
           ts: m.timestamp,
         });
       } else if (m.role === "compactionSummary") {
@@ -511,7 +518,7 @@ export class Registry {
       running: s.meta.running,
       queued: s.meta.queued,
       items: s.items.length,
-      lastTs: s.items.length ? s.items[s.items.length - 1].ts : null,
+      lastTs: s.items.at(-1)?.ts ?? null,
       pending: !!s.meta.pending,
       active: s.id === this.activeId,
     }));

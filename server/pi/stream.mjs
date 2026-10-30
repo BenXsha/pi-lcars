@@ -10,6 +10,14 @@ import { diffFromResult, diffFromWrite } from "./diff.mjs";
  */
 const MAX_CHILDREN = 80;
 
+/** pi's bash tool puts the status in structuredContent.exit_code (details is free-form). */
+function exitCodeOf(result) {
+  const structured = result?.structuredContent;
+  if (typeof structured?.exit_code === "number") return structured.exit_code;
+  if (typeof result?.details?.exitCode === "number") return result.details.exitCode;
+  return undefined;
+}
+
 /** The subagent tool reports a compact summary instead of nested calls. */
 function agentMeta(details) {
   if (!details || typeof details !== "object") return null;
@@ -29,6 +37,13 @@ function agentMeta(details) {
 
 /** ToolResultMessage.nestedCalls → children[] (used when the subagent runs its
  *  own loop and does not emit parentToolCallId events into this session). */
+/** Nested subagent calls report "pending" while running; the UI only knows three states. */
+function childStatus(status) {
+  if (status === "error") return "error";
+  if (status === "ok") return "ok";
+  return "run";
+}
+
 function nestedChildren(nested) {
   const calls = nested?.calls;
   if (!Array.isArray(calls) || !calls.length) return null;
@@ -36,7 +51,7 @@ function nestedChildren(nested) {
     id: c.id,
     name: c.name,
     args: shortArgs(c.name, c.arguments),
-    status: c.status === "error" ? "error" : c.status === "ok" ? "ok" : "run",
+    status: childStatus(c.status),
     ms: c.durationMs,
     ts: now(),
   }));
@@ -55,7 +70,10 @@ function childPatch(entry, parentId, childId, fields) {
 }
 
 export function applyEvent(entry, ev) {
-  if (process.env.LCARS_TRACE) console.log("[ev]", ev.type, ev.type === "message_update" ? ev.assistantMessageEvent?.type : "");
+  if (process.env.LCARS_TRACE) {
+    const sub = ev.type === "message_update" ? ev.assistantMessageEvent?.type ?? "" : "";
+    console.error("[ev]", ev.type, sub);
+  }
   switch (ev.type) {
     case "message_start":
       if (ev.message?.role === "assistant") {
@@ -177,15 +195,18 @@ export function applyEvent(entry, ev) {
         diff = diffFromWrite(args?.content, args?.path);
       }
       entry.rawCalls?.delete(ev.toolCallId);
-      entry.patch(id, {
+      const patch = {
         status: ev.isError ? "error" : "ok",
         output: out,
         ms: ev.durationMs,
+        // bash reports its status in structuredContent.exit_code; never invent one
+        exitCode: exitCodeOf(ev.result),
         truncated: truncationOf(ev.result, out),
-        ...(diff ? { diff } : {}),
-        ...(nestedKids ? { children: nestedKids } : {}),
-        ...(agent ? { agent } : {}),
-      });
+      };
+      if (diff) patch.diff = diff;
+      if (nestedKids) patch.children = nestedKids;
+      if (agent) patch.agent = agent;
+      entry.patch(id, patch);
       break;
     }
 

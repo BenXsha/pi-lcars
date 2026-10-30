@@ -385,6 +385,7 @@ export function Console() {
               />
             ) : (
             <div class="scroll" id="scroll">
+              <div key={view} class={view === "session" ? undefined : "anim-swap"}>
               {view === "session" ? (
                 <Transcript
                   items={s.items}
@@ -422,6 +423,7 @@ export function Console() {
               ) : (
                 <SettingsPanel items={s.items} meta={meta} policy={s.policy} theme={theme} onTheme={(id) => { applyTheme(id); setTheme(id); }} />
               )}
+              </div>
             </div>
             )}
 
@@ -735,7 +737,11 @@ function SkillBlock({ skill }: { skill: NonNullable<Extract<Item, { kind: "user"
           </button>
         </div>
         <div class="pth">{skill.location.replace(/^\/Users\/[^/]+/, "~")}</div>
-        {open ? <pre class="head">{skill.head}</pre> : null}
+        {open ? (
+          <pre class="head anim-in" key="open">
+            {skill.head}
+          </pre>
+        ) : null}
       </div>
     </div>
   );
@@ -852,6 +858,12 @@ function Transcript({
 }) {
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const t0 = items[0]?.ts ?? Date.now();
+  // Items that existed on the first paint are history: they appear at once.
+  // Everything appended later keeps its entrance animation for the life of the
+  // node (a class that stays put never replays, and streaming deltas can't cut
+  // the wipe short).
+  const restored = useRef<Set<string> | null>(null);
+  if (restored.current === null) restored.current = new Set(items.map((i) => i.id));
 
   if (!items.length) {
     return (
@@ -883,7 +895,11 @@ function Transcript({
       {items.map((it, i) => {
         const prev = items[i - 1];
         const turn = it.kind === "user" || (it.kind === "assistant" && prev && prev.kind !== "assistant");
-        const cls = `blk${turn ? " turn" : ""}${it.kind === "approval" ? " approval-blk" : ""}`;
+        const block = it.kind === "user" || it.kind === "assistant" || it.kind === "summary";
+        const animate = !restored.current?.has(it.id);
+        const cls = `blk${turn ? " turn" : ""}${it.kind === "approval" ? " approval-blk" : ""}${
+          animate ? (block ? " anim-wipe" : " anim-in") : ""
+        }`;
 
         if (it.kind === "user") {
           return (
@@ -896,7 +912,7 @@ function Transcript({
                 onRecall={onRecall ? () => onRecall(buildTurns(items).find((tn) => tn.id === it.id)?.n ?? 0, it.text, it.id) : undefined}
               />
               {it.steer || it.queued ? (
-                <div style={{ marginLeft: "88px", marginTop: "2px", font: "700 10px/1.4 var(--din)", letterSpacing: "0.14em", color: it.steer ? "var(--orange)" : "var(--moon)" }}>
+                <div class="steer-note" data-tone={it.steer ? "steer" : "queued"}>
                   {it.steer ? "STEERED INTO RUN" : "QUEUED"}
                 </div>
               ) : null}
@@ -934,6 +950,7 @@ function Transcript({
                 errorText={it.errorText}
                 state={state}
                 ms={it.ms}
+                exitCode={it.exitCode}
                 truncated={it.truncated}
                 diff={it.diff}
                 onOpenDiff={
