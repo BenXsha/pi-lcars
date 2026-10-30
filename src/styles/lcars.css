@@ -2885,3 +2885,28 @@ html[data-backdrop="1"] body::after {
 [data-theme="borg"] .sess .rt { color: var(--t2); }
 [data-theme="borg"] .sess .num { color: var(--orange); }
 [data-theme="borg"] .sess .l1[data-empty="1"] { color: var(--g3); }
+
+/* borg: alcove breathing — only the running tool strip, only in borg.
+   Two segments (status bar and readout block) breathe in opposite phase on the
+   900ms/3-step clock the console already uses for scan bars; reduced motion and
+   the SETTINGS motion switch kill it through the global rules. */
+@keyframes alcove {
+  0%,
+  33% {
+    opacity: 1;
+  }
+  34%,
+  66% {
+    opacity: 0.55;
+  }
+  67%,
+  100% {
+    opacity: 0.8;
+  }
+}
+[data-theme="borg"] .tool[data-state="run"] > .st {
+  animation: alcove var(--t-4) steps(1, end) infinite;
+}
+[data-theme="borg"] .tool[data-state="run"] > .mt {
+  animation: alcove var(--t-4) steps(1, end) 450ms infinite reverse;
+}
