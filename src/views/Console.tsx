@@ -597,45 +597,80 @@ function Sidenav({
   );
 }
 
+/* ---------------------------------------------------------------- skill */
+/** A "/skill" invocation: the injected body collapses into one readable line. */
+function SkillBlock({ skill }: { skill: NonNullable<Extract<Item, { kind: "user" }>["skill"]> }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div class="skl" data-open={open ? "1" : "0"}>
+      <span class="st" />
+      <div class="sb">
+        <div class="sb-hd">
+          <span class="lb">SKILL</span>
+          <span class="nm">{skill.name}</span>
+          <span class="mt">
+            {skill.lines} LINES · {Math.round(skill.chars / 1024)}K
+          </span>
+          <button type="button" class="pv-btn ghost" onClick={() => setOpen(!open)}>
+            {open ? "HIDE" : "PREVIEW"}
+          </button>
+        </div>
+        <div class="pth">{skill.location.replace(/^\/Users\/[^/]+/, "~")}</div>
+        {open ? <pre class="head">{skill.head}</pre> : null}
+      </div>
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ ask */
 /** A blocked extension dialog (select / confirm / input) rendered inline. */
 function AskBlock({ item }: { item: Extract<Item, { kind: "ask" }> }) {
   const [text, setText] = useState("");
   const pending = item.status === "pending";
+  const options = item.options ?? [];
+
+  const split = (opt: string) => {
+    const clean = opt.replace(/^\s*\d+\.\s*/, "");
+    const i = clean.indexOf(" — ");
+    return i === -1 ? [clean, ""] : [clean.slice(0, i), clean.slice(i + 3)];
+  };
 
   return (
     <div class="ask" data-state={item.status}>
       <span class="st" />
       <div class="ab">
         <div class="ab-hd">
-          <span class="ab-tag">{pending ? "WAITING FOR YOU" : "ANSWERED"}</span>
+          <span class="ab-tag">ASK</span>
           <span class="ab-mode">{item.mode.toUpperCase()}</span>
+          <span class="ab-wait">
+            {pending
+              ? "WAITING FOR YOU"
+              : item.status === "cancelled"
+                ? "DISMISSED"
+                : item.status === "timeout"
+                  ? "TIMED OUT"
+                  : "ANSWERED"}
+          </span>
         </div>
+
         <div class="ab-title">{item.title}</div>
         {item.message ? <div class="ab-msg">{item.message}</div> : null}
 
         {pending ? (
-          item.mode === "select" ? (
-            <div class="ab-opts">
-              {(item.options ?? []).map((opt) => (
-                <button type="button" key={opt} class="ab-opt" onClick={() => actions.answer(item.id, opt)}>
-                  {opt}
-                </button>
-              ))}
-              <button type="button" class="ab-opt ghost" onClick={() => actions.answer(item.id, null)}>
-                SKIP / CANCEL
-              </button>
-            </div>
-          ) : item.mode === "confirm" ? (
+          item.mode === "confirm" ? (
             <div class="ab-opts">
               <button type="button" class="ab-opt" onClick={() => actions.answer(item.id, "Yes")}>
-                YES
+                <span class="n">Y</span>
+                <span class="t">Yes</span>
+                <span class="a">→</span>
               </button>
               <button type="button" class="ab-opt" onClick={() => actions.answer(item.id, "No")}>
-                NO
+                <span class="n">N</span>
+                <span class="t">No</span>
+                <span class="a">→</span>
               </button>
             </div>
-          ) : (
+          ) : item.mode === "input" ? (
             <div class="ab-in">
               <input
                 value={text}
@@ -645,15 +680,41 @@ function AskBlock({ item }: { item: Extract<Item, { kind: "ask" }> }) {
                   if (e.key === "Enter" && text.trim()) actions.answer(item.id, text.trim());
                 }}
               />
-              <button type="button" class="ab-opt" disabled={!text.trim()} onClick={() => actions.answer(item.id, text.trim())}>
+              <button type="button" class="pv-btn" disabled={!text.trim()} onClick={() => actions.answer(item.id, text.trim())}>
                 SEND
+              </button>
+            </div>
+          ) : (
+            <div class="ab-opts">
+              {options.map((opt, i) => {
+                const [label, desc] = split(opt);
+                const custom = /type something/i.test(label);
+                return (
+                  <button
+                    type="button"
+                    key={opt}
+                    class="ab-opt"
+                    data-custom={custom ? "1" : "0"}
+                    onClick={() => actions.answer(item.id, opt)}
+                  >
+                    <span class="n">{custom ? "+" : i + 1}</span>
+                    <span class="t">
+                      {custom ? "Type something." : label}
+                      {desc && !custom ? <em>{desc}</em> : null}
+                    </span>
+                    <span class="a">→</span>
+                  </button>
+                );
+              })}
+              <button type="button" class="ab-opt" data-custom="1" onClick={() => actions.answer(item.id, null)}>
+                <span class="n">×</span>
+                <span class="t">Dismiss — the model is told you declined</span>
+                <span class="a">→</span>
               </button>
             </div>
           )
         ) : (
-          <div class="ab-res">
-            {item.status === "cancelled" ? "dismissed" : item.status === "timeout" ? "timed out" : item.value}
-          </div>
+          <div class="ab-res">{item.status === "cancelled" ? "declined" : item.status === "timeout" ? "no answer in time" : item.value}</div>
         )}
       </div>
     </div>
@@ -708,6 +769,7 @@ function Transcript({
         if (it.kind === "user") {
           return (
             <div class={cls} key={it.id} data-id={it.id} data-turn="1">
+              {it.skill ? <SkillBlock skill={it.skill} /> : null}
               <MessageRow
                 role="user"
                 time={`T+${mmss(it.ts - t0)}`}

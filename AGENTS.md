@@ -416,12 +416,26 @@ Codex 的做法是：**工作区在你开 session 时就定了，之后不可变
   `custom()` 返回 `undefined` 是有意的：浏览器没有 overlay，让包自己走 dialog walker。
 - 每次 dialog 变成一条 `kind:"ask"` 的 item（`mode/title/options/placeholder`），
   用户选择 → `POST /api/answer {id, value}` → 解析 Promise → 工具继续执行并写回 toolResult。
+- **样式与工具条/审批条同宗**：4px 竖脊 + 填充体 + **条状选项**（`20px 序号 | 文本 | →`，hover 出橙脊），
+  不用胶囊按钮 —— 胶囊是本项目的"动作"形状，不是"选项"形状。描述折到第二行（`em`，`--g3`）。
+  `Type something.` 与 `Dismiss` 用 `data-custom="1"` 降到灰阶，和真正的选项区分。
 - `select` 的返回值可以是**选项原文**，也可以是**自由文本**（包把非选项文本当作"自己的答案"），
   所以块里既有选项按钮，也可以以后加输入框；取消 = 传 `null`，包会当作 Esc 并把"用户拒绝"告诉模型。
 - 绑定时机：**第一次 prompt 之前**自动 `entry.bind()`（顺带把 MCP 工具注册进来），
   不在 boot 时绑 —— 那会拖慢会话创建。
 - 注意 `tool_search` 会重写 active tool set，实测在一次搜索后 `ask_user_question` 会被挤出列表；
   这是 pi 扩展行为，不是本项目的 bug，写在这里免得下次误判。
+
+### 7.6l Skill 调用块
+
+用户输入 `/skill …` 时，pi 会把技能正文以
+`<skill name="…" location="…">\n…\n</skill>\n\n用户自己的话` 的形式塞进消息。服务端用 SDK 的
+`parseSkillBlock()` 拆开，`user` item 变成两段：
+
+- `text` 只留操作者真正打的字（`</skill>` 之后的内容），不再把整篇技能正文倒进消息流。
+- `skill` 字段带 `{name, location, lines, chars, head}`，渲染成独立块：
+  **ice 竖脊 + `SKILL` 标签 + 技能名 + `N LINES · NK` + 路径（等宽、家目录简写）**，
+  `PREVIEW` 展开前 3 行注入内容。默认收起 —— 一次技能调用动辄几百行，不能让它淹没对话。
 
 ### 7.6j 消息动作：复制 / 引用 / 撤回 / 排队
 

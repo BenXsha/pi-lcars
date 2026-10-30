@@ -1,7 +1,15 @@
 /** Typed client for the console server. */
 
 export type Item =
-  | { kind: "user"; id: string; text: string; steer?: boolean; queued?: boolean; ts: number }
+  | {
+      kind: "user";
+      id: string;
+      text: string;
+      skill?: { name: string; location: string; lines: number; chars: number; head: string } | null;
+      steer?: boolean;
+      queued?: boolean;
+      ts: number;
+    }
   | {
       kind: "assistant";
       id: string;

@@ -201,10 +201,29 @@ const routes = {
     const steerable = queue.runningId === entry.id;
     // running but not the queue's current job (settling / aborting) → reject
     if (entry.meta.running && !steerable) return fail(res, 409, "session is busy, try again in a moment");
+    // a "/skill" invocation arrives as <skill name location>…</skill> + the
+    // operator's own words; keep both so the transcript can show them apart
+    let skill = null;
+    try {
+      const parsed = sdk.parseSkillBlock?.(text);
+      if (parsed) {
+        skill = {
+          name: parsed.name,
+          location: parsed.location,
+          lines: (parsed.content.match(/\n/g)?.length ?? 0) + 1,
+          chars: parsed.content.length,
+          head: parsed.content.split("\n").slice(0, 3).join("\n"),
+        };
+      }
+    } catch {
+      skill = null;
+    }
+
     entry.emit({
       kind: "user",
       id: `u${++registry.counter}-${Math.random().toString(36).slice(2, 5)}`,
-      text,
+      text: skill ? text.split("</skill>")[1]?.trim() || "" : text,
+      skill,
       steer: steerable,
       queued: !steerable && (queue.depth > 0 || queue.runningId !== null),
       ts: now(),
