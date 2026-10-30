@@ -1259,13 +1259,14 @@ function Rail({
           <b>{pct}%</b>
         </div>
         <Readout value={fmtTok(usage.total)} unit={`/ ${fmtTok(win)}`} />
-        <Meter segments={[{ tone: "sys", pct: 8 }, { tone: "tool", pct: 4 }, { tone: "hist", pct: Math.max(1, pct - 12) }, { pct: Math.max(1, 100 - pct) }]} />
+        {/* The SDK reports one total per request, not a system/tools/history
+            split — so the meter shows exactly the two numbers we have. */}
+        <Meter segments={[{ tone: "hist", pct: Math.max(1, pct) }, { pct: Math.max(1, 100 - pct) }]} />
         <div class="legend">
-          <span><i style={{ background: "var(--cyan)" }} />SYSTEM</span>
-          <span><i style={{ background: "var(--ice)" }} />TOOLS</span>
-          <span><i style={{ background: "var(--orange)" }} />HISTORY</span>
+          <span><i style={{ background: "var(--orange)" }} />USED</span>
           <span><i style={{ background: "var(--g1)" }} />FREE</span>
         </div>
+        <span class="rnote">system / tools breakdown is not reported by the SDK</span>
       </div>
 
       <div class="phead ice">TOOL CALLS / THIS SESSION</div>
@@ -1465,22 +1466,47 @@ function ModelDeck({ current, onClose }: { current?: string; onClose: () => void
       .catch((e) => setErr(e.message));
   }, []);
 
+  const groups = useMemo(() => {
+    const byProvider = new Map<string, ModelInfo[]>();
+    for (const m of models) {
+      const list = byProvider.get(m.provider) ?? [];
+      list.push(m);
+      byProvider.set(m.provider, list);
+    }
+    return [...byProvider.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  }, [models]);
+
+  const meta = (m: ModelInfo) => {
+    const bits = [m.contextWindow ? fmtTok(m.contextWindow) : null];
+    if (m.cost && (m.cost.input || m.cost.output)) bits.push(`$${m.cost.input}/$${m.cost.output} Mtok`);
+    if (m.reasoning) bits.push("reasoning");
+    return bits.filter(Boolean).join(" · ") || m.provider;
+  };
+
   return (
-    <Deck label="MODEL" sub="TAKES EFFECT NEXT TURN">
+    <Deck label="MODEL" sub={`${models.length} AVAILABLE · TAKES EFFECT NEXT TURN`}>
       {err ? <div style={{ font: "400 11px/1.5 var(--mono)", color: "var(--tomato)" }}>{err}</div> : null}
-      {models.slice(0, 8).map((m) => (
-        <PickRow
-          key={`${m.provider}/${m.id}`}
-          icon="fld-model"
-          name={m.id}
-          meta={`${m.provider}${m.contextWindow ? ` · ${fmtTok(m.contextWindow)}` : ""}`}
-          selected={m.id === current}
-          onClick={async () => {
-            await actions.setModel(m.provider, m.id);
-            onClose();
-          }}
-        />
-      ))}
+      <div class="deck-list">
+        {groups.map(([provider, list]) => (
+          <div key={provider}>
+            <div class="deck-grp">{provider}</div>
+            {list.map((m) => (
+              <PickRow
+                key={`${m.provider}/${m.id}`}
+                icon="fld-model"
+                name={m.id}
+                meta={meta(m)}
+                selected={m.id === current}
+                onClick={async () => {
+                  await actions.setModel(m.provider, m.id);
+                  onClose();
+                }}
+              />
+            ))}
+          </div>
+        ))}
+        {groups.length === 0 && !err ? <div class="deck-empty">no model with valid credentials</div> : null}
+      </div>
     </Deck>
   );
 }

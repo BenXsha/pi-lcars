@@ -350,6 +350,7 @@ const routes = {
         name: m.name || m.id,
         contextWindow: m.contextWindow,
         reasoning: !!m.reasoning,
+        cost: m.cost ? { input: m.cost.input ?? 0, output: m.cost.output ?? 0 } : null,
       })),
     });
   },
@@ -637,7 +638,9 @@ const handler = async (req, res) => {
       await booted();
       await routes[key](req, res);
     } catch (e) {
-      if (!e.status) console.error(`[${key}]`, e);
+      // constant format string: `key` carries the request path, and a "%s" in it
+      // would otherwise be interpreted by console.error's util.format
+      if (!e.status) console.error("[route]", key, e);
       if (!res.headersSent) fail(res, e.status || 500, e.message || e, { code: e.code || "E_ROUTE" });
     }
     return;

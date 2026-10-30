@@ -299,7 +299,7 @@ LCARS 原版用 `Swiss 911 Ultra Compressed`（压缩粗体）。**本项目不�
 | 顶栏 | `project@branch` · 模型名 · `sessionId` 短码 · 已运行时长 · 连接数 | — |
 | 主区 mission log | user / assistant / thinking / tool call / tool result | message types |
 | 工具读数行 | 工具名 · 参数摘要 1 行 · 耗时 · exit code · 输出折叠 | tool calls |
-| 右栏 resource | context 分段条（system/tools/history/free）· tokens · 费用 · 延迟 | usage |
+| 右栏 resource | context `USED / FREE` 两段（SDK 不报细分时**不编** system/tools 段）· tokens · 费用 | usage |
 | 底部 command | 输入框 + `RUN`（回车）· `PLAN`（plan mode）· `STOP`（中断） | keybindings |
 | 阻断层 | 工具审批：`tomato` 块 + `APPROVE / DENY / ALWAYS` | approvals |
 | 左轨 `07 ABOUT` | 版本 · 依赖与许可证 · LCARS 归属 · 字体 · 网络姿态 | package.json + vite `define` + `api/system` |
@@ -716,6 +716,8 @@ composer 上方出现 `QUEUED n` 条带，逐条显示待投递文本 + `deliver
 | 2026-xx-xx | 动作条统一为一条语言：40px 中性底 + 4px 橙脊 + 34px 图标格 + 11px 标签，图标格与编号列同轴、标签与标题同轴（50px） | `.lnew` 被两条同名规则叠成竖排（新规则没重置 `flex-direction`），且与 `.sess` 网格对不齐 | `src/styles/lcars.css`（`.lnew`、`.add-row`、`.form-actions`、`.form-note`、`.pv-h`） |
 | 2026-xx-xx | `meta.queue` 只允许文本数组，客户端 `textList()` 兜底 | 服务端一处发数字、一处发数组，`...(... ?? [])` 抛异常后整页停止重渲染（表现为"点什么都没反应"） | `server/pi/registry.mjs`、`src/views/Console.tsx` |
 | 2026-xx-xx | `Esc` 统一关闭覆盖层：deck → 分支树 → 查看器 → 否则中断运行 | 只有查看器响应 Esc，deck/树关不掉，与"覆盖层可 Esc 关闭"的直觉冲突 | `src/views/Console.tsx` |
+| 2026-xx-xx | 右栏 context 条只画 `USED / FREE`，并写明"细分未由 SDK 提供" | 原来写死 `system 8% / tools 4%` 是编造数字，违反 §7.6；宁可少画一段也不假装有数据 | `src/views/Console.tsx`、`src/styles/lcars.css`（`.rnote`） |
+| 2026-xx-xx | 模型列表按 provider 分组、全量展示、带 `ctx · $in/$out Mtok · reasoning`，46vh 内滚 | 原来只 `slice(0, 8)` 且不给成本/窗口，等于让人盲选；pi 的 model 对象本来就带 `contextWindow` 与 `cost` | `src/views/Console.tsx`、`server/index.mjs`（`/api/models`）、`src/api.ts` |
 | 2026-xx-xx | 新会话在 `#load()` 里补齐默认模型与思考档：`createAgentSession()` 不传 model 时 pi 会停在 `unknown/unknown`，导致 shelf 与 `pi-lcars status` 显示假值 | “unknown/unknown” 违反 §7.6 数字自洽；同时它让 pi-lens 把 situational 工具当默认激活，工具清单虚高 | `server/pi/registry.mjs`、`test/smoke.mjs` |
 
 ---

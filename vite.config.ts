@@ -13,10 +13,21 @@ const api = process.env.LCARS_API || "http://127.0.0.1:4173";
 const require = createRequire(import.meta.url);
 const ROOT = new URL(".", import.meta.url);
 
+type PackageJson = {
+  name?: string;
+  version?: string;
+  license?: string;
+  homepage?: string;
+  repository?: { url?: string };
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
+};
+
 /** package.json is build metadata: a broken file must not take the build down. */
-function readJson(path: URL | string): Record<string, any> {
+function readJson(path: URL | string): PackageJson {
   try {
-    return JSON.parse(readFileSync(path, "utf8"));
+    const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
+    return typeof parsed === "object" && parsed !== null ? (parsed as PackageJson) : {};
   } catch {
     return {};
   }

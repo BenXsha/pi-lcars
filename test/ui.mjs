@@ -293,12 +293,26 @@ try {
   await sleep(200);
   check("right pane expands again", (await attr(".app", "data-right")) === rightBefore);
 
+  /* ------------------------------------- 6b. rail does not invent numbers */
+  const legend = await evaluate(`[...document.querySelectorAll('.legend span')].map((el) => el.textContent.trim())`);
+  check("resources meter claims only what it knows", JSON.stringify(legend) === JSON.stringify(["USED", "FREE"]), JSON.stringify(legend));
+  check("resources meter states what is missing", /not reported/i.test(await evaluate(`document.querySelector('.rnote')?.textContent ?? ''`)));
+
   /* ------------------------------------------------------ 7. decks */
   const chips = await evaluate(`[...document.querySelectorAll('.shelf .ctl')].map((el) => el.textContent.trim())`);
   check("shelf exposes model + think chips", Array.isArray(chips) && chips.length >= 2, JSON.stringify(chips));
   await click(".shelf .ctl");
-  await sleep(300);
+  await sleep(400);
   check("model deck opens", await exists(".deck"));
+  const deckRows = await evaluate(`[...document.querySelectorAll('.deck .opt')].map((el) => el.textContent.trim())`);
+  check("model deck lists every available model", Array.isArray(deckRows) && deckRows.length > 0, `${deckRows?.length ?? 0} rows`);
+  const grouped = await evaluate(`document.querySelectorAll('.deck .deck-grp').length`);
+  check("model deck groups by provider", grouped >= 1, `${grouped} groups`);
+  check(
+    "model rows carry context",
+    await evaluate(`[...document.querySelectorAll('.deck .opt')].slice(0, 3).every((el) => /K|M/.test(el.textContent))`),
+    JSON.stringify(deckRows?.slice(0, 2)),
+  );
   await evaluate(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`);
   await sleep(250);
   check("escape closes the deck", !(await exists(".deck")));

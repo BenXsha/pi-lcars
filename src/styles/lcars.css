@@ -2326,6 +2326,40 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 .trow2 .cf { display: flex; gap: 2px; align-items: center; }
 .trow2 .cur { font: 700 9px/1 var(--din); letter-spacing: 0.12em; color: #000; background: var(--orange); padding: 3px 5px; border-radius: var(--r-1); }
 
+/* rail caveat line: says what the data does NOT contain */
+.rnote {
+  display: block;
+  margin-top: 6px;
+  font: 400 11px/1.6 var(--mono);
+  color: var(--g2);
+}
+
+/* ------------------------------------------------------------------ decks */
+/* Model list groups by provider and scrolls inside the deck. */
+.deck-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 46vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.deck-grp {
+  margin: 8px 0 3px;
+  padding-left: 8px;
+  font: 700 11px/1.2 var(--din);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--amber);
+  box-shadow: inset 4px 0 0 var(--g1);
+}
+.deck-grp:first-child { margin-top: 0; }
+.deck-empty {
+  font: 400 11.5px/1.8 var(--mono);
+  color: var(--g2);
+  padding: 4px 8px;
+}
+
 /* ------------------------------------------------------------------ about */
 /* Credits read as rows on a spine, not as cards: [4px bar][name][why][ver][lic] */
 .about .pv-row .st { background: var(--g2); }

@@ -57,7 +57,7 @@
 | S8 | Policy | off / risky / all + 超时 + always 清单 | ✅ 并入 SETTINGS 站（`set.policy` 三段按钮） |
 | S9 | Tools | loadout 表 + 每工具调用统计 | ✅ 并入 SYSTEM 站：loadout 徽标带「本次会话 N× · 平均耗时 · 错误数」，右栏另有调用/失败列表 |
 | S10 | 工作区选择 | 新建 / 切会话时选 cwd：面包屑 + 目录列表 + 最近使用 | ✅ workspace deck（预览 → 提交） |
-| S11 | 模型选择 | 按 provider 分组的模型表：id、context window、cost、当前标记 | ✅ shelf `MODEL` chip → ModelDeck |
+| S11 | 模型选择 | 按 provider 分组的模型表：id、context window、cost、当前标记 | ✅ shelf `MODEL` chip → ModelDeck（全部可用模型、按 provider 分组、ctx + $in/$out Mtok + reasoning 标记、46vh 内滚） |
 | S12 | 思考开关 | OFF / LOW / MED / HIGH 四段控件 | ✅ shelf `THINK` chip → ThinkDeck |
 | S13 | About | 版本、运行时、依赖与许可证、LCARS 归属、字体、网络姿态 | ✅ ABOUT 站（`#about`），依赖清单由 vite 构建期注入 |
 
@@ -403,6 +403,7 @@ user | assistant | tool | approval | notice | subagent | diff
 | S8 Policy 屏 | 独立屏 | 并入 SETTINGS 的 `set.policy` | 低频设置不值得单独一站 |
 | S9 TOOLS 屏 | 独立屏 | SYSTEM 的 loadout + 本次调用统计 | 新增一站只为一屏统计，收益低于成本 |
 | 子 agent | 独立舱 | 工具行内嵌 children | 少一层容器，层级更平 |
+| 右栏 context 分段条 | system / tools / history / free 四段 | 只画 `USED / FREE`，并注明 SDK 不给细分 | SDK 每次只报一个总量；四段是编出来的数，违反 §7.6 数字自洽 |
 
 ### 9.2 欠账清单（本轮结清）
 

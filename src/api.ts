@@ -231,6 +231,8 @@ export type ModelInfo = {
   name: string;
   contextWindow?: number;
   reasoning?: boolean;
+  /** per million tokens, as pi reports them */
+  cost?: { input: number; output: number } | null;
 };
 
 export type DirEntry = { name: string; path: string; items: number | null };
