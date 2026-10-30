@@ -1,4 +1,4 @@
-export type ThemeId = "tng" | "voy" | "ds9" | "kelvin" | "picard" | "mono";
+export type ThemeId = "tng" | "voy" | "ds9" | "kelvin" | "picard" | "hull" | "mono";
 
 export type ThemeMeta = {
   id: ThemeId;
@@ -45,6 +45,13 @@ export const THEMES: ThemeMeta[] = [
     short: "PICARD",
     note: "S3 复兴版 LCARS：石板底 + 亮青焦点 + 珊瑚告警",
     swatch: ["#41c4f7", "#d2d5df", "#8a93ad", "#ff6753"],
+  },
+  {
+    id: "hull",
+    name: "HULL / STILL",
+    short: "HULL",
+    note: "取自舰体静帧：钢蓝外壳 + 引擎铜光 + 冰白高光",
+    swatch: ["#d28b74", "#9fc3d6", "#6e93bd", "#6fbdb8"],
   },
   {
     id: "mono",

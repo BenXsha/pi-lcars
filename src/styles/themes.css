@@ -110,6 +110,29 @@
   --bg: #05080c;
 }
 
+/* ---------- HULL / still frame ----------
+   Palette lifted from a starship still: near-black space, slate-blue hull, pale
+   ice highlight, and the copper of the engine glow. Roles are unchanged; only
+   the hues move, and every block is lifted until black type clears 4.5:1. */
+[data-theme="hull"] {
+  --orange: #d28b74; /* focus: engine copper */
+  --amber: #a2b7c4; /* secondary metalabels: pale steel */
+  --tang: #75aeca; /* tool running: hull light */
+  --tomato: #c97a63; /* alert: hot copper */
+  --lilac: #7c8ea8; /* memory / context */
+  --lav: #6e93bd; /* subagents */
+  --ice: #9fc3d6; /* read-only refs */
+  --moon: #bfcfd8; /* plan / pending */
+  --cyan: #6fbdb8; /* system / ok: engine teal */
+
+  --w: #e8eef3;
+  --g3: #93a3b5;
+  --g2: #6e7f94;
+  --g1: #1b222e;
+  --g0: #0b1017;
+  --bg: #030507;
+}
+
 /* ---------- MONO / LCARS 47 — desaturated neutrals + one ice accent ------ */
 [data-theme="mono"] {
   --orange: #e8e8e8; /* focus is white, not a hue */
