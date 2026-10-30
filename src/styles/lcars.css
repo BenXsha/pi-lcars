@@ -191,13 +191,18 @@ button { cursor: pointer; }
    tool readout strip
    ============================================================ */
 .tool {
+  --tone: var(--cyan);
   display: grid;
   grid-template-columns: 4px var(--name) minmax(0, 1fr) var(--meta);
   gap: var(--gap);
   align-items: stretch;
   min-height: 36px;
 }
-.tool > .st { background: var(--cyan); border-radius: var(--r-pill) 0 0 var(--r-pill); }
+.tool[data-state="run"] { --tone: var(--tang); }
+.tool[data-state="error"] { --tone: var(--tomato); }
+.tool[data-state="warn"] { --tone: var(--amber); }
+
+.tool > .st { background: var(--tone); border-radius: var(--r-pill) 0 0 var(--r-pill); }
 /* the icon lives inside the name block so the coloured strip stays unbroken */
 .tool > .nm .icon { color: #000; opacity: 0.85; }
 .tool > .nm > .lb { display: flex; flex-direction: column; align-items: center; gap: 1px; }
@@ -206,7 +211,7 @@ button { cursor: pointer; }
   align-items: center;
   justify-content: center;
   gap: 6px;
-  background: var(--tang);
+  background: var(--tone);
   color: #000;
   font: 700 12.5px/1 var(--din);
   letter-spacing: 0.08em;
@@ -214,7 +219,15 @@ button { cursor: pointer; }
   overflow: hidden;
 }
 .tool > .nm small { font: 700 11px/1 var(--din); letter-spacing: 0.06em; opacity: 0.72; font-variant-numeric: tabular-nums; }
-.tool > .bd { display: flex; flex-direction: column; justify-content: center; gap: 3px; padding: 6px 12px; min-width: 0; }
+.tool > .bd {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  padding: 6px 12px;
+  min-width: 0;
+  background: color-mix(in srgb, var(--tone) 9%, transparent);
+}
 /* args are metadata, not body copy: smaller than the output, dimmed */
 .tool > .bd .args {
   font: 400 12.5px/1.9 var(--mono);
@@ -253,20 +266,20 @@ button { cursor: pointer; }
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--g1);
+  background: color-mix(in srgb, var(--tone) 22%, #000);
   font: 400 13.5px/1 var(--din);
   font-variant-numeric: tabular-nums;
-  color: var(--cyan);
+  color: var(--tone);
   border-radius: 0 var(--r-pill) var(--r-pill) 0;
 }
 
-.tool[data-state="run"] > .st { background: var(--tang); }
 
-.tool[data-state="error"] > .st { background: var(--tomato); }
 
-.tool[data-state="error"] > .nm { background: var(--tomato); }
+
+
+
 .tool[data-state="error"] > .mt { background: var(--tomato); color: #000; font-weight: 700; font-size: 11.5px; letter-spacing: 0.08em; }
-.tool[data-state="warn"] > .st { background: var(--amber); }
+
 
 
 .scan { display: inline-flex; gap: 3px; }
