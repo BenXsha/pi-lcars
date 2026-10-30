@@ -1,4 +1,4 @@
-import { readdir, stat, realpath } from "node:fs/promises";
+import { readdir, stat, realpath, readFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { resolve, relative, sep, join, dirname, isAbsolute } from "node:path";
 
@@ -107,7 +107,85 @@ export async function openPath({ cwd, target, mode = "editor" }) {
   throw err;
 }
 
+/* Only what a browser can render: text, images, audio, video. Everything else
+   is reported as "other" and left to the OS. */
+const IMAGE = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".avif", ".bmp", ".ico"]);
+const AUDIO = new Set([".mp3", ".wav", ".m4a", ".aac", ".ogg", ".flac", ".opus"]);
+const VIDEO = new Set([".mp4", ".webm", ".mov", ".m4v", ".ogv"]);
+const TEXT = new Set([
+  ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".json", ".jsonc", ".md", ".mdx", ".txt", ".log",
+  ".css", ".scss", ".sass", ".less", ".html", ".htm", ".vue", ".svelte", ".xml", ".svg", ".yml",
+  ".yaml", ".toml", ".ini", ".env", ".sh", ".zsh", ".bash", ".py", ".rb", ".go", ".rs", ".java",
+  ".kt", ".swift", ".c", ".h", ".cc", ".cpp", ".hpp", ".cs", ".php", ".sql", ".graphql", ".diff",
+  ".patch", ".gitignore", ".editorconfig", ".lock", "",
+]);
+
+const MIME = {
+  ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif",
+  ".webp": "image/webp", ".svg": "image/svg+xml", ".avif": "image/avif", ".bmp": "image/bmp",
+  ".ico": "image/x-icon", ".mp3": "audio/mpeg", ".wav": "audio/wav", ".m4a": "audio/mp4",
+  ".aac": "audio/aac", ".ogg": "audio/ogg", ".flac": "audio/flac", ".opus": "audio/opus",
+  ".mp4": "video/mp4", ".webm": "video/webm", ".mov": "video/quicktime", ".m4v": "video/mp4",
+  ".ogv": "video/ogg",
+};
+
+/** What the viewer can do with this path. */
+export function classify(absPath) {
+  const ext = (absPath.match(/\.[^./]+$/)?.[0] || "").toLowerCase();
+  const kind = IMAGE.has(ext) ? "image" : AUDIO.has(ext) ? "audio" : VIDEO.has(ext) ? "video" : TEXT.has(ext) ? "text" : "other";
+  return { ext, kind, mime: MIME[ext] ?? (kind === "text" ? "text/plain; charset=utf-8" : "application/octet-stream") };
+}
+
+/** Read a file for the in-app viewer: text inline, media by URL, else metadata. */
+export async function readTextFile({ cwd, target, maxBytes = 512 * 1024, maxLines = 6000 }) {
+  const { abs, root } = await guardPath(cwd, target);
+  const st = await stat(abs);
+  if (!st.isFile()) {
+    const e = new Error(`not a file: ${target}`);
+    e.status = 400;
+    e.code = "E_NOT_FILE";
+    throw e;
+  }
+  const { ext, kind, mime } = classify(abs);
+  const base = { path: abs, rel: relative(root, abs), size: st.size, kind, mime, ext, mtime: st.mtime };
+
+  if (kind !== "text") return { ...base, lines: 0, truncated: false, reason: null, text: "" };
+
+  if (st.size > maxBytes) {
+    return { ...base, truncated: true, reason: "size", text: "", lines: 0 };
+  }
+  const buf = await readFile(abs);
+  if (buf.subarray(0, 8000).includes(0)) {
+    return { ...base, kind: "other", mime: "application/octet-stream", truncated: true, reason: "binary", text: "", lines: 0 };
+  }
+  const text = buf.toString("utf8");
+  const all = text.split("\n");
+  const clipped = all.length > maxLines;
+  const shown = clipped ? all.slice(0, maxLines).join("\n") : text;
+  return { ...base, lines: all.length, truncated: clipped, reason: clipped ? "lines" : null, text: shown };
+}
+
 export const isInside = (root, p) => {
   const abs = isAbsolute(p) ? p : resolve(root, p);
   return abs === root || abs.startsWith(root + sep);
 };
+
+/** Stream raw bytes with range support (video scrubbing needs it). */
+export async function streamFile({ cwd, target, range }) {
+  const { abs } = await guardPath(cwd, target);
+  const st = await stat(abs);
+  if (!st.isFile()) {
+    const e = new Error(`not a file: ${target}`);
+    e.status = 400;
+    e.code = "E_NOT_FILE";
+    throw e;
+  }
+  const { mime } = classify(abs);
+  const { createReadStream } = await import("node:fs");
+  if (!range) return { size: st.size, mime, stream: createReadStream(abs), partial: null };
+  const m = /bytes=(\d*)-(\d*)/.exec(range);
+  if (!m) return { size: st.size, mime, stream: createReadStream(abs), partial: null };
+  const start = m[1] ? Number(m[1]) : 0;
+  const end = m[2] ? Number(m[2]) : st.size - 1;
+  return { size: st.size, mime, stream: createReadStream(abs, { start, end }), partial: { start, end } };
+}

@@ -213,6 +213,7 @@ export function ToolStrip(props: {
   count?: number;
   truncated?: boolean;
   diff?: DiffData;
+  onOpenDiff?: () => void;
   children?: SubCall[];
   agent?: AgentMeta;
   expanded?: boolean;
@@ -263,7 +264,14 @@ export function ToolStrip(props: {
       <div class="bd">
         <div class="args">{props.args}</div>
         {props.diff ? (
-          <DiffView rows={visibleDiff} stat={props.diff.stat} truncated={props.diff.truncated} />
+          <>
+            {props.onOpenDiff ? (
+              <button type="button" class="more" onClick={props.onOpenDiff}>
+                OPEN IN VIEWER
+              </button>
+            ) : null}
+            <DiffView rows={visibleDiff} stat={props.diff.stat} truncated={props.diff.truncated} />
+          </>
         ) : shown.length ? (
           <OutputBlock
             text={shown.join("\n")}
@@ -489,7 +497,7 @@ export function BarButton(props: {
 }
 
 /* ---------------------------------------------------------------- diff */
-type DiffRow =
+export type DiffRow =
   | { kind: "hunk"; text: string }
   | { kind: "add" | "del" | "ctx"; o?: number; n?: number; text: string };
 
@@ -505,7 +513,7 @@ function OutputBlock({ text, tone, lang }: { text: string; tone: "out" | "err"; 
   return <div class={`${tone} hljs`} dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
-function flattenDiff(diff: DiffData): DiffRow[] {
+export function flattenDiff(diff: DiffData): DiffRow[] {
   const rows: DiffRow[] = [];
   for (const h of diff.hunks) {
     if (h.hdr) rows.push({ kind: "hunk", text: h.hdr });
@@ -520,7 +528,7 @@ function flattenDiff(diff: DiffData): DiffRow[] {
 }
 
 /** Hunk view: two line-number gutters, a sign column, then the text. */
-function DiffView({ rows, stat, truncated }: { rows: DiffRow[]; stat: { add: number; del: number }; truncated?: boolean }) {
+export function DiffView({ rows, stat, truncated }: { rows: DiffRow[]; stat: { add: number; del: number }; truncated?: boolean }) {
   return (
     <div class="diff">
       <div class="df-stat">

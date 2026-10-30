@@ -18,7 +18,7 @@ import { createQueue } from "./pi/queue.mjs";
 import { Registry } from "./pi/registry.mjs";
 import { now, summaryOf } from "./pi/format.mjs";
 import { mcpStatus, setEnabled, addServer, removeServer } from "./pi/mcpConfig.mjs";
-import { listTree, openPath } from "./pi/fs.mjs";
+import { listTree, openPath, readTextFile, streamFile } from "./pi/fs.mjs";
 import { listHistory, deleteHistoryFile, renameHistoryFile } from "./pi/history.mjs";
 import { listSkills, reloadSkills } from "./pi/skills.mjs";
 import { listProviders, listProviderModels, testProvider, setDefaultModel, setProviderKey, addProvider, removeProvider, reloadProviders } from "./pi/providers.mjs";
@@ -474,6 +474,31 @@ const routes = {
       target: url.searchParams.get("path") || "",
       showHidden: url.searchParams.get("hidden") === "1",
     }));
+  },
+
+  "GET /api/file": async (req, res) => {
+    const url = new URL(req.url, "http://x");
+    const target = url.searchParams.get("path");
+    if (!target) return fail(res, 400, "path is required", { code: "E_ARGS" });
+    ok(res, await readTextFile({ cwd: CWD, target }));
+  },
+
+  "GET /api/raw": async (req, res) => {
+    const url = new URL(req.url, "http://x");
+    const target = url.searchParams.get("path");
+    if (!target) return fail(res, 400, "path is required", { code: "E_ARGS" });
+    const r = await streamFile({ cwd: CWD, target, range: req.headers.range });
+    if (r.partial) {
+      res.writeHead(206, {
+        "content-type": r.mime,
+        "content-length": r.partial.end - r.partial.start + 1,
+        "content-range": `bytes ${r.partial.start}-${r.partial.end}/${r.size}`,
+        "accept-ranges": "bytes",
+      });
+    } else {
+      res.writeHead(200, { "content-type": r.mime, "content-length": r.size, "accept-ranges": "bytes" });
+    }
+    r.stream.pipe(res);
   },
 
   "POST /api/open": async (req, res) => {

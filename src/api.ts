@@ -172,6 +172,20 @@ export type ModelInfo = {
 
 export type DirEntry = { name: string; path: string; items: number | null };
 
+export type FileResult = {
+  path: string;
+  rel: string;
+  size: number;
+  kind: "text" | "image" | "audio" | "video" | "other";
+  mime: string;
+  ext: string;
+  lines: number;
+  truncated: boolean;
+  reason: string | null;
+  text: string;
+  mtime?: string;
+};
+
 export type TreeEntry = { name: string; path: string; rel: string; type: "dir" | "file" | "other"; size: number | null };
 export type TreeResult = { path: string; rel: string; parent: string | null; root: string; entries: TreeEntry[] };
 
@@ -258,6 +272,7 @@ export const api = {
   mcpRemove: (name: string) => post<unknown>("/api/mcp", { op: "remove", name }),
   mcpConnect: () => post<McpConfig & { connectMs: number; pending: boolean }>("/api/mcp", { op: "connect" }),
   tree: (path?: string) => call<TreeResult>(`/api/tree${path ? `?path=${encodeURIComponent(path)}` : ""}`),
+  file: (path: string) => call<FileResult>(`/api/file?path=${encodeURIComponent(path)}`),
   openPath: (path: string, mode: "editor" | "reveal" | "default" = "editor") =>
     post<{ cmd: string; args: string[] }>("/api/open", { path, mode }),
   fs: (path?: string) =>

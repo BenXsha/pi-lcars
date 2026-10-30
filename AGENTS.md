@@ -404,6 +404,20 @@ Codex 的做法是：**工作区在你开 session 时就定了，之后不可变
 - 语言只翻**界面外壳**（导航、按钮、输入提示、设置面板），消息与工具输出保持原文，
   面板底部明确写出这一点；新增文案先加 `i18n.ts` 的 key，不要在组件里写死中英文。
 
+### 7.6h 内置查看器（文件 / 差异）
+
+不弹窗、不跳转：查看器**替换 transcript 所在的整列**（头部 + 主体），composer 仍然固定在底部。
+
+- **头部**：4px 橙脊 + 相对路径（等宽）+ `TYPE · SIZE · LINES` + 动作（md 的 `SOURCE/PREVIEW`、文本的 `WRAP`、`COPY`、`OPEN`、`CLOSE`）。
+  `Esc` 关闭。头部用 **flex 而不是 grid** —— 动作数量随类型变化，grid 列数写死会把按钮挤到第二行（踩过）。
+- **只预览浏览器能渲染的格式**：`text` / `image` / `audio` / `video`；
+  其它一律 `NO INLINE PREVIEW` + 用 `OPEN` 交给系统。判定在服务端（`classify()` 按扩展名）。
+- **文本**：左侧 52px 行号槽（`pointer-events: none`，不可选中）+ hljs 高亮正文，正文内部滚动。
+  超过 512KB 或 6000 行会截断并明确说明原因（size / lines / binary）。
+- **图片/音视频**走 `/api/raw`（支持 Range，视频可拖拽进度），`<img>/<audio>/<video>` 原生控件。
+- **Markdown 默认 PREVIEW**（复用 §3.5b 的 Markdown 渲染），头部可切 `SOURCE` 回到带行号的源码。
+- **差异视图**复用同一外壳：transcript 里的 diff 块有 `OPEN IN VIEWER`，打开后是整屏 hunk 视图。
+
 ### 7.6g 空态（standby）
 
 空会话不能只剩一段说明文字：

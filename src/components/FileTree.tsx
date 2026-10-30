@@ -11,12 +11,15 @@ export function FileTree({
   preview = false,
   notice,
   onPickWorkspace,
+  onOpenFile,
 }: {
   root: string;
   /** browsing a candidate workspace from the shelf deck */
   preview?: boolean;
   notice?: string | null;
   onPickWorkspace?: () => void;
+  /** clicking a file row opens the in-app viewer instead of an external editor */
+  onOpenFile?: (path: string) => void;
 }) {
   const [children, setChildren] = useState<Record<string, TreeEntry[]>>({});
   const [open, setOpen] = useState<Record<string, boolean>>({});
@@ -82,9 +85,9 @@ export function FileTree({
             role="button"
             tabIndex={0}
             title={e.rel || e.name}
-            onClick={() => (isDir ? toggle(e.path) : openWith(e, "editor"))}
+            onClick={() => (isDir ? toggle(e.path) : onOpenFile ? onOpenFile(e.path) : openWith(e, "editor"))}
             onKeyDown={(ev) => {
-              if (ev.key === "Enter") isDir ? toggle(e.path) : openWith(e, "editor");
+              if (ev.key === "Enter") isDir ? toggle(e.path) : onOpenFile ? onOpenFile(e.path) : openWith(e, "editor");
             }}
           >
             <span class="ic">

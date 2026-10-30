@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import type { DirEntry, Item, McpConfig, McpServer, ModelInfo, ProviderRow, ProvidersResult, SkillsResult, SystemInfo } from "../api";
+import type { DiffData, DirEntry, Item, McpConfig, McpServer, ModelInfo, ProviderRow, ProvidersResult, SkillsResult, SystemInfo } from "../api";
 import { api } from "../api";
 import { actions, connect, getState, subscribe } from "../store";
 import { THEMES, appliedTheme, applyTheme, type ThemeId } from "../theme";
@@ -8,6 +8,7 @@ import { t } from "../i18n";
 import { Icon, type IconName } from "../components/Icon";
 import { Logo } from "../components/Logo";
 import { FileTree } from "../components/FileTree";
+import { FileViewer } from "../components/FileViewer";
 import {
   ApprovalDeck,
   BarButton,
@@ -107,6 +108,7 @@ export function Console() {
   const [deck, setDeck] = useState<null | "new" | "model" | "think">(null);
   const [sideMode, setSideMode] = useState<"sessions" | "files">("sessions");
   const [previewCwd, setPreviewCwd] = useState<string | null>(null);
+  const [viewer, setViewer] = useState<{ path: string; diff?: DiffData } | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
   const [panes, setPanes] = useState(() => {
     const read = (k: string) => {
@@ -166,6 +168,7 @@ export function Console() {
         onMode={setSideMode}
         previewCwd={previewCwd}
         flash={flash}
+        onOpenFile={(p) => setViewer({ path: p })}
         onNewSession={() => {
           setDeck("new");
           setSideMode("files");
@@ -252,9 +255,12 @@ export function Console() {
               </div>
             ) : null}
 
+            {viewer ? (
+              <FileViewer path={viewer.path} diff={viewer.diff} onClose={() => setViewer(null)} />
+            ) : (
             <div class="scroll" id="scroll">
               {view === "session" ? (
-                <Transcript items={s.items} />
+                <Transcript items={s.items} onOpenDiff={(p, d) => setViewer({ path: p, diff: d })} />
               ) : view === "mcp" ? (
                 <McpPanel />
               ) : view === "providers" ? (
@@ -265,6 +271,7 @@ export function Console() {
                 <SettingsPanel items={s.items} meta={meta} policy={s.policy} theme={theme} onTheme={(id) => { applyTheme(id); setTheme(id); }} />
               )}
             </div>
+            )}
 
             <Composer running={!!meta?.running} disabled={s.link !== "open"} />
           </main>
@@ -340,6 +347,7 @@ function Sidenav({
   onMode,
   previewCwd,
   flash,
+  onOpenFile,
   onNewSession,
   onPickWorkspace,
 }: {
@@ -355,6 +363,7 @@ function Sidenav({
   onMode: (m: "sessions" | "files") => void;
   previewCwd: string | null;
   flash: string | null;
+  onOpenFile: (path: string) => void;
   onNewSession: () => void;
   onPickWorkspace: () => void;
 }) {
@@ -403,6 +412,7 @@ function Sidenav({
           preview={!!previewCwd && previewCwd.startsWith(cwd) && previewCwd !== cwd}
           notice={previewCwd && !previewCwd.startsWith(cwd) ? "preview limited to the current workspace — the choice still applies to the new session" : flash}
           onPickWorkspace={onPickWorkspace}
+          onOpenFile={onOpenFile}
         />
       ) : null}
 
@@ -512,7 +522,13 @@ function Sidenav({
 }
 
 /* ----------------------------------------------------------- transcript */
-function Transcript({ items }: { items: Item[] }) {
+function Transcript({
+  items,
+  onOpenDiff,
+}: {
+  items: Item[];
+  onOpenDiff?: (path: string, diff: DiffData) => void;
+}) {
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const t0 = items[0]?.ts ?? Date.now();
 
@@ -593,6 +609,11 @@ function Transcript({ items }: { items: Item[] }) {
                 ms={it.ms}
                 truncated={it.truncated}
                 diff={it.diff}
+                onOpenDiff={
+                  it.diff && onOpenDiff
+                    ? () => onOpenDiff(it.args.split(" / ")[0].split(" ")[0] || it.name, it.diff!)
+                    : undefined
+                }
                 children={it.children}
                 agent={it.agent}
                 expanded={open[it.id] ?? false}
