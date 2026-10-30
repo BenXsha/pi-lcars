@@ -334,9 +334,9 @@ function Sidenav({
 
   return (
     <aside class="sidenav" data-cramped={cramped ? "1" : "0"} style={{ width: `${col}px`, flex: `0 0 ${col}px` }}>
-      {/* collapsed: a 64px square cap — there is no bar to merge with, so the
-          elbow becomes a plain block and the mark centres in the 64px column */}
-      <TopCap w={collapsed ? 64 : col + 55} h={100} bar={44} flat={collapsed}>
+      {/* the cap is always column + r, so the concave corner keeps landing on
+          the column edge — collapsed included. Only its contents recentre. */}
+      <TopCap w={col + 55} h={100} bar={44}>
         <span class={`cap-logo ${collapsed ? "is-mini" : ""}`}>
           <Logo size={collapsed ? 74 : 72} />
         </span>
@@ -357,7 +357,8 @@ function Sidenav({
         type="button"
         class={`lnew ${collapsed ? "is-mini" : ""}`}
         style={mode === "files" ? { display: "none" } : undefined}
-        title="New session"
+        data-tip={t("side.new")}
+        aria-label={t("side.new")}
         onClick={() => { actions.newSession(); onView("session"); }}
       >
         <span class="ic">
@@ -437,6 +438,7 @@ function Sidenav({
             full
             h={42}
             active={view === n.view}
+            tip={t(n.key)}
             onClick={() => onView(n.view)}
           />
         ))}
@@ -452,11 +454,25 @@ function Transcript({ items }: { items: Item[] }) {
 
   if (!items.length) {
     return (
-      <div class="empty-log">
-        <b>STANDING BY.</b> This console is wired to a live <code>pi</code> session.
-        <br />
-        Type below and press <code>ENTER</code>. Every row comes from a real event: text deltas, tool
-        executions, retries, truncation, approvals.
+      <div class="standby">
+        <div class="sb-head">
+          <span class="st" />
+          <span class="ttl">STANDING BY</span>
+          <span class="sub">NO TRANSMISSION IN THIS SESSION</span>
+        </div>
+        <div class="sb-rows">
+          {[
+            ["LINK", "live pi session — nothing here is scripted"],
+            ["INPUT", "ENTER transmits · SHIFT+ENTER breaks the line"],
+            ["STREAM", "text deltas · tool calls · retries · truncation · approvals"],
+            ["SCOPE", "this session only; the workspace tree lives in the sidebar"],
+          ].map(([k, v]) => (
+            <div class="sb-row" key={k}>
+              <span class="k">{k}</span>
+              <span class="v">{v}</span>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }

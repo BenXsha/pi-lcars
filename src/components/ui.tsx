@@ -172,6 +172,8 @@ export function Station(props: {
   active?: boolean;
   full?: boolean;
   badge?: string;
+  /** hover hint; shown as an LCARS strip to the right of the rail */
+  tip?: string;
   onClick?: () => void;
 }) {
   return (
@@ -179,6 +181,8 @@ export function Station(props: {
       type="button"
       class={`station ${props.full ? "is-full" : ""} ${props.label ? "" : "is-icon"}`}
       data-tone={props.tone}
+      data-tip={props.tip ?? props.label}
+      aria-label={props.tip ?? props.label}
       aria-current={props.active ? "true" : "false"}
       style={props.full ? { height: `${props.h ?? 44}px` } : { width: `${props.w ?? 196}px`, height: `${props.h ?? 52}px` }}
       onClick={props.onClick}
