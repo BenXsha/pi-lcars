@@ -3008,6 +3008,18 @@ function SettingsPanel({
       </div>
 
       <div class="set-block">
+        <span class="lb">{t("set.backdrop")}</span>
+        <div class="seg small">
+          <button type="button" aria-pressed={prefs.backdrop === "off" ? "true" : "false"} onClick={() => setSettings({ backdrop: "off" })}>
+            OFF
+          </button>
+          <button type="button" aria-pressed={prefs.backdrop === "on" ? "true" : "false"} onClick={() => setSettings({ backdrop: "on" })}>
+            SHIP
+          </button>
+        </div>
+      </div>
+
+      <div class="set-block">
         <span class="lb">{t("set.scale")}</span>
         <div class="seg small">
           {([0.9, 1, 1.1] as const).map((v) => (

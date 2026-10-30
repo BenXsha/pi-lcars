@@ -4,12 +4,14 @@ export type Scale = 0.9 | 1 | 1.1;
 export type Settings = {
   scale: Scale;
   motion: "system" | "reduced";
+  /** opt-in starship backdrop; default off so the LCARS black stays canonical */
+  backdrop: "off" | "on";
   locale: Locale;
 };
 
 const KEY = "lcars.settings";
 
-const DEFAULTS: Settings = { scale: 1, motion: "system", locale: "en" };
+const DEFAULTS: Settings = { scale: 1, motion: "system", backdrop: "off", locale: "en" };
 
 function load(): Settings {
   try {
@@ -19,6 +21,7 @@ function load(): Settings {
     return {
       scale: p.scale === 0.9 || p.scale === 1.1 ? p.scale : 1,
       motion: p.motion === "reduced" ? "reduced" : "system",
+      backdrop: p.backdrop === "on" ? "on" : "off",
       locale: p.locale === "zh" ? "zh" : "en",
     };
   } catch {
@@ -37,6 +40,7 @@ export function applySettings() {
   root.style.setProperty("--ui-scale", String(state.scale));
   root.dataset.motion = state.motion;
   root.dataset.locale = state.locale;
+  root.dataset.backdrop = state.backdrop === "on" ? "1" : "0";
 }
 
 export function setSettings(patch: Partial<Settings>) {

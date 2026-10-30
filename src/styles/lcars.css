@@ -2831,3 +2831,26 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 }
 .panic-actions button:hover { background: var(--orange); color: #000; }
 
+
+/* ----------------------------------------------------- starship backdrop */
+/* Opt-in (SETTINGS → BACKDROP / ?backdrop=1). The image is a texture under the
+   blocks, not a wallpaper: 42% opacity plus a 55-62% scrim keeps the worst-case
+   composite at ≤ rgb(48,48,48), which still clears 4.5:1 for g3 small labels. */
+html[data-backdrop="1"] body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: url("/backdrop.jpg") center 42% / cover no-repeat;
+  opacity: 0.42;
+}
+html[data-backdrop="1"] body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0.55) 45%, rgba(0, 0, 0, 0.62));
+}
+#root { position: relative; z-index: 1; }
