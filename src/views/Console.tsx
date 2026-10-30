@@ -150,23 +150,12 @@ export function Console() {
 
   return (
     <div class="app" data-left={panes.left ? "1" : "0"} data-right={panes.right ? "1" : "0"}>
-      <Sidenav sessions={s.sessions} activeId={s.activeId} view={view} onView={setView} cwd={meta?.cwd ?? ""} col={col} collapsed={!panes.left} />
+      <Sidenav sessions={s.sessions} activeId={s.activeId} view={view} onView={setView} cwd={meta?.cwd ?? ""} col={col} collapsed={!panes.left} onToggle={() => setPanes((p) => ({ ...p, left: !p.left }))} />
 
       <div class="main">
         <Shelf
           brand=""
           tag=""
-          left={
-            <button
-              type="button"
-              class="pane-tgl"
-              title={panes.left ? "Collapse sidebar (⌘B)" : "Expand sidebar (⌘B)"}
-              aria-pressed={panes.left ? "true" : "false"}
-              onClick={() => setPanes((p) => ({ ...p, left: !p.left }))}
-            >
-              <Icon name={panes.left ? "pane-collapse-left" : "pane-collapse-right"} size={12} />
-            </button>
-          }
         >
           {meta ? (
             <>
@@ -197,15 +186,6 @@ export function Console() {
             <span style={{ font: "700 11px/1 var(--din)", letterSpacing: "0.14em" }}>CONNECTING…</span>
           )}
           <span class="shelf-tag">{view === "session" ? "MISSION LOG" : view.toUpperCase()}</span>
-          <button
-            type="button"
-            class="pane-tgl"
-            title={panes.right ? "Collapse resources (⌘⇧B)" : "Expand resources (⌘⇧B)"}
-            aria-pressed={panes.right ? "true" : "false"}
-            onClick={() => setPanes((p) => ({ ...p, right: !p.right }))}
-          >
-            <Icon name={panes.right ? "pane-collapse-right" : "pane-collapse-left"} size={12} />
-          </button>
         </Shelf>
 
         {deck === "cwd" ? <CwdDeck meta={meta} onClose={() => setDeck(null)} /> : null}
@@ -256,7 +236,31 @@ export function Console() {
             <Composer running={!!meta?.running} disabled={s.link !== "open"} />
           </main>
 
-          {rail && panes.right ? <Rail items={s.items} meta={meta} queue={s.queue} width={rail} /> : null}
+          {rail ? (
+            panes.right ? (
+              <Rail
+                items={s.items}
+                meta={meta}
+                queue={s.queue}
+                width={rail}
+                onToggle={() => setPanes((p) => ({ ...p, right: !p.right }))}
+              />
+            ) : (
+              /* collapsed: keep a 24px handle so the pane can always be reopened */
+              <aside class="rail is-collapsed">
+                <button
+                  type="button"
+                  class="pane-foot is-right"
+                  data-tip={t("pane.expandRight")}
+                  aria-label={t("pane.expandRight")}
+                  aria-pressed="false"
+                  onClick={() => setPanes((p) => ({ ...p, right: true }))}
+                >
+                  <Icon name="pane-collapse-left" size={12} />
+                </button>
+              </aside>
+            )
+          ) : null}
         </div>
       </div>
     </div>
@@ -298,6 +302,7 @@ function Sidenav({
   cwd,
   col,
   collapsed,
+  onToggle,
 }: {
   sessions: { id: string; name?: string; title?: string | null; items: number; running: boolean; queued: boolean; lastTs: number | null; pending: boolean; modelId: string; cwd: string }[];
   activeId: string | null;
@@ -306,6 +311,7 @@ function Sidenav({
   cwd: string;
   col: number;
   collapsed: boolean;
+  onToggle: () => void;
 }) {
   const sorted = [...sessions].sort((a, b) => (b.lastTs ?? 0) - (a.lastTs ?? 0));
   const listRef = useRef<HTMLDivElement>(null);
@@ -439,6 +445,17 @@ function Sidenav({
           />
         ))}
       </div>
+
+      <button
+        type="button"
+        class="pane-foot"
+        data-tip={collapsed ? t("pane.expand") : t("pane.collapse")}
+        aria-label={collapsed ? t("pane.expand") : t("pane.collapse")}
+        aria-pressed={collapsed ? "false" : "true"}
+        onClick={onToggle}
+      >
+        <Icon name={collapsed ? "pane-collapse-right" : "pane-collapse-left"} size={12} />
+      </button>
     </aside>
   );
 }
@@ -632,7 +649,19 @@ function Composer({ running, disabled }: { running: boolean; disabled: boolean }
 }
 
 /* ------------------------------------------------------------------ rail */
-function Rail({ items, meta, queue, width }: { items: Item[]; meta: ReturnType<typeof getState>["meta"]; queue: { waiting: string[] }; width: number }) {
+function Rail({
+  items,
+  meta,
+  queue,
+  width,
+  onToggle,
+}: {
+  items: Item[];
+  meta: ReturnType<typeof getState>["meta"];
+  queue: { waiting: string[] };
+  width: number;
+  onToggle: () => void;
+}) {
   const stats = useMemo(() => {
     const out: Record<string, { calls: number; fails: number; trunc: number }> = {};
     for (const it of items) {
@@ -652,6 +681,7 @@ function Rail({ items, meta, queue, width }: { items: Item[]; meta: ReturnType<t
 
   return (
     <aside class="rail" style={{ width: `${width}px`, flex: `0 0 ${width}px` }}>
+      <div class="rail-body">
       <div class="phead">RESOURCES</div>
       <div class="panel">
         <div class="ctx-top">
@@ -711,6 +741,18 @@ function Rail({ items, meta, queue, width }: { items: Item[]; meta: ReturnType<t
           <div class="mrow"><span>QUEUE</span><span>{queue.waiting.length}</span></div>
         </div>
       </div>
+      </div>
+
+      <button
+        type="button"
+        class="pane-foot is-right"
+        data-tip={t("pane.collapseRight")}
+        aria-label={t("pane.collapseRight")}
+        aria-pressed="true"
+        onClick={onToggle}
+      >
+        <Icon name="pane-collapse-right" size={12} />
+      </button>
     </aside>
   );
 }

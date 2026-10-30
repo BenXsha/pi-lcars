@@ -1776,3 +1776,45 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 
 /* the station tag lives with the controls, not at the far left */
 .shelf-r .shelf-tag { margin-right: 8px; }
+
+/* ============================================================
+   pane footers — each rail carries its own collapse handle
+   ============================================================ */
+.pane-foot {
+  flex: 0 0 26px;
+  height: 26px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--g2);
+  border-radius: 0 var(--r-1) 0 0;
+}
+.pane-foot:hover { background: var(--g0); color: var(--w); }
+.pane-foot.is-right { border-radius: var(--r-1) 0 0 0; }
+
+.rail { padding-bottom: 0; }
+.rail-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--seam);
+  overflow-y: auto;
+  scrollbar-width: none;
+  padding-bottom: 4px;
+}
+.rail-body::-webkit-scrollbar { display: none; }
+
+/* collapsed handle: a 24px strip, chevron sits where the footer would be */
+.rail.is-collapsed {
+  width: 24px;
+  flex: 0 0 24px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end; /* column axis: handle sits at the bottom */
+  align-items: stretch;
+}
+.rail.is-collapsed .pane-foot { margin-bottom: 8px; }
