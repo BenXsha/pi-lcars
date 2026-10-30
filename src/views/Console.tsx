@@ -2461,9 +2461,12 @@ function TreePanel({ onClose, onSwitch }: { onClose: () => void; onSwitch: () =>
     turnCount.set(turn, (turnCount.get(turn) ?? 0) + 1);
   });
 
-  const clock = (iso: string) => {
+  const clock = (iso: string, withMs = true) => {
     const d = new Date(iso);
-    return Number.isNaN(d.getTime()) ? "" : `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    if (Number.isNaN(d.getTime())) return "";
+    const pad = (n: number, w = 2) => String(n).padStart(w, "0");
+    const base = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    return withMs ? `${base}.${pad(d.getMilliseconds(), 3)}` : base;
   };
 
   return (
@@ -2508,9 +2511,10 @@ function TreePanel({ onClose, onSwitch }: { onClose: () => void; onSwitch: () =>
             <>
             {startsTurn ? (
               <div class="tsep" key={`t${n.id}`}>
-                <span class="st" />
                 <span class="n">T{String(t).padStart(2, "0")}</span>
-                <span class="ts">{clock(n.ts)}</span>
+                <span class="ts" title={clock(n.ts)}>
+                  {clock(n.ts, false)}
+                </span>
                 <span class="ct">{turnCount.get(t) ?? 0} ENTRIES</span>
               </div>
             ) : null}
@@ -2539,7 +2543,9 @@ function TreePanel({ onClose, onSwitch }: { onClose: () => void; onSwitch: () =>
                 </span>
               </span>
               <span class="tl">
-                <span class="ts">{clock(n.ts)}</span>
+                <span class="ts" title={clock(n.ts)}>
+                  {clock(n.ts)}
+                </span>
                 {total > 1 ? (
                   <span class="fork">
                     <button

@@ -2549,6 +2549,32 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 .tnode[data-confirm="1"] .go { background: #000; color: var(--tomato); }
 .tnode[data-confirm="1"] .go:hover:not(:disabled) { background: #000; color: var(--w); }
 
+/* turn header: deliberately quieter than the entry strips — a 24px label rail
+   with an orange spine, not another capsule */
+.tsep {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 24px;
+  flex: 0 0 24px;
+  margin: 12px 0 2px;
+  padding: 0 12px 0 10px;
+  background: var(--g0);
+  border-radius: 0 var(--r-pill) var(--r-pill) 0;
+  box-shadow: inset 4px 0 0 var(--orange);
+  font: 700 11px/1 var(--din);
+  letter-spacing: 0.14em;
+  color: var(--t3);
+}
+.tsep .n { color: var(--orange); }
+.tsep .ts {
+  font: 400 11px/1 var(--mono);
+  letter-spacing: 0.04em;
+  color: var(--t2);
+  font-variant-numeric: tabular-nums;
+}
+.tsep .ct { margin-left: auto; color: var(--t3); }
+
 /* rail caveat line: says what the data does NOT contain */
 .rnote {
   display: block;
