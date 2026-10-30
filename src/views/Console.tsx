@@ -2380,6 +2380,7 @@ function TreePanel({ onClose, onSwitch }: { onClose: () => void; onSwitch: () =>
   const [data, setData] = useState<{ count: number; leaf: string | null; nodes: TreeRow[] } | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
 
   const load = () =>
     api
@@ -2391,21 +2392,60 @@ function TreePanel({ onClose, onSwitch }: { onClose: () => void; onSwitch: () =>
     load();
   }, []);
 
-  const kindTone = (k: string) =>
-    k === "user" ? "var(--orange)" : k === "assistant" ? "var(--w)" : k === "toolResult" ? "var(--tang)" : k === "compaction" ? "var(--moon)" : "var(--lav)";
+  const nodes = data?.nodes ?? [];
+  // siblings tell the reader where a branch actually forks
+  const siblings = new Map<string, number>();
+  for (const n of nodes) {
+    if (!n.parentId) continue;
+    siblings.set(n.parentId, (siblings.get(n.parentId) ?? 0) + 1);
+  }
+  const order = new Map<string, number>();
+  for (const n of nodes) {
+    if (!n.parentId) continue;
+    order.set(n.parentId, (order.get(n.parentId) ?? 0) + 1);
+  }
+  const forks = [...siblings.values()].filter((n) => n > 1).length;
+  // Indent only where the graph actually forks. A conversation is a long chain
+  // of single children — indenting per message turns the list into a staircase
+  // that runs off the panel.
+  const shownDepth = new Map<string, number>();
+  for (const n of nodes) {
+    if (!n.parentId) {
+      shownDepth.set(n.id, 0);
+      continue;
+    }
+    const parentDepth = shownDepth.get(n.parentId) ?? 0;
+    const parentForks = (siblings.get(n.parentId) ?? 0) > 1;
+    shownDepth.set(n.id, parentDepth + (parentForks ? 1 : 0));
+  }
+  const clock = (iso: string) => {
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? "" : `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  };
 
   return (
     <div class="tv">
       <div class="fv-hd">
         <span class="st" />
         <span class="nm">branch tree</span>
-        <span class="mt">{data ? `${data.count} ENTRIES` : "…"}</span>
+        <span class="mt">
+          {data ? `${nodes.length} ENTRIES · ${forks} FORKS · HEAD ${data.leaf ? `#${data.leaf.slice(-4)}` : "—"}` : "…"}
+        </span>
         <button type="button" class="pv-btn ghost" onClick={load}>
           RELOAD
         </button>
         <button type="button" class="pv-btn" onClick={onClose}>
           CLOSE
         </button>
+      </div>
+
+      <div class="tv-legend">
+        <span class="lg" data-k="user">USER</span>
+        <span class="lg" data-k="assistant">ASSISTANT</span>
+        <span class="lg" data-k="toolResult">TOOL</span>
+        <span class="lg" data-k="compaction">COMPACT</span>
+        <span class="lg" data-k="branch_summary">BRANCH</span>
+        <span class="hint">switching moves the conversation to that point — the tail is kept on its own branch</span>
       </div>
 
       {err ? (
@@ -2416,41 +2456,69 @@ function TreePanel({ onClose, onSwitch }: { onClose: () => void; onSwitch: () =>
 
       <div class="tv-body">
         {data?.count === 0 ? <div class="pv-note">nothing in this session yet</div> : null}
-        {(data?.nodes ?? []).map((n) => (
-          <div class="trow2" key={n.id} data-current={n.current ? "1" : "0"} data-path={n.isLeafPath ? "1" : "0"} data-confirm={confirm === n.id ? "1" : "0"}>
-            <span class="spine" style={{ marginLeft: `${n.depth * 14}px`, background: kindTone(n.kind) }} />
-            <span class="kd">{n.kind === "toolResult" ? "TOOL" : n.kind.toUpperCase()}</span>
-            <span class="lb">{n.label || "—"}</span>
-            {confirm === n.id ? (
-              <span class="cf">
-                <button
-                  type="button"
-                  class="pv-btn"
-                  onClick={async () => {
-                    await actions.goto(n.id);
-                    onSwitch();
-                  }}
-                >
-                  SWITCH HERE
-                </button>
-                <button type="button" class="pv-btn ghost" onClick={() => setConfirm(null)}>
-                  CANCEL
-                </button>
+        {nodes.map((n) => {
+          const total = n.parentId ? siblings.get(n.parentId) ?? 1 : 1;
+          const index = n.parentId ? order.get(n.parentId) ?? 1 : 1;
+          return (
+            <div
+              class="tnode"
+              key={n.id}
+              data-kind={n.kind}
+              data-current={n.current ? "1" : "0"}
+              data-path={n.isLeafPath ? "1" : "0"}
+              data-confirm={confirm === n.id ? "1" : "0"}
+              data-selected={selected === n.id ? "1" : "0"}
+              style={{ "--d": `${shownDepth.get(n.id) ?? 0}` } as Record<string, string>}
+              onClick={() => setSelected(n.id)}
+            >
+              <span class="spine" />
+              <span class="kd">{n.kind === "toolResult" ? "TOOL" : n.kind.toUpperCase()}</span>
+              <span class="lb" title={n.label}>
+                {n.label || "—"}
               </span>
-            ) : (
+              <span class="fork">{total > 1 ? `${index}/${total}` : ""}</span>
+              <span class="ts">{clock(n.ts)}</span>
               <span class="cf">
-                {n.current ? <span class="cur">HEAD</span> : null}
-                <button type="button" class="pv-btn ghost" onClick={() => setConfirm(n.id)}>
-                  GO
-                </button>
+                {confirm === n.id ? (
+                  <>
+                    <button
+                      type="button"
+                      class="pv-btn"
+                      onClick={async () => {
+                        setConfirm(null);
+                        await actions.goto(n.id);
+                        onSwitch();
+                      }}
+                    >
+                      SWITCH HERE
+                    </button>
+                    <button type="button" class="pv-btn ghost" onClick={() => setConfirm(null)}>
+                      CANCEL
+                    </button>
+                  </>
+                ) : n.current ? (
+                  <span class="cur">HEAD</span>
+                ) : (
+                  <button
+                    type="button"
+                    class="pv-btn ghost"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setConfirm(n.id);
+                    }}
+                  >
+                    GO
+                  </button>
+                )}
               </span>
-            )}
-          </div>
-        ))}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
 }
+
 
 /* --------------------------------------------------------------- history */
 function HistoryPanel({ onOpen, onFork }: { onOpen: (path: string) => void; onFork: (path: string) => void }) {
