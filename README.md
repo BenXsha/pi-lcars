@@ -84,6 +84,8 @@ server/            Node, no runtime deps beyond the pi SDK
 src/               Vite + Preact + TS client
   styles/          tokens (structure) + themes (colour) + lcars (components)
   components/      Elbow · ToolStrip · ApprovalDeck · FieldRow · Icon …
+  drafts.ts        per-session composer drafts + sent-history (localStorage)
+  views/Console.tsx console shell, mission log, and the four-zone workspace
   views/Craft.tsx  craft layer, the visual contract in one page
   icons.ts         generated: remixicon -fill paths (64 icons, no font)
 demo/              v0 vanilla implementation, kept for reference
@@ -99,8 +101,9 @@ PLAN.md            milestone plan (M0..M9) (repo only, not published)
 | GET | `/api/bootstrap` | sessions, active meta, policy, items |
 | GET | `/api/stream` | single SSE channel; events carry `sessionId` |
 | GET | `/api/state` | same + queue snapshot (debugging) |
-| POST | `/api/session` | `{op: new\|open\|fork\|activate\|rename\|delete}` |
-| POST | `/api/prompt` | steers the running session, otherwise queues |
+| POST | `/api/session` | `{op: new\|open\|fork\|activate\|rename\|delete\|compact\|tree\|goto\|rewind}` |
+| POST | `/api/prompt` | `{text, images?}` — steers the running session, otherwise queues. Images are base64, `png/jpeg/webp/gif`, max 6 |
+| GET | `/api/files?q=` | flat, ranked workspace file index for the composer's `@` completion |
 | POST | `/api/abort` | cancels queued work, denies pending approvals |
 | POST | `/api/approve` | `{id, decision: approve\|deny\|always}` |
 | POST | `/api/policy` | `off` / `risky` / `all` |
@@ -118,13 +121,32 @@ PLAN.md            milestone plan (M0..M9) (repo only, not published)
 - `/` — the console: left rail (session list + MCP / SKILLS / PROVIDERS / HISTORY / SYSTEM / ABOUT),
   shelf controls (model / thinking), live transcript, pinned composer, resources rail.
   Stations are hash-addressable: `/#about`, `/#providers`, …
-- `/?craft` — the primitive sheet (elbows, motion, icons, form language, themes),
+- `/#stream` — the **four-zone workspace**: the same live stream cut by kind instead of by time.
+  `THINKING` (reasoning) over `BASE` (prompts + compactions) on the left, `OUTPUT` (answers) on the right,
+  and `TERMINAL` across the bottom: bash shows the real command line after a `$`, its raw output, and
+  `T+01:12 · 0.8s · exit 1`; diffs keep their `+`/`-` lines; anything still running ends in a blinking `$ ▊`.
+  Each zone scrolls and follows on its own. The `STREAM` badge toggles it, `Esc` goes back — the mission log
+  stays the only place that reads a thread in order.
+- `/?craft` — the primitive sheet (elbows, motion, icons, form language, themes, the zone layout),
   i.e. the visual contract on one page.
 
 `SYSTEM → BACKDROP` lets you point the console at one of your own stills (any
 folder on any volume, or your photo folder). The file is streamed from where it
 lives, never copied into the project and never bundled — clear it and the screen
 is LCARS black again.
+
+## Composer
+
+The input area is the one place that remembers things:
+
+| | behaviour |
+|---|---|
+| draft | kept per session in `localStorage`; survives reload, switching stations and switching sessions |
+| history | `↑` from the start of the draft recalls what you already sent (per session, last 40); `↓` walks forward again |
+| images | paste, drop or the attach button → chips, sent through pi's own `prompt(text, { images })`. The transcript only keeps the counts |
+| `@` | opens a ranked file list; the pick lands in the draft as a backticked path for pi's `read` tool |
+| `/` | skills, prompt templates and the console's own commands (`/compact` `/fork` `/new` `/model` `/stop`) |
+| height | grows with the draft to `min(240px, 26vh)`, then scrolls; `Enter` sends, `Shift+Enter` breaks the line |
 
 ## Troubleshooting
 
@@ -156,7 +178,10 @@ class of report: if `/probe` dies, the console is not involved.
 | `⌘K` / `Ctrl K` | focus the composer |
 | `Enter` | send (steers while a run is active) |
 | `Shift+Enter` | newline |
-| `Esc` | close a deck / tree / viewer, else stop the current run |
+| `Esc` | close a deck / branch tree / workspace / viewer, else stop the current run |
+| `↑` / `↓` | at the start of the draft: walk the sent-history (or move the palette cursor) |
+| `@` | file references: ranked workspace paths, inserted as a code span |
+| `/` | command palette (`Tab` / `Enter` completes, `Esc` clears) |
 | `⌘B` | collapse / expand the left rail (64px icon rail when collapsed) |
 | `⌘⇧B` | collapse / expand the resources rail |
 
