@@ -256,6 +256,18 @@ export type FileResult = {
 export type TreeEntry = { name: string; path: string; rel: string; type: "dir" | "file" | "other"; size: number | null };
 export type TreeResult = { path: string; rel: string; parent: string | null; root: string; entries: TreeEntry[] };
 
+/** One directory as the backdrop picker sees it: folders + stills we can render. */
+export type BackdropImage = { name: string; path: string; size: number; mtime: number };
+export type BackdropDir = {
+  path: string;
+  parent: string | null;
+  home: string;
+  roots: { label: string; path: string }[];
+  dirs: { name: string; path: string }[];
+  images: BackdropImage[];
+  truncated: boolean;
+};
+
 export type McpTool = { name: string; exposure: "direct" | "deferred"; description: string };
 
 export type McpServer = {
@@ -368,6 +380,11 @@ export const api = {
     call<{ path: string; parent: string | null; dirs: DirEntry[]; home: string; roots: { label: string; path: string }[] }>(
       `/api/fs${path ? `?path=${encodeURIComponent(path)}` : ""}`,
     ),
+  backdrop: (dir?: string) =>
+    call<BackdropDir>(`/api/backdrop${dir ? `?dir=${encodeURIComponent(dir)}` : ""}`),
+  /** Stills are streamed from their original path — nothing is copied or cached. */
+  backdropUrl: (path: string, mtime?: number) =>
+    `/api/backdrop/file?path=${encodeURIComponent(path)}${mtime ? `&v=${mtime}` : ""}`,
 };
 
 export type StreamEvent =

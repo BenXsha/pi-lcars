@@ -52,7 +52,7 @@ platform-correct install command instead of failing with a stack trace.
 npm install
 npm run dev      # client at :5173, proxies /api → :4173
 npm run server   # in another shell: real pi session, SSE on :4173
-npm test         # pi-env (18) + endpoints (50) + launcher (28) + ui (61) checks
+npm test         # pi-env (18) + mcp-config (27) + endpoints (59) + launcher (28) + ui (100) checks
 
 SMOKE_MODEL=1 npm test   # also does one real turn + fork (costs a model call)
 ```
@@ -85,7 +85,7 @@ src/               Vite + Preact + TS client
   styles/          tokens (structure) + themes (colour) + lcars (components)
   components/      Elbow · ToolStrip · ApprovalDeck · FieldRow · Icon …
   views/Craft.tsx  craft layer, the visual contract in one page
-  icons.ts         generated: remixicon -fill paths (56 icons, no font)
+  icons.ts         generated: remixicon -fill paths (64 icons, no font)
 demo/              v0 vanilla implementation, kept for reference
 boards/            MasterGo frames (v1 skeleton, v2 real stream)
 AGENTS.md          the design contract — read before touching UI (repo only, not published)
@@ -108,6 +108,8 @@ PLAN.md            milestone plan (M0..M9) (repo only, not published)
 | POST | `/api/thinking` | `off` / `low` / `medium` / `high` (reports `clamped`) |
 | GET | `/api/models` | available models for the active session |
 | GET | `/api/fs?path=` | directories only, for the workspace picker |
+| GET | `/api/backdrop?dir=` | folders + image files, for the backdrop picker (whole disk) |
+| GET | `/api/backdrop/file?path=` | streams the chosen still from its own path; no copy, no bundle |
 | GET | `/api/mcp` | servers from `mcp.json` (global + project overrides) |
 | POST | `/api/mcp` | `{op: toggle\|add\|remove}` — writes with a `.bak` backup |
 
@@ -118,6 +120,11 @@ PLAN.md            milestone plan (M0..M9) (repo only, not published)
   Stations are hash-addressable: `/#about`, `/#providers`, …
 - `/?craft` — the primitive sheet (elbows, motion, icons, form language, themes),
   i.e. the visual contract on one page.
+
+`SYSTEM → BACKDROP` lets you point the console at one of your own stills (any
+folder on any volume, or your photo folder). The file is streamed from where it
+lives, never copied into the project and never bundled — clear it and the screen
+is LCARS black again.
 
 ## Troubleshooting
 

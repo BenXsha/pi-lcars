@@ -74,6 +74,7 @@ const MANIFEST = {
   "fld-model": "brain-fill",
   "fld-args": "list-unordered",
   "fld-path": "folder-fill",
+  "fld-image": "image-fill",
   // approval
   "ap-approve": "check-fill",
   "ap-deny": "prohibited-fill",

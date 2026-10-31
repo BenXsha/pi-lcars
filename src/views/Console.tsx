@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import type { DiffData, DirEntry, HistoryResult, TreeRow, Item, McpConfig, McpServer, ModelInfo, ProviderRow, ProvidersResult, SkillsResult, SystemInfo } from "../api";
+import type { BackdropDir, BackdropImage, DiffData, DirEntry, HistoryResult, TreeRow, Item, McpConfig, McpServer, ModelInfo, ProviderRow, ProvidersResult, SkillsResult, SystemInfo } from "../api";
 import { api } from "../api";
 import { actions, connect, getState, subscribe } from "../store";
 import { THEMES, appliedTheme, applyTheme, type ThemeId } from "../theme";
-import { getSettings, setSettings, subscribeSettings } from "../settings";
+import { getSettings, setSettings, subscribeSettings, touchBackdrop } from "../settings";
 import { t } from "../i18n";
 import { Icon, type IconName } from "../components/Icon";
 import { Logo } from "../components/Logo";
@@ -84,7 +84,10 @@ const ago = (ts: number | null) => {
   if (d < 86_400_000) return `${Math.round(d / 3_600_000)}h`;
   return `${Math.round(d / 86_400_000)}d`;
 };
-const shortPath = (p: string) => p.replace(/^\/Users\/[^/]+/, "~");
+const shortPath = (p: string) =>
+  p.replace(/^\/(?:Users|home)\/[^/]+/, "~").replace(/^[A-Za-z]:\\Users\\[^\\]+/i, "~");
+const fmtBytes = (n: number) =>
+  n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : n >= 1024 ? `${Math.round(n / 1024)} KB` : `${n} B`;
 const fmtTok = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(1)}K` : String(n));
 
 /**
@@ -2921,6 +2924,130 @@ const SHORTCUTS: [string, string][] = [
   ["⌘⇧B / Ctrl ⇧B", "collapse or expand the resources rail"],
 ];
 
+/**
+ * Backdrop picker. Deliberately not workspace-scoped: an operator's stills live
+ * wherever they live (Pictures, Desktop, an external volume), so this browses
+ * the real filesystem. The server streams the chosen file from its original
+ * path — nothing is copied into the project, and deleting the file simply turns
+ * the backdrop off.
+ */
+function BackdropPicker({
+  current,
+  onUse,
+  onClose,
+}: {
+  current: string;
+  onUse: (path: string) => void;
+  onClose: () => void;
+}) {
+  const [data, setData] = useState<BackdropDir | null>(null);
+  const [sel, setSel] = useState<BackdropImage | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  const load = (dir?: string) => {
+    api
+      .backdrop(dir)
+      .then((d) => {
+        setData(d);
+        setSel(null);
+        setErr(null);
+      })
+      .catch((e) => setErr(e.message));
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  // Escape closes the picker only — the applied backdrop is not touched.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopPropagation();
+      onClose();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [onClose]);
+
+  const path = data?.path ?? "";
+  // keep the separators so POSIX and Windows paths both split into prefixes
+  const parts = path.split(/(?<=[\\/])/).filter(Boolean);
+  const crumbPath = (i: number) => parts.slice(0, i + 1).join("");
+
+  return (
+    <div class="bd-browse">
+      <div class="hd">
+        <span class="lb">{t("bd.pickTitle")}</span>
+        <span class="sub">{t("bd.pickSub")}</span>
+      </div>
+
+      <div class="ws-crumbs">
+        {parts.map((seg, i) => (
+          <button type="button" class="ws-crumb" key={crumbPath(i)} onClick={() => load(crumbPath(i))}>
+            {seg.replace(/[\\/]$/, "") || seg}
+          </button>
+        ))}
+      </div>
+
+      <div class="ws-recent">
+        <span class="lb">{t("bd.goTo")}</span>
+        {(data?.roots ?? []).map((r) => (
+          <button type="button" key={r.path} class="ws-chip" onClick={() => load(r.path)}>
+            {r.label}
+          </button>
+        ))}
+      </div>
+
+      {err ? <div class="bd-empty" style={{ color: "var(--tomato)" }}>{err}</div> : null}
+
+      <div class="bd-scroll">
+        {(data?.dirs ?? []).map((d) => (
+          <PickRow key={d.path} icon="fld-path" name={d.name} onClick={() => load(d.path)} />
+        ))}
+        {(data?.images ?? []).length ? (
+          <div class="bd-imgs">
+            {(data?.images ?? []).map((img) => (
+              <button
+                type="button"
+                key={img.path}
+                class="bd-img"
+                aria-selected={sel?.path === img.path ? "true" : "false"}
+                title={img.path}
+                onClick={() => setSel(img)}
+              >
+                <span class="st" />
+                <span class="th" style={{ backgroundImage: `url("${api.backdropUrl(img.path, img.mtime)}")` }} />
+                <span class="nm">{img.name}</span>
+                <span class="mt">{fmtBytes(img.size)}</span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div class="bd-empty">{t("bd.noImages")}</div>
+        )}
+        {data?.truncated ? <div class="bd-empty">{t("bd.truncated")}</div> : null}
+      </div>
+
+      <div class="bd-foot">
+        <span class="picked" title={sel?.path ?? current}>
+          {sel ? shortPath(sel.path) : current ? shortPath(current) : t("bd.none")}
+        </span>
+        <button type="button" class="pv-btn ghost" disabled={!data?.parent} onClick={() => data?.parent && load(data.parent)}>
+          {t("bd.up")}
+        </button>
+        <button type="button" class="pv-btn ghost" onClick={onClose}>
+          {t("bd.cancel")}
+        </button>
+        <button type="button" class="pv-btn" disabled={!sel} onClick={() => sel && onUse(sel.path)}>
+          {t("bd.use")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function SettingsPanel({
   items,
   meta,
@@ -2936,6 +3063,7 @@ function SettingsPanel({
 }) {
   const [sys, setSys] = useState<SystemInfo | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  const [picking, setPicking] = useState(false);
   const [, force] = useState(0);
   const prefs = getSettings();
 
@@ -3008,15 +3136,52 @@ function SettingsPanel({
         </div>
       </div>
 
-      <div class="set-block">
+      <div class="set-block" data-open={picking ? "1" : "0"}>
         <span class="lb">{t("set.backdrop")}</span>
-        <div class="seg small">
-          <button type="button" aria-pressed={prefs.backdrop === "off" ? "true" : "false"} onClick={() => setSettings({ backdrop: "off" })}>
-            OFF
-          </button>
-          <button type="button" aria-pressed={prefs.backdrop === "on" ? "true" : "false"} onClick={() => setSettings({ backdrop: "on" })}>
-            SHIP
-          </button>
+        <div>
+          <div class="bd-row">
+            <span
+              class="bd-thumb"
+              data-empty={prefs.backdrop ? "0" : "1"}
+              style={prefs.backdrop ? { backgroundImage: `url("${api.backdropUrl(prefs.backdrop)}")` } : undefined}
+            >
+              {prefs.backdrop ? null : <Icon name="fld-image" size={13} />}
+            </span>
+            <span class="bd-path" data-empty={prefs.backdrop ? "0" : "1"} title={prefs.backdrop || t("bd.none")}>
+              {prefs.backdrop ? shortPath(prefs.backdrop) : t("bd.none")}
+            </span>
+            <span class="bd-acts">
+              <button type="button" class="pv-btn" data-bd-choose="1" onClick={() => setPicking((v) => !v)}>
+                {prefs.backdrop ? t("bd.change") : t("bd.choose")}
+              </button>
+              {prefs.backdrop ? (
+                <button
+                  type="button"
+                  class="pv-btn ghost"
+                  onClick={() => {
+                    setSettings({ backdrop: "" });
+                    setPicking(false);
+                    flash(t("bd.cleared"));
+                  }}
+                >
+                  {t("bd.clear")}
+                </button>
+              ) : null}
+            </span>
+          </div>
+
+          {picking ? (
+            <BackdropPicker
+              current={prefs.backdrop}
+              onClose={() => setPicking(false)}
+              onUse={(path) => {
+                setSettings({ backdrop: path });
+                touchBackdrop();
+                setPicking(false);
+                flash(`${t("bd.applied")} · ${shortPath(path)}`);
+              }}
+            />
+          ) : null}
         </div>
       </div>
 

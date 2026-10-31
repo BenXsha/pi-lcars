@@ -438,7 +438,7 @@ ADD 表单因此覆盖：
   内圆角语言不能丢；只是里面的标记改以 32px（窄轨中心）对齐。shelf 左内距恒为 70px。
 - 快捷键：`⌘B / Ctrl B` 左栏、`⌘⇧B / Ctrl ⇧B` 右栏；**在输入框里也生效**（composer 没有占用这组绑定）。
 - 状态写 localStorage（`lcars.left` / `lcars.right`），刷新保留。
-- SETTINGS 站只放**界面相关**的东西：配色 / 界面缩放 / 动效 / 语言 / PI 运行时路径 / 快捷键表 / 审批策略。
+- SETTINGS 站只放**界面相关**的东西：配色 / 界面缩放 / 动效 / 语言 / 背景 / PI 运行时路径 / 快捷键表 / 审批策略。
   运行时数值（模型、token）不放这里 —— 它们在 rail 与 CONTEXT 站。
 - 语言只翻**界面外壳**（导航、按钮、输入提示、设置面板），消息与工具输出保持原文，
   面板底部明确写出这一点；新增文案先加 `i18n.ts` 的 key，不要在组件里写死中英文。
@@ -758,6 +758,8 @@ composer 上方出现 `QUEUED n` 条带，逐条显示待投递文本 + `deliver
 | 2026-xx-xx | 背景图改为**自绘 SVG**（`scripts/build-backdrop.mjs` → `public/backdrop.svg`），随包按 MIT 分发；不再使用影视剧照 | 参考图能表达"舰体+星空"的味道，但素材版权不明，不能随开源包分发。自绘只用平涂与低透明度，符合 §2 R4（无渐变/发光） | `scripts/build-backdrop.mjs`、`public/backdrop.svg`、`src/styles/lcars.css` |，角色语义不变；色值来自 fan-canon 调色板（trekcolors / thelcars.com 的 Picard、Nemesis 等）并逐色提到"黑字可读"的亮度 | 用户要求跟进最近两部电影与新剧的配色；原四套已够用但没有"影视新作"的表达 | `src/styles/themes.css`、`src/theme.ts`、`scripts/check-themes.mjs` |：状态色同时决定 4px 状态条、名字块实色、正文 9% 透明底、读数块 22% 底 | 原来正文块无底色，实色名字块与灰读数块浮在黑底上，一行像两个岛，不是 LCARS 的连续条带 | `src/styles/lcars.css`（`.tool` 的 `--tone`） |
 | 2026-xx-xx | 背景图换成用户提供的舰体静帧（`public/backdrop.jpg`，1600px / 238 KB，40% 不透明度 + 55% 黑幕）；自绘 SVG 生成脚本保留作为可复现的替代方案 | 用户要的是这张图的实际观感；同一条"最坏合成 ≤ 46"的约束仍然成立（g3 4.9:1，g2 3.3:1 非文本） | `public/backdrop.jpg`、`src/styles/lcars.css`、`scripts/build-backdrop.mjs` |
 | 2026-xx-xx | 新会话在 `#load()` 里补齐默认模型与思考档：`createAgentSession()` 不传 model 时 pi 会停在 `unknown/unknown`，导致 shelf 与 `pi-lcars status` 显示假值 | “unknown/unknown” 违反 §7.6 数字自洽；同时它让 pi-lens 把 situational 工具当默认激活，工具清单虚高 | `server/pi/registry.mjs`、`test/smoke.mjs` |
+| 2026-xx-xx | **内置壁纸移除**。背景改为用户自选本地图片：`SETTINGS → BACKDROP → CHOOSE…` 打开磁盘选择器（HOME / PICTURES / DESKTOP / DOWNLOADS / ROOT / 挂载卷，面包屑 + 图片行带缩略图），选定后 `settings.backdrop` 存绝对路径 | 随包分发壁纸无论自绘还是静帧都是替用户做审美决定，且要背素材来源；把选择权交给用户后包里零图片零版权负担。图片**原地读取**（`/api/backdrop/file`）不复制进项目，删掉文件即自动回到纯黑 | `server/pi/fs.mjs`（`listBackdropDir` / `backdropFile`）、`server/index.mjs`、`src/views/Console.tsx`（`BackdropPicker`）、`src/settings.ts`、`src/styles/lcars.css`、`test/smoke.mjs`、`test/ui.mjs`；删除 `public/backdrop.jpg`、`scripts/build-backdrop.mjs` |
+| 2026-xx-xx | 背景仍是**纹理而非壁纸**：40% 不透明度 + 55% 黑幕的合成上界与图片内容无关（任意像素最坏 rgb(46,46,46)），所以用户换成多亮的照片都不会突破 §2 R2；不做亮度/透明度滑杆，避免第二个变量破坏对比度 | 纯色块是 LCARS 的构图基础，背景只能“看得见舰体，读得清读数”；把上界做成常量就不需要每张图人工验对比度 | `src/styles/lcars.css`（`--backdrop-image`） |
 
 ---
 

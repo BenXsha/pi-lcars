@@ -1,6 +1,7 @@
 import { readdir, stat, realpath, readFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { resolve, relative, sep, join, dirname, isAbsolute } from "node:path";
+import { homedir } from "node:os";
 
 const SKIP = new Set(["node_modules", ".git", "dist", ".turbo", ".next"]);
 
@@ -169,6 +170,121 @@ export const isInside = (root, p) => {
   const abs = isAbsolute(p) ? p : resolve(root, p);
   return abs === root || abs.startsWith(root + sep);
 };
+
+/* ------------------------------------------------------------- backdrop */
+/*
+ * The backdrop is the one thing the console reads from outside the workspace:
+ * the operator picks a still from their own disk. Nothing is copied into the
+ * project, nothing is stored server-side — the chosen path is kept in the
+ * client's settings and the bytes are read in place, so moving or deleting the
+ * file simply turns the backdrop off. The endpoint is local-only (the server
+ * binds 127.0.0.1) and refuses anything that is not a plain image file.
+ */
+const BACKDROP_EXT = new Set([".png", ".jpg", ".jpeg", ".webp", ".avif", ".gif", ".bmp"]);
+const BACKDROP_MAX = 64 * 1024 * 1024;
+const BACKDROP_ROWS = 400;
+
+const extOf = (p) => (p.match(/\.[^./\\]+$/)?.[0] || "").toLowerCase();
+const isBackdropImage = (p) => BACKDROP_EXT.has(extOf(p));
+
+const backdropError = (message, status, code) => {
+  const e = new Error(message);
+  e.status = status;
+  e.code = code;
+  return e;
+};
+
+const isDir = async (p) => {
+  try {
+    const st = await stat(p);
+    return st.isDirectory();
+  } catch {
+    return false;
+  }
+};
+
+/** Roots the picker offers: only paths that actually exist on this machine. */
+async function backdropRoots(home) {
+  const roots = [];
+  const add = async (label, p) => {
+    if (await isDir(p)) roots.push({ label, path: p });
+  };
+  await add("HOME", home);
+  await add("PICTURES", join(home, "Pictures"));
+  await add("DESKTOP", join(home, "Desktop"));
+  await add("DOWNLOADS", join(home, "Downloads"));
+  await add("ROOT", process.platform === "win32" ? `${process.env.SystemDrive || "C:"}\\` : "/");
+  if (process.platform === "darwin") {
+    try {
+      for (const v of await readdir("/Volumes")) {
+        if (v === "Macintosh HD") continue;
+        roots.push({ label: `VOL ${v}`, path: join("/Volumes", v) });
+      }
+    } catch {
+      /* no volumes */
+    }
+  }
+  return roots;
+}
+
+/** One directory of the picker: sub-folders plus the images it can show. */
+export async function listBackdropDir({ dir, showHidden = false } = {}) {
+  const home = homedir();
+  let start = dir ? resolve(dir) : join(home, "Pictures");
+  if (!dir && !(await isDir(start))) start = home;
+
+  let dirents;
+  try {
+    dirents = await readdir(start, { withFileTypes: true });
+  } catch (e) {
+    throw backdropError(`cannot read ${start}: ${e.code || e.message}`, 400, "E_BACKDROP");
+  }
+
+  const dirs = [];
+  const images = [];
+  for (const d of dirents) {
+    if (!showHidden && d.name.startsWith(".")) continue;
+    const full = join(start, d.name);
+    if (d.isDirectory()) {
+      if (!SKIP.has(d.name)) dirs.push({ name: d.name, path: full });
+      continue;
+    }
+    if (!d.isFile() || !isBackdropImage(d.name)) continue;
+    try {
+      const st = await stat(full);
+      images.push({ name: d.name, path: full, size: st.size, mtime: Math.round(st.mtimeMs) });
+    } catch {
+      /* unreadable entry — skip it rather than fail the listing */
+    }
+  }
+
+  dirs.sort((a, b) => a.name.localeCompare(b.name));
+  // newest first: the still somebody just downloaded is the one they want
+  images.sort((a, b) => b.mtime - a.mtime || a.name.localeCompare(b.name));
+
+  return {
+    path: start,
+    parent: dirname(start) === start ? null : dirname(start),
+    home,
+    roots: await backdropRoots(home),
+    dirs: dirs.slice(0, BACKDROP_ROWS),
+    images: images.slice(0, BACKDROP_ROWS),
+    truncated: dirs.length > BACKDROP_ROWS || images.length > BACKDROP_ROWS,
+  };
+}
+
+/** Stream the chosen still. Absolute image path only; no workspace guard on purpose. */
+export async function backdropFile({ path: target }) {
+  if (!target || !isAbsolute(target)) throw backdropError("an absolute image path is required", 400, "E_ARGS");
+  const abs = await realpath(target).catch(() => target);
+  if (!isBackdropImage(abs)) throw backdropError(`not an image file: ${target}`, 415, "E_NOT_IMAGE");
+  const st = await stat(abs).catch(() => null);
+  if (!st || !st.isFile()) throw backdropError(`not a file: ${target}`, 400, "E_NOT_FILE");
+  if (st.size > BACKDROP_MAX) throw backdropError(`image is larger than ${BACKDROP_MAX / 1048576} MB`, 413, "E_TOO_LARGE");
+  const { mime } = classify(abs);
+  const { createReadStream } = await import("node:fs");
+  return { abs, size: st.size, mime, mtime: Math.round(st.mtimeMs), stream: createReadStream(abs) };
+}
 
 /** Stream raw bytes with range support (video scrubbing needs it). */
 export async function streamFile({ cwd, target, range }) {

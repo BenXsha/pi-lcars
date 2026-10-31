@@ -20,7 +20,7 @@ import { Dialogs } from "./pi/dialogs.mjs";
 import { listCommands } from "./pi/commands.mjs";
 import { now, summaryOf } from "./pi/format.mjs";
 import { mcpStatus, setEnabled, addServer, removeServer } from "./pi/mcpConfig.mjs";
-import { listTree, openPath, readTextFile, streamFile } from "./pi/fs.mjs";
+import { listTree, openPath, readTextFile, streamFile, listBackdropDir, backdropFile } from "./pi/fs.mjs";
 import { queryHistory, startHistoryScan, historyCache as historyCacheRef, deleteHistoryFile, renameHistoryFile } from "./pi/history.mjs";
 import { listSkills, reloadSkills } from "./pi/skills.mjs";
 import { listProviders, listProviderModels, testProvider, setDefaultModel, setProviderKey, addProvider, removeProvider, reloadProviders } from "./pi/providers.mjs";
@@ -688,6 +688,29 @@ ${css ? `<link rel="stylesheet" href="${css}">` : ""}
     } else {
       res.writeHead(200, { "content-type": r.mime, "content-length": r.size, "accept-ranges": "bytes" });
     }
+    r.stream.pipe(res);
+  },
+
+  "GET /api/backdrop": async (req, res) => {
+    const url = new URL(req.url, "http://x");
+    // no dir → home/Pictures when it exists, else home: this is a picker
+    ok(res, await listBackdropDir({
+      dir: url.searchParams.get("dir") || "",
+      showHidden: url.searchParams.get("hidden") === "1",
+    }));
+  },
+
+  "GET /api/backdrop/file": async (req, res) => {
+    const url = new URL(req.url, "http://x");
+    const target = url.searchParams.get("path");
+    if (!target) return fail(res, 400, "path is required", { code: "E_ARGS" });
+    const r = await backdropFile({ path: target });
+    res.writeHead(200, {
+      "content-type": r.mime,
+      "content-length": r.size,
+      "cache-control": "private, max-age=300",
+      "last-modified": new Date(r.mtime).toUTCString(),
+    });
     r.stream.pipe(res);
   },
 

@@ -1702,11 +1702,14 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
   min-height: 40px;
 }
 .set-block > .lb {
-  font: 700 10.5px/1.3 var(--din);
+  font: 700 11px/1.3 var(--din);
   letter-spacing: 0.12em;
   color: var(--g3);
 }
-.set-themes { display: flex; gap: 4px; }
+/* the label sits at the top when the backdrop picker is expanded under it */
+.set-block[data-open="1"] { align-items: start; }
+.set-block[data-open="1"] > .lb { padding-top: 10px; }
+.set-themes { display: flex; flex-wrap: wrap; gap: 4px; }
 .theme-opt.mini {
   display: grid;
   grid-template-columns: 44px auto;
@@ -1762,6 +1765,77 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 .set-tool[data-used="1"] { color: var(--w); background: var(--g1); }
 .set-tool em { font: 400 11px/1.3 var(--mono); font-style: normal; color: var(--cyan); }
 .set-tool em[data-err="1"] { color: var(--tomato); }
+
+/* backdrop: the operator's own still, read in place — no bundled wallpaper */
+.bd-row { display: flex; align-items: center; gap: var(--gap); min-width: 0; }
+.bd-thumb {
+  flex: 0 0 auto;
+  width: 96px;
+  height: 40px;
+  background: var(--g1) center / cover no-repeat;
+  border-radius: 0 var(--r-1) var(--r-1) 0;
+}
+.bd-thumb[data-empty="1"] { display: flex; align-items: center; justify-content: center; color: var(--g2); }
+.bd-path {
+  flex: 1 1 auto;
+  min-width: 0;
+  font: 400 11.5px/1.5 var(--mono);
+  color: var(--w);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bd-path[data-empty="1"] { color: var(--g3); }
+.bd-acts { display: flex; gap: 2px; flex: 0 0 auto; }
+
+/* picker: same spindle as the workspace deck, but it lists folders *and* stills */
+.bd-browse {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 2px 0 6px;
+  padding: 8px 10px 6px;
+  background: var(--g0);
+  border-radius: 0 var(--r-2) var(--r-2) 0;
+  box-shadow: inset 4px 0 0 var(--orange);
+}
+.bd-browse .hd { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; padding: 0 0 4px 4px; }
+.bd-browse .hd .lb { font: 700 11px/1.3 var(--din); letter-spacing: 0.14em; color: var(--orange); }
+.bd-browse .hd .sub { font: 400 11px/1.4 var(--din); color: var(--g3); }
+.bd-scroll { max-height: 46vh; overflow: auto; padding-right: 2px; }
+.bd-imgs { display: flex; flex-direction: column; gap: 2px; }
+.bd-img {
+  display: grid;
+  grid-template-columns: 4px 60px minmax(0, 1fr) 74px;
+  gap: var(--gap);
+  align-items: center;
+  min-height: 40px;
+  width: 100%;
+  text-align: left;
+  border-radius: 0 var(--r-1) var(--r-1) 0;
+}
+.bd-img > .st { align-self: stretch; margin: 8px 0; background: transparent; border-radius: var(--r-pill); }
+.bd-img > .th {
+  height: 34px;
+  background: var(--g1) center / cover no-repeat;
+  border-radius: 0 var(--r-1) var(--r-1) 0;
+}
+.bd-img > .nm {
+  min-width: 0;
+  font: 400 11.5px/1.5 var(--mono);
+  color: var(--w);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bd-img > .mt { font: 400 11px/1.3 var(--din); letter-spacing: 0.08em; color: var(--g3); text-align: right; }
+.bd-img:hover { background: var(--g0); }
+.bd-img[aria-selected="true"] { background: var(--g1); }
+.bd-img[aria-selected="true"] > .st { background: var(--orange); }
+.bd-img[aria-selected="true"] > .nm { color: var(--w); }
+.bd-empty { font: 400 11px/1.6 var(--mono); color: var(--g3); padding: 4px 6px; }
+.bd-foot { display: flex; align-items: center; gap: var(--gap); padding: 6px 0 0; }
+.bd-foot .picked { flex: 1 1 auto; min-width: 0; font: 400 11px/1.5 var(--mono); color: var(--g3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ============================================================
    hover hints — a small LCARS strip, not an OS tooltip
@@ -1944,9 +2018,9 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 .ws-path { font: 400 11.5px/1.6 var(--mono); color: var(--w); padding: 0 0 2px 2px; }
 .ws-path span { color: var(--g3); margin-left: 8px; }
 .ws-recent { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; padding: 2px 0 4px; }
-.ws-recent .lb { font: 700 9px/1 var(--din); letter-spacing: 0.14em; color: var(--g2); margin-right: 4px; }
+.ws-recent .lb { font: 700 11px/1 var(--din); letter-spacing: 0.14em; color: var(--g2); margin-right: 4px; }
 .ws-chip {
-  font: 400 10.5px/1.3 var(--mono);
+  font: 400 11px/1.3 var(--mono);
   color: var(--g3);
   background: var(--g0);
   padding: 3px 7px;
@@ -2834,18 +2908,21 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 .panic-actions button:hover { background: var(--orange); color: #000; }
 
 
-/* ----------------------------------------------------- starship backdrop */
-/* Opt-in (SETTINGS → BACKDROP / ?backdrop=1). User-supplied still (a generated
-   ship-and-stars frame), shipped as public/backdrop.jpg. It is a texture under the
-   blocks, not a wallpaper: 40% opacity plus a 55% scrim keeps the worst-case
-   composite at rgb(46,46,46) — 4.9:1 for g3 labels, 3.3:1 for g2 non-text. */
+/* ---------------------------------------------------------- backdrop */
+/* Opt-in (SETTINGS → BACKDROP). The still is the operator's own file, streamed
+   from its original path by /api/backdrop/file — nothing ships with the console
+   and nothing is copied into the project. It is a texture under the blocks, not
+   a wallpaper: 40% opacity plus a 55% scrim bounds the worst case (a white pixel)
+   at rgb(46,46,46), which still leaves 4.9:1 for g3 labels and 3.3:1 for the
+   non-text g2. That bound holds for any image, so contrast cannot be broken by
+   the choice. `--backdrop-image` is set by src/settings.ts. */
 html[data-backdrop="1"] body::before {
   content: "";
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background: url("/backdrop.jpg") center 42% / cover no-repeat;
+  background: var(--backdrop-image, none) center 42% / cover no-repeat;
   opacity: 0.4;
 }
 html[data-backdrop="1"] body::after {

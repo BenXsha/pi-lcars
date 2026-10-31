@@ -11,7 +11,7 @@
  */
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdtemp, readdir, rm } from "node:fs/promises";
+import { mkdtemp, readdir, rm, mkdir, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -372,6 +372,46 @@ try {
   check("theme button applies a theme", clickedVoy && (await attr("html", "data-theme")) === "voy", String(await attr("html", "data-theme")));
   await evaluate(`(() => { const b = [...document.querySelectorAll('.theme-opt')].find((el) => /TNG/i.test(el.textContent)); b?.click(); })()`);
   await sleep(200);
+
+  /* ------------------------------------------------ 8b. backdrop */
+  // the picker browses the real filesystem; the still is read from its own path
+  const stills = join(tmp, "stills");
+  await mkdir(stills, { recursive: true });
+  const stillPath = join(stills, "frame.png");
+  await writeFile(stillPath, Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==", "base64"));
+
+  const bdRow = await evaluate(`document.querySelector('.bd-row')?.textContent ?? ''`);
+  check("settings offers a backdrop picker, not a bundled still", /CHOOSE/.test(bdRow) && /LCARS black/.test(bdRow), bdRow.slice(0, 60));
+  check("no built-in wallpaper button remains", !(await evaluate(`[...document.querySelectorAll('.set-block .seg button')].some((b) => /SHIP/.test(b.textContent))`)));
+
+  await click("[data-bd-choose]");
+  await sleep(500);
+  check("backdrop picker opens", await exists(".bd-browse"));
+  const rootsListed = await evaluate(`[...document.querySelectorAll('.bd-browse .ws-chip')].map((el) => el.textContent.trim())`);
+  check("picker offers disk roots", rootsListed.includes("HOME"), JSON.stringify(rootsListed));
+  check("picker cannot apply nothing", await evaluate(`[...document.querySelectorAll('.bd-browse .bd-foot .pv-btn')].find((b) => /USE/.test(b.textContent))?.disabled === true`));
+  await evaluate(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`);
+  await sleep(250);
+  check("escape closes the picker", !(await exists(".bd-browse")));
+  check("closing the picker keeps settings intact", await exists(".bd-row"));
+
+  // apply a still through the same stored setting the picker writes, then reload
+  await evaluate(
+    `(() => { const s = JSON.parse(localStorage.getItem('lcars.settings') || '{}'); s.backdrop = ${JSON.stringify(stillPath)}; localStorage.setItem('lcars.settings', JSON.stringify(s)); localStorage.setItem('lcars.theme', 'tng'); })()`,
+  );
+  await cdp.send("Page.navigate", { url: process.env.UI_BASE || handshake.url });
+  await sleep(1800);
+  check("stored still turns the backdrop on", (await attr("html", "data-backdrop")) === "1", String(await attr("html", "data-backdrop")));
+  const bgImage = await evaluate(`getComputedStyle(document.documentElement).getPropertyValue('--backdrop-image')`);
+  check("backdrop url points at the chosen file", bgImage.includes("/api/backdrop/file?path=") && bgImage.includes("frame.png"), bgImage.slice(0, 80));
+
+  await click(".lnav .station:nth-child(5)"); // settings
+  await sleep(300);
+  check("settings shows the chosen still", await evaluate(`/frame.png$/.test(document.querySelector('.bd-path')?.textContent.trim() ?? '')`));
+  await evaluate(`[...document.querySelectorAll('.bd-acts .pv-btn')].find((b) => /CLEAR/.test(b.textContent))?.click()`);
+  await sleep(250);
+  check("clear turns the backdrop off", (await attr("html", "data-backdrop")) === "0", String(await attr("html", "data-backdrop")));
+  check("clear forgets the path", (await evaluate(`JSON.parse(localStorage.getItem('lcars.settings')).backdrop`)) === "");
 
   /* --------------------------------------------------- 9. composer */
   await click(".lsessions .sess");

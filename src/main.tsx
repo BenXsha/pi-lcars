@@ -16,7 +16,11 @@ installWatchdog();
 const params = new URLSearchParams(location.search);
 if (params.has("nomotion")) setSettings({ motion: "reduced" });
 else if (params.has("motion")) setSettings({ motion: "system" });
-if (params.has("backdrop")) setSettings({ backdrop: params.get("backdrop") === "0" ? "off" : "on" });
+// `?backdrop=<absolute path>` applies a still for this profile; `0`/`off` clears it
+if (params.has("backdrop")) {
+  const v = (params.get("backdrop") || "").trim();
+  setSettings({ backdrop: v === "0" || v === "off" ? "" : v });
+}
 
 // theme before first paint — no flash of the default palette
 restoreTheme();

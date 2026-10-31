@@ -7,7 +7,7 @@
  *   node test/smoke.mjs
  */
 import { spawn } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -82,6 +82,31 @@ try {
   check("tree lists dirs first", tree.body?.data?.entries?.[0]?.type === "dir");
   const outside = await post("/api/open", { path: "../../etc/hosts" });
   check("open refuses paths outside the workspace", outside.status === 403 && outside.body?.code === "E_OUTSIDE");
+
+  /* ------------- backdrop: the operator's own still, read in place ------------- */
+  const PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==";
+  const pngBytes = Buffer.from(PNG, "base64");
+  const stills = join(dir, "stills");
+  await mkdir(stills, { recursive: true });
+  await writeFile(join(stills, "frame.png"), pngBytes);
+  await writeFile(join(stills, "notes.txt"), "not an image");
+
+  const bd = await get(`/api/backdrop?dir=${encodeURIComponent(stills)}`);
+  check("GET /api/backdrop lists folders + stills", bd.status === 200 && Array.isArray(bd.body?.data?.dirs) && bd.body?.data?.images?.length === 1, `${bd.body?.data?.images?.length ?? "?"} images`);
+  check("backdrop lists only images", bd.body?.data?.images?.[0]?.name === "frame.png", JSON.stringify(bd.body?.data?.images?.map((i) => i.name)));
+  check("backdrop picker offers roots", (bd.body?.data?.roots ?? []).some((r) => r.label === "HOME"), JSON.stringify(bd.body?.data?.roots?.map((r) => r.label)));
+
+  const img = await fetch(`${BASE}/api/backdrop/file?path=${encodeURIComponent(join(stills, "frame.png"))}`);
+  const imgLen = (await img.arrayBuffer()).byteLength;
+  check("backdrop still is served from its own path", img.status === 200 && img.headers.get("content-type") === "image/png", String(img.status));
+  check("backdrop still keeps its bytes", imgLen === pngBytes.length, `${imgLen} vs ${pngBytes.length}`);
+
+  const notImage = await get(`/api/backdrop/file?path=${encodeURIComponent(join(stills, "notes.txt"))}`);
+  check("backdrop refuses non-images", notImage.status === 415 && notImage.body?.code === "E_NOT_IMAGE", String(notImage.status));
+  const relative = await get(`/api/backdrop/file?path=stills/frame.png`);
+  check("backdrop requires an absolute path", relative.status === 400 && relative.body?.code === "E_ARGS", String(relative.status));
+  const bundled = await fetch(`${BASE}/backdrop.jpg`);
+  check("no wallpaper ships with the client", bundled.status === 404, String(bundled.status));
 
   const cmds = await get("/api/commands");
   check("GET /api/commands", cmds.status === 200 && Array.isArray(cmds.body?.data?.commands), `${cmds.body?.data?.commands?.length ?? 0} commands`);
