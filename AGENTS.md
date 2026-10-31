@@ -496,6 +496,29 @@ TUI 的 `/tree` 对应物。服务端 `POST /api/session {op:"tree"}` 把 `manag
 - 切换前必须二次确认（行内 `SWITCH HERE / CANCEL`）——它会把后续对话从当前视图移走。
 - 入口是 center header 的 `TREE` 徽标，视图与文件查看器同级（替换 transcript 列，composer 不动）。
 
+### 7.6r 四分区域工作区（STREAM，实验视图）
+
+**同一份 `items` 的第二种看法**，不是替代品：mission log 仍是唯一按时间顺序读的地方。
+用途是扫一场长跑——「它在想什么 / 我要它做什么 / 它给出了什么 / 机器现在在干什么」四件事分别可扫。
+
+- **入口**：center header 的 `STREAM` 徽标（开着时变 `LOG`，`data-on="1"` 用 ice 实心），`Esc` 退回日志，
+  `#stream` 可深链（与 `TREE` 同级：替换 transcript 区，composer 不动）。
+- **切分是纯函数**（`zonesOf()`），每条 item 只落一个区，不复制、不编造：
+
+  | 区 | 收什么 | 脊色 | 头部读数 |
+  |---|---|---|---|
+  | `THINKING` | assistant 的 `thinking`（非空） | `--moon` | 总词数；每块一条可展开（默认展开最新一条，折叠 6 行） |
+  | `BASE` | `user`（含 skill / 附件）+ `summary`（压缩摘要） | `--orange` | `TURN n` |
+  | `OUTPUT` | assistant 的 `text`（流式中也算） | `--w` | 流式时写 `生成中` |
+  | `ACTION` | `tool` / `approval` / `ask` / `notice` | `--tang` | 正在跑的工具数 |
+
+- **布局**：`thinking` 压 `base` 在左列（360px），`output` 占右列两行，`action` 满宽 168px 条在底部。
+  ≤1180px 退成单列（每区最小 132px，`output` 220、`action` 168），整块滚动。区块之间只有黑缝，无描边。
+- **每个区独立滚动且独立跟随**：只有贴底时才自动滚（滚上去就不再被拽回去）；四区各自一个 `ResizeObserver` 不需要——按 `count` 变化跟随即可。
+- **空区必须自证**：四区各自的空态文案（`ws.empty*`）走 i18n，不留纯黑板。
+- 头部读数全部来自本次数据（词数、turn 数、运行中工具数），不写装饰数字（§7.6）。
+
+
 ### 7.6n 斜杠命令与压缩摘要
 
 **斜杠命令只列真正能跑的**：
@@ -783,6 +806,7 @@ composer 上方出现 `QUEUED n` 条带，逐条显示待投递文本 + `deliver
 | 2026-xx-xx | 输入区四项能力：**草稿持久化 + ↑ 历史召回 + 图片附件 + `@` 文件引用 + 自增高**（详规进 §4.3b） | 这四项全是"一眼看得出该有、但现在没有"的输入区缺口；实现都靠真事件（`prompt(text, {images})` / `steer(text, images)`），不造第二条消息通道 | `src/views/Console.tsx`（`Composer`）、`src/drafts.ts`、`src/api.ts`、`src/store.ts`、`server/index.mjs`（`normalizeImages` + `GET /api/files`）、`server/pi/fs.mjs`（`searchFiles`）、`server/pi/format.mjs`（`imagesOf`）、`src/components/ui.tsx`（`fmtSize`、附件 chip） |
 | 2026-xx-xx | 输入区高度从"固定 96px"改为 **96px 下限 + 240px 上限的自增高**，`ENTRY` 块与按钮**固定 96 贴底** | 多行草稿（粘贴一段日志/报错）在两行高的字段里根本没法改；但整条 bar 一起长高会把按钮拉成色块板。只让字段长高、控件贴底，两个问题都解 | `src/styles/lcars.css`（`.cmdbar` / `.cmd-entry` / `.btn`）、`Composer` 的测量 effect、AGENTS §4.3 |
 | 2026-xx-xx | 附件在**转录区只留数量与体积**（`{mimeType, bytes}`），不回传 base64 | 一张截图 base64 就几百 KB，塞进 SSE 会让每次重渲染都搬运一遍；模型已经拿到字节，界面只需要回答"这轮带了什么" | `server/index.mjs`（`attachmentMeta`）、`server/pi/registry.mjs`（重开后从 session 里 `imagesOf` 还原）、`src/components/ui.tsx`（`.msg-attach`） |
+| 2026-xx-xx | 新增实验视图 **四分区域工作区**（`STREAM` 徽标切换 / `#stream` 深链）：同一份 items 按种类切成 thinking / base / output / action 四区，各自滚动、各自跟随；**不替换 mission log**，`Esc` 或徽标退回 | 长跑里「在读什么、产出什么、机器在干什么」混在一条时间线里，扫不动；分区是 LCARS 多仪表盘的原始用法，而按时间顺序读仍然只有 log 一种正确方式，所以做成并列视图而不是改造 log | `src/views/Console.tsx`（`zonesOf`/`Zone`/`Workspace`、`wsOpen`、hash、Esc）、`src/styles/lcars.css`（`.ws*`）、`src/i18n.ts`（`ws.*`）、`test/ui.mjs`、AGENTS §7.6r |
 
 ---
 

@@ -1,3 +1,4 @@
+import type { ComponentChildren } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { BackdropDir, BackdropImage, DiffData, DirEntry, HistoryResult, TreeRow, Item, ImageAttachment, McpConfig, ModelInfo, ProviderRow, ProvidersResult, SkillsResult, SystemInfo } from "../api";
 import { api } from "../api";
@@ -148,6 +149,8 @@ export function Console() {
   const [previewCwd, setPreviewCwd] = useState<string | null>(null);
   const [viewer, setViewer] = useState<{ path: string; diff?: DiffData } | null>(null);
   const [treeOpen, setTreeOpen] = useState(false);
+  // the four-zone workspace is a second view of the same stream (#stream deep-links it)
+  const [wsOpen, setWsOpen] = useState(() => (typeof location === "undefined" ? false : location.hash === "#stream"));
   const [activeTurn, setActiveTurn] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
   // stream following: pinned to the bottom unless the reader scrolled up
@@ -172,12 +175,15 @@ export function Console() {
 
   // keep the hash in step with the station (replace, so Back stays useful)
   useEffect(() => {
-    const want = view === "session" ? "" : `#${view}`;
+    const want = view === "session" ? (wsOpen ? "#stream" : "") : `#${view}`;
     if (location.hash === want) return;
     history.replaceState(null, "", want ? `${location.pathname}${want}` : location.pathname);
-  }, [view]);
+  }, [view, wsOpen]);
   useEffect(() => {
-    const onHash = () => setView(viewFromHash());
+    const onHash = () => {
+      setWsOpen(location.hash === "#stream");
+      setView(viewFromHash());
+    };
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
@@ -241,18 +247,19 @@ export function Console() {
     setUnseen(0);
   };
 
-  // Escape dismisses whatever is layered over the transcript: view deck, then tree.
+  // Escape dismisses whatever is layered over the transcript: view deck, then tree, then workspace.
   useEffect(() => {
-    if (!deck && !treeOpen) return;
+    if (!deck && !treeOpen && !wsOpen) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       e.preventDefault();
       if (deck) setDeck(null);
-      else setTreeOpen(false);
+      else if (treeOpen) setTreeOpen(false);
+      else setWsOpen(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [deck, treeOpen]);
+  }, [deck, treeOpen, wsOpen]);
 
   // which exchange is under the reading position — drives the outline marker
   useEffect(() => {
@@ -428,6 +435,17 @@ export function Console() {
                 )}
                 <span class="badge ice">{countTools(s.items)} CALLS</span>
                 {view === "session" ? (
+                  <button
+                    type="button"
+                    class="badge dim"
+                    data-on={wsOpen ? "1" : "0"}
+                    onClick={() => setWsOpen((open) => !open)}
+                    title={wsOpen ? t("ws.close") : t("ws.open")}
+                  >
+                    {wsOpen ? "LOG" : "STREAM"}
+                  </button>
+                ) : null}
+                {view === "session" ? (
                   <button type="button" class="badge dim" onClick={() => setTreeOpen(true)} title="Branch tree (⌘T)">
                     TREE
                   </button>
@@ -452,6 +470,8 @@ export function Console() {
                   setActiveTurn(null);
                 }}
               />
+            ) : wsOpen && view === "session" ? (
+              <Workspace items={s.items} onOpenDiff={(p, d) => setViewer({ path: p, diff: d })} />
             ) : (
             <div class="scroll" id="scroll" ref={scrollRef}>
               <div key={view} class={view === "session" ? undefined : "anim-swap"}>
@@ -496,7 +516,7 @@ export function Console() {
             </div>
             )}
 
-            {view === "session" && !viewer && !treeOpen && !following ? (
+            {view === "session" && !viewer && !treeOpen && !wsOpen && !following ? (
               <button type="button" class="jumpbar" onClick={jumpToLatest} title="Jump to the newest message">
                 <span class="ar" aria-hidden="true">
                   ↓
@@ -1101,6 +1121,231 @@ function Transcript({
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------ workspace */
+/*
+ * A second look at the *same* live stream, cut into four zones instead of one
+ * scroll: what the model is reasoning about, what it was asked, what it
+ * produced, and what the machine is doing or waiting on. The mission log stays
+ * the source of truth — this view is for scanning a long run, not for reading
+ * a thread in order.
+ */
+type Zones = {
+  thinking: Extract<Item, { kind: "assistant" }>[];
+  base: Item[];
+  output: Extract<Item, { kind: "assistant" }>[];
+  action: Item[];
+};
+
+const wordsOf = (text: string) => text.trim().split(/\s+/).filter(Boolean).length;
+
+/** Split, don't invent: every item lands in exactly one zone. */
+function zonesOf(items: Item[]): Zones {
+  const zones: Zones = { thinking: [], base: [], output: [], action: [] };
+  for (const it of items) {
+    if (it.kind === "assistant") {
+      if ((it.thinking ?? "").trim()) zones.thinking.push(it);
+      if ((it.text ?? "").trim() || it.streaming) zones.output.push(it);
+      continue;
+    }
+    // a user turn and a compaction summary are what the run stands on
+    if (it.kind === "user" || it.kind === "summary") zones.base.push(it);
+    // tools, approvals, dialogs and notices are machine activity
+    else zones.action.push(it);
+  }
+  return zones;
+}
+
+/** One zone: a titled strip over a body that scrolls and follows on its own. */
+function Zone(props: {
+  zone: string;
+  label: string;
+  tone: string;
+  count: number;
+  note?: string;
+  empty: string;
+  children: ComponentChildren;
+}) {
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const pinned = useRef(true);
+
+  // each zone follows the tail independently: scrolled up means "don't yank me"
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (!el || !pinned.current) return;
+    el.scrollTop = el.scrollHeight;
+  }, [props.count]);
+
+  return (
+    <section class="ws-zone" data-zone={props.zone}>
+      <div class="ws-hd" data-tone={props.tone}>
+        <span class="lb">{props.label}</span>
+        {props.note ? <span class="nt">{props.note}</span> : null}
+        <span class="n">{props.count}</span>
+      </div>
+      <div
+        class="ws-body"
+        ref={bodyRef}
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 32;
+        }}
+      >
+        {props.count ? props.children : <div class="ws-empty">{props.empty}</div>}
+      </div>
+    </section>
+  );
+}
+
+function Workspace({ items, onOpenDiff }: { items: Item[]; onOpenDiff?: (path: string, diff: DiffData) => void }) {
+  const zones = useMemo(() => zonesOf(items), [items]);
+  const [openThink, setOpenThink] = useState<Record<string, boolean>>({});
+  const [openTool, setOpenTool] = useState<Record<string, boolean>>({});
+  const t0 = items[0]?.ts ?? Date.now();
+
+  const words = zones.thinking.reduce((n, it) => n + wordsOf(it.thinking), 0);
+  const running = zones.action.filter((it) => it.kind === "tool" && it.status === "run").length;
+  const streaming = zones.output.some((it) => it.streaming);
+
+  return (
+    <div class="ws">
+      <Zone
+        zone="thinking"
+        label={t("ws.zoneThinking")}
+        tone="moon"
+        count={zones.thinking.length}
+        note={words ? `${words} W` : ""}
+        empty={t("ws.emptyThinking")}
+      >
+        {zones.thinking.map((it, i) => {
+          const body = it.thinking.trim();
+          // the newest block opens itself: it is the thing being written
+          const open = openThink[it.id] ?? i === zones.thinking.length - 1;
+          return (
+            <button
+              type="button"
+              class="ws-t"
+              key={it.id}
+              data-open={open ? "1" : "0"}
+              aria-expanded={open ? "true" : "false"}
+              onClick={() => setOpenThink((prev) => ({ ...prev, [it.id]: !open }))}
+            >
+              <span class="hd">
+                <Icon name={open ? "act-collapse" : "act-expand"} size={10} />
+                <span class="num">{String(i + 1).padStart(2, "0")}</span>
+                <span class="w">{wordsOf(body)} W</span>
+                <span class="tm">T+{mmss(it.ts - t0)}</span>
+              </span>
+              <span class="bd">{body}</span>
+            </button>
+          );
+        })}
+      </Zone>
+
+      <Zone
+        zone="base"
+        label={t("ws.zoneBase")}
+        tone="orange"
+        count={zones.base.length}
+        note={zones.base.length ? `TURN ${zones.base.filter((it) => it.kind === "user").length}` : ""}
+        empty={t("ws.emptyBase")}
+      >
+        {zones.base.map((it) =>
+          it.kind === "user" ? (
+            <div class="ws-item" key={it.id}>
+              {it.skill ? <SkillBlock skill={it.skill} /> : null}
+              <MessageRow
+                role="user"
+                time={`T+${mmss(it.ts - t0)}`}
+                text={it.text}
+                attachments={it.attachments}
+              />
+            </div>
+          ) : it.kind === "summary" ? (
+            <div class="ws-item" key={it.id}>
+              <SummaryBlock item={it} />
+            </div>
+          ) : null,
+        )}
+      </Zone>
+
+      <Zone
+        zone="output"
+        label={t("ws.zoneOutput")}
+        tone="w"
+        count={zones.output.length}
+        note={streaming ? t("ws.streaming") : ""}
+        empty={t("ws.emptyOutput")}
+      >
+        {zones.output.map((it) => (
+          <div class="ws-item" key={it.id}>
+            <MessageRow
+              role="assistant"
+              time=""
+              model={it.usage ? `${fmtTok(it.usage.output)} TOK` : ""}
+              text={it.text}
+              streaming={it.streaming}
+            />
+            {it.errorMessage ? <div class="errbar">{it.errorMessage}</div> : null}
+          </div>
+        ))}
+      </Zone>
+
+      <Zone
+        zone="action"
+        label={t("ws.zoneAction")}
+        tone="tang"
+        count={zones.action.length}
+        note={running ? `${running} ${t("ws.running")}` : ""}
+        empty={t("ws.emptyAction")}
+      >
+        {zones.action.map((it) => {
+          if (it.kind === "tool") {
+            const state = it.status === "run" ? "run" : it.status === "error" ? "error" : it.truncated ? "warn" : "ok";
+            return (
+              <ToolStrip
+                key={it.id}
+                name={it.name}
+                icon={toolIcon(it.name)}
+                args={it.args}
+                output={it.output}
+                errorText={it.errorText}
+                state={state}
+                ms={it.ms}
+                exitCode={it.exitCode}
+                truncated={it.truncated}
+                diff={it.diff}
+                onOpenDiff={
+                  it.diff && onOpenDiff
+                    ? () => onOpenDiff(it.args.split(" / ")[0].split(" ")[0] || it.name, it.diff!)
+                    : undefined
+                }
+                children={it.children}
+                agent={it.agent}
+                expanded={openTool[it.id] ?? false}
+                onToggle={() => setOpenTool((prev) => ({ ...prev, [it.id]: !prev[it.id] }))}
+              />
+            );
+          }
+          if (it.kind === "approval") {
+            return (
+              <ApprovalDeck
+                key={it.id}
+                tool={it.tool}
+                args={it.args}
+                state={it.status === "always" ? "approved" : it.status}
+                onDecide={(d) => actions.approve(it.id, d)}
+              />
+            );
+          }
+          if (it.kind === "ask") return <AskBlock key={it.id} item={it} />;
+          if (it.kind === "notice") return <NoticeRow key={it.id} label={it.label} text={it.text} tone={it.tone} />;
+          return null;
+        })}
+      </Zone>
     </div>
   );
 }

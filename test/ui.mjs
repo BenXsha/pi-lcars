@@ -517,6 +517,43 @@ try {
   check("the draft survives a reload", (await value()) === "draft survives reload", await value());
   await clearInput();
 
+  /* ---------------------------- 9c. four-zone workspace (test view) */
+  const streamBadge = `[...document.querySelectorAll('.chips .badge')].find((b) => /STREAM|LOG/.test(b.textContent))`;
+  check("the stream badge is offered in the log", !!(await evaluate(`!!${streamBadge}`)));
+  await evaluate(`${streamBadge}?.click()`);
+  await sleep(400);
+  check("the workspace replaces the log", await exists(".ws"));
+  check(
+    "it has exactly the four zones",
+    (await evaluate(`[...document.querySelectorAll('.ws-zone')].map((z) => z.dataset.zone).join(',')`)) ===
+      "thinking,base,output,action",
+    await evaluate(`[...document.querySelectorAll('.ws-zone')].map((z) => z.dataset.zone).join(',')`),
+  );
+  check(
+    "each zone carries a tone spine and a count",
+    (await evaluate(`document.querySelectorAll('.ws-hd[data-tone] .n').length`)) === 4,
+  );
+  // the harness session is empty, so every zone must say so instead of rendering nothing
+  check("empty zones explain themselves", (await evaluate(`document.querySelectorAll('.ws-empty').length`)) === 4);
+  check("the workspace deep-links", (await hash()) === "#stream", await hash());
+  check(
+    "the badge turns into a way back",
+    /LOG/.test(await evaluate(`${streamBadge}?.textContent ?? ''`)),
+    await evaluate(`${streamBadge}?.textContent ?? ''`),
+  );
+  await evaluate(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`);
+  await evaluate(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`);
+  await sleep(400);
+  check("escape returns to the mission log", !(await exists(".ws")) && (await inTranscript()));
+  check("leaving the workspace clears the hash", (await hash()) === "", await hash());
+  // and it is reachable again from the badge
+  await evaluate(`${streamBadge}?.click()`);
+  await sleep(300);
+  check("the workspace reopens", await exists(".ws"));
+  await evaluate(`${streamBadge}?.click()`);
+  await sleep(300);
+  check("the badge toggles the workspace off too", !(await exists(".ws")));
+
   /* ------------------------------------------------ 10. console errors */
   const errors = cdp.events
     .filter((e) => e.method === "Runtime.exceptionThrown")
