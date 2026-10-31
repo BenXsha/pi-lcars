@@ -189,6 +189,14 @@ try {
     check("run settles", idle);
     const forked = await post("/api/session", { op: "fork", id: second });
     check("fork after a turn", forked.status === 200 && forked.body?.ok, JSON.stringify(forked.body?.error ?? ""));
+    // a transcript with turns must load back as items — an empty array here means
+    // the console shows a forked/opened session as blank until the next prompt
+    const carried = forked.body?.data?.items ?? [];
+    check(
+      "a forked transcript carries its items",
+      carried.length >= 2 && carried.some((i) => i.kind === "assistant" && i.text),
+      `${carried.length} items`,
+    );
   }
 
   const badRewind = await post("/api/session", { op: "rewind", turn: 99 });

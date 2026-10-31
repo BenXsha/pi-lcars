@@ -1148,7 +1148,9 @@ function zonesOf(items: Item[]): Zones {
   for (const it of items) {
     if (it.kind === "assistant") {
       if ((it.thinking ?? "").trim()) zones.thinking.push(it);
-      if ((it.text ?? "").trim() || it.streaming) zones.output.push(it);
+      // a message that only carries tool calls never produced output — showing it
+      // while it streams leaves an empty caret row that then has to disappear
+      if ((it.text ?? "").trim()) zones.output.push(it);
       continue;
     }
     // a user turn and a compaction summary are what the run stands on
@@ -1172,12 +1174,13 @@ function Zone(props: {
   const bodyRef = useRef<HTMLDivElement>(null);
   const pinned = useRef(true);
 
-  // each zone follows the tail independently: scrolled up means "don't yank me"
+  // Each zone follows the tail independently: scrolled up means "don't yank me".
+  // Growth is the trigger, not the item count — a streamed answer, a thinking
+  // block and a running command's output all grow without adding an item.
   useEffect(() => {
     const el = bodyRef.current;
-    if (!el || !pinned.current) return;
-    el.scrollTop = el.scrollHeight;
-  }, [props.count]);
+    if (el && pinned.current) el.scrollTop = el.scrollHeight;
+  });
 
   return (
     <section class="ws-zone" data-zone={props.zone}>
@@ -1208,7 +1211,8 @@ export function Workspace({ items, onOpenDiff }: { items: Item[]; onOpenDiff?: (
 
   const words = zones.thinking.reduce((n, it) => n + wordsOf(it.thinking), 0);
   const running = zones.action.filter((it) => it.kind === "tool" && it.status === "run").length;
-  const streaming = zones.output.some((it) => it.streaming);
+  // the session is producing something, whether or not this zone has text yet
+  const streaming = items.some((it) => it.kind === "assistant" && it.streaming);
 
   return (
     <div class="ws">

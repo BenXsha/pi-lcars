@@ -71,34 +71,61 @@ function setBootstrap(b: {
   emit();
 }
 
+/**
+ * Live events must land as *new* arrays and *new* items, never as in-place
+ * edits: the four-zone workspace, the outline and the loadout memos key off
+ * `items`, and mutating through a shared identity froze them for the whole
+ * run — a response would stream in the log while the zones stayed on the
+ * membership they had when the run started.
+ */
+function publishItems(sessionId: string, next: Item[]) {
+  itemsBySession.set(sessionId, next);
+  if (sessionId === state.activeId) {
+    state.items = next;
+    const s = state.sessions.find((x) => x.id === sessionId);
+    if (s) s.items = next.length;
+  }
+  emit();
+}
+
+/** Replace one item in that session's list, returning the new list (or null). */
+function replaceItem(sessionId: string, id: string, item: Item): Item[] | null {
+  const list = itemsBySession.get(sessionId);
+  if (!list) return null;
+  const i = list.findIndex((x) => x.id === id);
+  if (i === -1) return null;
+  const next = list.slice();
+  next[i] = item;
+  return next;
+}
+
 function upsertItem(sessionId: string, item: Item) {
   const list = itemsBySession.get(sessionId) ?? [];
   const i = list.findIndex((x) => x.id === item.id);
-  if (i === -1) list.push(item);
-  else list[i] = item;
-  itemsBySession.set(sessionId, list);
+  const next = i === -1 ? [...list, item] : list.map((x) => (x.id === item.id ? item : x));
   byId.set(item.id, item);
-  if (sessionId === state.activeId) {
-    state.items = list;
-    const s = state.sessions.find((x) => x.id === sessionId);
-    if (s) s.items = list.length;
-  }
-  emit();
+  publishItems(sessionId, next);
 }
 
 function patchItem(sessionId: string, id: string, patch: Partial<Item>) {
   const it = byId.get(id);
   if (!it) return;
-  Object.assign(it, patch);
-  if (sessionId === state.activeId) emit();
+  const nextItem = { ...it, ...patch } as Item;
+  byId.set(id, nextItem);
+  const next = replaceItem(sessionId, id, nextItem);
+  if (next) publishItems(sessionId, next);
+  else emit();
 }
 
 function deltaItem(sessionId: string, id: string, field: "text" | "thinking", d: string) {
   const it = byId.get(id);
-  if (!it) return;
-  const rec = it as unknown as Record<string, unknown>;
-  rec[field] = String(rec[field] ?? "") + d;
-  if (sessionId === state.activeId) emit();
+  // only the streaming assistant row ever receives deltas (stream.mjs)
+  if (it?.kind !== "assistant") return;
+  const nextItem: Item = { ...it, [field]: (it[field] ?? "") + d };
+  byId.set(id, nextItem);
+  const next = replaceItem(sessionId, id, nextItem);
+  if (next) publishItems(sessionId, next);
+  else emit();
 }
 
 function applyEvent(ev: StreamEvent) {

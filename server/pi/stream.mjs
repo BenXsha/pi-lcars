@@ -19,7 +19,7 @@ function exitCodeOf(result) {
 }
 
 /** The subagent tool reports a compact summary instead of nested calls. */
-function agentMeta(details) {
+export function agentMeta(details) {
   if (!details || typeof details !== "object") return null;
   if (details.subagentType === undefined && details.toolUses === undefined) return null;
   return {
@@ -44,7 +44,8 @@ function childStatus(status) {
   return "run";
 }
 
-function nestedChildren(nested) {
+/** Nested calls → the same children[] shape the live path patches in. */
+export function nestedChildren(nested) {
   const calls = nested?.calls;
   if (!Array.isArray(calls) || !calls.length) return null;
   return calls.slice(0, MAX_CHILDREN).map((c) => ({

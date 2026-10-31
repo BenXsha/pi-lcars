@@ -1,7 +1,8 @@
 import { readFile, unlink } from "node:fs/promises";
 import { join } from "node:path";
-import { applyEvent } from "./stream.mjs";
-import { imagesOf, shortArgs, textOf } from "./format.mjs";
+import { applyEvent, agentMeta, nestedChildren } from "./stream.mjs";
+import { imagesOf, shortArgs, textOf, truncationOf } from "./format.mjs";
+import { diffFromResult } from "./diff.mjs";
 import { httpError } from "./errors.mjs";
 
 /** Exit status from a persisted tool result: details first, then pi's own text. */
@@ -224,6 +225,9 @@ export class Registry {
     // showed up in the shelf and in `pi-lcars status`. Resolve it once, here.
     await this.#applyDefaults(session);
     session.subscribe((ev) => applyEvent(entry, ev));
+    // a transcript that already holds turns (history / resume / fork / branch)
+    // is the session's response history — show it, don't start from blank
+    this.#hydrate(entry);
 
     // Extensions are loaded but not bound yet: MCP connects its servers on
     // session_start, and that costs seconds. The operator starts it from the
@@ -323,24 +327,37 @@ export class Registry {
       /* extensions are optional */
     }
     session.subscribe((ev) => applyEvent(entry, ev));
+    this.#hydrate(entry);
 
-    entry.items = [];
-    entry.byId = new Map();
-    entry.cur = null;
+    this.refreshMeta(entry);
+    this.sink({ seq: nextSeq(), sessionId: entry.id, e: "items", items: entry.items });
+    return entry;
+  }
+
+  /**
+   * A transcript that already has messages (opened from history, resumed on
+   * boot, forked from a file, or rebuilt after a branch) must show them.
+   * Everything the console renders is derived from `entry.items`, and pi keeps
+   * the real record in `session.messages` — so read it back instead of letting
+   * an opened session look empty until the next turn.
+   */
+  #hydrate(entry) {
+    const messages = entry.session?.messages ?? [];
+    const items = [];
+    const byId = new Map();
     const calls = new Map();
     let n = 0;
-    const push = (item) => {
-      entry.items.push(item);
-      entry.byId.set(item.id, item);
-    };
-    for (const m of session.messages ?? []) {
+    // rebuilt from scratch: rewind/goto hand us the same session again
+    entry.usage = { input: 0, output: 0, cost: 0, total: 0 };
+    for (const m of messages) {
       if (m.role === "user") {
-        push({
+        const images = imagesOf(m.content);
+        items.push({
           kind: "user",
           id: `u${m.timestamp}-${++n}`,
           text: textOf(m.content),
           // a re-opened transcript still says which turns carried images
-          attachments: imagesOf(m.content).length ? imagesOf(m.content) : undefined,
+          attachments: images.length ? images : undefined,
           ts: m.timestamp,
         });
       } else if (m.role === "assistant") {
@@ -349,22 +366,37 @@ export class Registry {
         const text = textOf(content);
         const thinking = content.filter((c) => c?.type === "thinking").map((c) => c.thinking).join("");
         if (text || thinking) {
-          push({
+          items.push({
             kind: "assistant",
             id: `a${m.timestamp}-${++n}`,
             text,
             thinking,
             streaming: false,
             ts: m.timestamp,
+            stopReason: m.stopReason,
+            errorMessage: m.errorMessage,
             usage: m.usage
               ? { input: m.usage.input, output: m.usage.output, cost: m.usage.cost?.total ?? 0, total: m.usage.totalTokens }
               : undefined,
           });
         }
+        if (m.usage) {
+          // the same counters a live turn builds, so the context meter and the
+          // shelf readouts describe the session that is actually open
+          entry.usage.input += m.usage.input || 0;
+          entry.usage.output += m.usage.output || 0;
+          entry.usage.cost += m.usage.cost?.total || 0;
+          entry.usage.total = m.usage.totalTokens || entry.usage.total;
+        }
       } else if (m.role === "toolResult") {
         const call = calls.get(m.toolCallId);
         const out = textOf(m.content);
-        push({
+        // persisted results keep `details`; older ones only carry pi's own text
+        const details = m.details;
+        const diff = diffFromResult(details);
+        const children = nestedChildren(details?.nestedCalls);
+        const agent = agentMeta(details);
+        items.push({
           kind: "tool",
           id: `t${m.toolCallId}`,
           callId: m.toolCallId,
@@ -372,12 +404,16 @@ export class Registry {
           args: call ? shortArgs(m.toolName, call.arguments) : "",
           status: m.isError ? "error" : "ok",
           output: out,
-          // persisted messages keep details; older ones only carry pi's own text
+          ms: m.durationMs,
           exitCode: exitCodeOf(m),
+          truncated: truncationOf(m, out),
+          ...(diff ? { diff } : {}),
+          ...(children ? { children } : {}),
+          ...(agent ? { agent } : {}),
           ts: m.timestamp,
         });
       } else if (m.role === "compactionSummary") {
-        push({
+        items.push({
           kind: "summary",
           id: `sm${m.timestamp}-${++n}`,
           summary: m.summary ?? "",
@@ -388,10 +424,13 @@ export class Registry {
         });
       }
     }
-
-    this.refreshMeta(entry);
-    this.sink({ seq: nextSeq(), sessionId: entry.id, e: "items", items: entry.items });
-    return entry;
+    // a long transcript keeps its tail: the same cap the live path applies
+    const kept = items.length > MAX_ITEMS ? items.slice(items.length - MAX_ITEMS) : items;
+    for (const item of kept) byId.set(item.id, item);
+    entry.items = kept;
+    entry.byId = byId;
+    entry.cur = null;
+    return kept.length;
   }
 
   async rewind(id, turn) {

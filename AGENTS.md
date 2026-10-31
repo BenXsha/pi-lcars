@@ -509,7 +509,7 @@ TUI 的 `/tree` 对应物。服务端 `POST /api/session {op:"tree"}` 把 `manag
   |---|---|---|---|
   | `THINKING` | assistant 的 `thinking`（非空） | `--moon` | 总词数；每块一条可展开（默认展开最新一条，折叠 6 行） |
   | `BASE` | `user`（含 skill / 附件）+ `summary`（压缩摘要） | `--orange` | `TURN n` |
-  | `OUTPUT` | assistant 的 `text`（流式中也算） | `--w` | 流式时写 `生成中` |
+  | `OUTPUT` | assistant 的 `text`（非空；只有 toolCall 的 assistant 消息不进） | `--w` | 会话正在生成时写 `生成中` |
   | `ACTION`（标签 `TERMINAL`） | `tool` / `approval` / `ask` / `notice` | `--tang` | 正在跑的工具数 |
 
 **ACTION 是终端，不是又一个卡片列表**（这是它占最多高度的原因）：
@@ -525,7 +525,9 @@ TUI 的 `/tree` 对应物。服务端 `POST /api/session {op:"tree"}` 把 `manag
 
 - **布局**：`thinking` 压 `base` 在左列（360px），`output` 占右列两行，`action`（终端）**满宽拿最大一份高度**：行高比 `0.78fr / 0.58fr / 1.55fr`（1600×1000 实测 189 / 141 / 376，终端正文 346px ≈ 22 行）。早期版本把终端压在 168px，命令一多就只看得到最后两条——终端是这个视图的用途，不是脚注。
   ≤1180px 退成单列（每区最小 132px，`output` 220、`action` 260），整块滚动。区块之间只有黑缝，无描边。
-- **每个区独立滚动且独立跟随**：只有贴底时才自动滚（滚上去就不再被拽回去）；四区各自一个 `ResizeObserver` 不需要——按 `count` 变化跟随即可。
+- **每个区独立滚动且独立跟随**：只有贴底时才自动滚（滚上去就不再被拽回去）。**跟随的触发是内容增长，不是 `count`**：
+  流式正文、流式 thinking、正在跑的命令输出都是“item 数不变、高度在长”，只按条数跟随等于看着答案长到屏幕外。
+  实现是 `Zone` 里每次渲染后的 effect（`pinned` 为真才写 `scrollTop`），不需要 `ResizeObserver`。
 - **空区必须自证**：四区各自的空态文案（`ws.empty*`）走 i18n，不留纯黑板。
 - 头部读数全部来自本次数据（词数、turn 数、运行中工具数），不写装饰数字（§7.6）。
 
@@ -818,6 +820,7 @@ composer 上方出现 `QUEUED n` 条带，逐条显示待投递文本 + `deliver
 | 2026-xx-xx | 输入区高度从"固定 96px"改为 **96px 下限 + 240px 上限的自增高**，`ENTRY` 块与按钮**固定 96 贴底** | 多行草稿（粘贴一段日志/报错）在两行高的字段里根本没法改；但整条 bar 一起长高会把按钮拉成色块板。只让字段长高、控件贴底，两个问题都解 | `src/styles/lcars.css`（`.cmdbar` / `.cmd-entry` / `.btn`）、`Composer` 的测量 effect、AGENTS §4.3 |
 | 2026-xx-xx | 附件在**转录区只留数量与体积**（`{mimeType, bytes}`），不回传 base64 | 一张截图 base64 就几百 KB，塞进 SSE 会让每次重渲染都搬运一遍；模型已经拿到字节，界面只需要回答"这轮带了什么" | `server/index.mjs`（`attachmentMeta`）、`server/pi/registry.mjs`（重开后从 session 里 `imagesOf` 还原）、`src/components/ui.tsx`（`.msg-attach`） |
 | 2026-xx-xx | 新增实验视图 **四分区域工作区**（`STREAM` 徽标切换 / `#stream` 深链）：同一份 items 按种类切成 thinking / base / output / action 四区，各自滚动、各自跟随；**不替换 mission log**，`Esc` 或徽标退回 | 长跑里「在读什么、产出什么、机器在干什么」混在一条时间线里，扫不动；分区是 LCARS 多仪表盘的原始用法，而按时间顺序读仍然只有 log 一种正确方式，所以做成并列视图而不是改造 log | `src/views/Console.tsx`（`zonesOf`/`Zone`/`Workspace`、`wsOpen`、hash、Esc）、`src/styles/lcars.css`（`.ws*`）、`src/i18n.ts`（`ws.*`）、`test/ui.mjs`、AGENTS §7.6r |
+| 2026-xx-xx | STREAM 视图对齐真实会话响应（三处）：① 客户端 store 的 `item` / `patch` / `delta` 不再原地改数组与对象，改发布**新数组 + 新 item**；② `Zone` 的跟随从“按 `count`”改为“每次渲染按内容高度”（贴底才跟）；③ `OUTPUT` 区只收真正有 `text` 的 assistant 消息，`生成中` 改由会话的 `streaming` 推导。服务端 `#load()` 也调用 `#hydrate()`（原先只有 rewind/goto 的 `#rebuild()` 才从 `session.messages` 重建） | 三条都是“真实响应到来时视图不真实”：memo 用的 `items` 身份在整场运行里不变，四区的**成员**被冻结在开跑那一刻（只有 log 在长）；流式正文/thinking/命令输出“条数不变、高度在长”，按条数跟随等于让答案长到屏幕外；只有 toolCall 的 assistant 消息会先占一条空 caret 再消失。而历史/恢复的会话 `items` 恒为 0——真实的 `session.messages` 从来没有被读回界面 | `src/store.ts`、`src/views/Console.tsx`（`zonesOf` / `Zone` / `Workspace`）、`server/pi/registry.mjs`（`#hydrate`）、`server/pi/stream.mjs`（导出 `agentMeta` / `nestedChildren`）、`test/smoke.mjs`、AGENTS §7.6r |
 | 2026-xx-xx | ACTION 区**重画成终端**并拿到最大高度（行高比 `0.78 / 0.58 / 1.55`，标签改 `TERMINAL`）：bash 显示真实命令行 + 原样输出 + `exit N`，diff 显示 `+N −M` 与着色行，跑着的条目末尾追加闪烁 `$ ▊` | 168px 的底栏只够看两条命令，而“这把到底跑了什么、回来什么”正是分区视图存在的理由；终端是唯一既能提密度又能保留原文的形态，也不与 log 里的 LCARS 读数条重复 | `src/views/Console.tsx`（`TerminalEntry` / `termCommand` / `termBody`）、`src/styles/lcars.css`（`.term*` + 行高比）、`src/views/Craft.tsx`（`?craft#workspace` 样例流）、AGENTS §7.6r |
 
 ---
