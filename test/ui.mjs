@@ -509,6 +509,36 @@ try {
   check("↓ returns to the draft", (await value()) === "", await value());
   await clearInput();
 
+  /* ---------------------------------- 9b2. IME (composition) safety */
+  // Enter commits a candidate, Esc dismisses the window: neither may reach the
+  // composer's own shortcuts, and composing text must already grow the field.
+  await evaluate(`(() => {
+    window.__calls.length = 0;
+    const t = document.querySelector('textarea');
+    t.focus();
+    t.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true, data: 'ni' }));
+    window.__imeStart = t.clientHeight;
+    t.value = 'ni hao shi jie\\n'.repeat(12);
+    t.dispatchEvent(new InputEvent('input', { bubbles: true, data: 'ni', isComposing: true }));
+    return true;
+  })()`);
+  await sleep(200);
+  check("composing text survives the keystroke", (await evaluate(`document.querySelector('textarea').value`)).startsWith("ni hao"));
+  check(
+    "the field grows while composing",
+    (await evaluate(`document.querySelector('textarea').clientHeight`)) > (await evaluate(`window.__imeStart`)),
+    `${await evaluate(`window.__imeStart`)} → ${await evaluate(`document.querySelector('textarea').clientHeight`)}px`,
+  );
+  await evaluate(
+    `document.querySelector('textarea').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true, isComposing: true }))`,
+  );
+  await sleep(300);
+  check("Enter while composing does not send the prompt", (await evaluate(`window.__calls.length`)) === 0);
+  await evaluate(`document.querySelector('textarea').dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: '你好世界' }))`);
+  await sleep(300);
+  check("the commit lands in the draft", (await value()).startsWith("ni hao"), await value());
+  await clearInput();
+
   // draft persistence survives a reload, per session
   await typeInto("draft survives reload");
   await sleep(700);

@@ -251,7 +251,7 @@ export function Console() {
   useEffect(() => {
     if (!deck && !treeOpen && !wsOpen) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
+      if (e.key !== "Escape" || imeBusy(e)) return;
       e.preventDefault();
       if (deck) setDeck(null);
       else if (treeOpen) setTreeOpen(false);
@@ -900,6 +900,7 @@ function AskBlock({ item }: { item: Extract<Item, { kind: "ask" }> }) {
                 placeholder={item.placeholder ?? "type an answer…"}
                 onInput={(e) => setText((e.target as HTMLInputElement).value)}
                 onKeyDown={(e) => {
+                  if (imeBusy(e)) return;
                   if (e.key === "Enter" && text.trim()) actions.answer(item.id, text.trim());
                 }}
               />
@@ -1505,6 +1506,17 @@ function readImage(file: File): Promise<Attachment | null> {
   });
 }
 
+/* An IME owns the keyboard for as long as a candidate window is open: Enter
+ * commits the candidate, ArrowUp/Down pick one, Escape dismisses it, and Space
+ * is a commit key in most Chinese/Japanese methods. None of those may reach a
+ * console shortcut — `composing` covers the browsers that report
+ * `isComposing: false` on the committing Enter, and `keyCode 229` covers the
+ * engines that never set `isComposing` at all. */
+function imeBusy(e: KeyboardEvent, composing?: { current: boolean }): boolean {
+  if (composing?.current || e.isComposing) return true;
+  return (e as KeyboardEvent & { keyCode?: number }).keyCode === 229;
+}
+
 function Composer({
   session,
   running,
@@ -1520,6 +1532,8 @@ function Composer({
   const ref = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const histDraft = useRef("");
+  /** true between compositionstart and compositionend — the IME owns `value` */
+  const composing = useRef(false);
   const [text, setText] = useState("");
   const [flashQuote, setFlashQuote] = useState(false);
   const [images, setImages] = useState<Attachment[]>([]);
@@ -1606,14 +1620,18 @@ function Composer({
   }, [session, text]);
 
   /* Auto-grow: the field rises with the draft, then scrolls inside its cap.
-     Measured, not guessed — `height:auto` first so scrollHeight is real. */
-  useEffect(() => {
+     Measured, not guessed — `height:auto` first so scrollHeight is real. Also
+     called from `input`/`compositionupdate`, because an IME grows the field
+     before it commits anything to `text`. */
+  const grow = () => {
     const el = ref.current;
     if (!el) return;
     el.style.height = "auto";
     const cap = Math.min(240, Math.max(96, Math.round(window.innerHeight * 0.26)));
     el.style.height = `${Math.min(Math.max(el.scrollHeight, 44), cap)}px`;
-  }, [text]);
+  };
+
+  useEffect(grow, [text]);
 
   /* File palette: debounced, because a walk per keystroke is wasteful. */
   useEffect(() => {
@@ -1692,6 +1710,9 @@ function Composer({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Esc in front of an IME candidate window dismisses the candidate — it is
+      // not an interrupt, and stopping the run on it loses the operator's input
+      if (imeBusy(e, composing)) return;
       if (e.key === "Escape" && running) {
         e.preventDefault();
         actions.abort();
@@ -1706,7 +1727,6 @@ function Composer({
   }, [running]);
 
   const [focused, setFocused] = useState(false);
-  const composing = useRef(false);
   const chars = text.length;
 
   const queued = [...textList(queue?.steering), ...textList(queue?.followUp)];
@@ -1728,6 +1748,7 @@ function Composer({
                 disabled={disabled}
                 placeholder="uncontrolled textarea — for bisecting the composer"
                 onKeyDown={(e) => {
+                  if (imeBusy(e)) return;
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
                     const value = plainRef.current?.value.trim();
@@ -1906,20 +1927,35 @@ function Composer({
             value={text}
             disabled={disabled}
             onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
+            onBlur={() => {
+              // an IME that never sent compositionend (blur cancels it) must not
+              // leave the composer thinking a candidate window is still open
+              composing.current = false;
+              setFocused(false);
+            }}
             /* An IME (fcitx5/ibus) owns the text between compositionstart and
-               compositionend — rewriting `value` in that window fights the
-               input method, and committing with Space is the classic crash. */
+               compositionend. The field stays *controlled*, so `value` has to
+               track the DOM exactly: Preact re-applies the prop whenever it
+               differs from `dom.value` (diff/index.js), which is precisely what
+               eats a half-composed candidate. Mirroring every input keeps the
+               two equal, so nothing is ever written back over the IME. */
             onCompositionStart={() => {
               composing.current = true;
             }}
+            onCompositionUpdate={grow}
             onCompositionEnd={(e) => {
               composing.current = false;
-              setText((e.target as HTMLTextAreaElement).value);
+              const el = e.target as HTMLTextAreaElement;
+              grow();
+              setText(el.value);
+              setCaret(el.selectionStart ?? 0);
             }}
             onInput={(e) => {
-              if (!composing.current) setText((e.target as HTMLTextAreaElement).value);
-              setCaret((e.target as HTMLTextAreaElement).selectionStart ?? 0);
+              const el = e.target as HTMLTextAreaElement;
+              // grow before the commit too: composing text already occupies rows
+              grow();
+              setText(el.value);
+              setCaret(el.selectionStart ?? 0);
               setHistPick(null);
             }}
             onSelect={(e) => setCaret((e.target as HTMLTextAreaElement).selectionStart ?? 0)}
@@ -1934,6 +1970,10 @@ function Composer({
               addFiles(picks);
             }}
             onKeyDown={(e) => {
+              // while a candidate window is open every key belongs to the IME:
+              // Enter commits, arrows/space pick, Esc dismisses. Swallow nothing,
+              // act on nothing — sending a half-composed prompt is the bug.
+              if (imeBusy(e, composing)) return;
               if (files.length && atQuery !== null) {
                 if (e.key === "ArrowDown") {
                   e.preventDefault();
@@ -2903,7 +2943,7 @@ function ProvidersPanel({ meta }: { meta: ReturnType<typeof getState>["meta"] })
                 value={keys[p.id] ?? ""}
                 placeholder={p.keyMask ?? "sk-…"}
                 onInput={(e) => setKeys((k) => ({ ...k, [p.id]: (e.target as HTMLInputElement).value }))}
-                onKeyDown={(e) => e.key === "Enter" && saveKey(p.id)}
+                onKeyDown={(e) => !imeBusy(e) && e.key === "Enter" && saveKey(p.id)}
               />
               <button type="button" class="pv-btn" disabled={busy === `k:${p.id}` || !(keys[p.id] ?? "").trim()} onClick={() => saveKey(p.id)}>
                 SAVE
@@ -3374,6 +3414,7 @@ function HistoryPanel({ onOpen, onFork }: { onOpen: (path: string) => void; onFo
                     autoFocus
                     onInput={(e) => setDraft((e.target as HTMLInputElement).value)}
                     onKeyDown={(e) => {
+                      if (imeBusy(e)) return;
                       if (e.key === "Enter" && draft.trim()) {
                         api.historyOp("rename", { path: h.path, name: draft.trim() }).then(() => {
                           setEditPath(null);
@@ -3618,7 +3659,7 @@ function BackdropPicker({
   // Escape closes the picker only — the applied backdrop is not touched.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
+      if (e.key !== "Escape" || imeBusy(e)) return;
       e.preventDefault();
       e.stopPropagation();
       onClose();
