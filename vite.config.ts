@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
@@ -13,15 +14,47 @@ const api = process.env.LCARS_API || "http://127.0.0.1:4173";
 const require = createRequire(import.meta.url);
 const ROOT = new URL(".", import.meta.url);
 
+type AuthorField = string | { name?: string; email?: string; url?: string } | null;
+
 type PackageJson = {
   name?: string;
   version?: string;
   license?: string;
   homepage?: string;
+  author?: AuthorField;
   repository?: { url?: string };
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
 };
+
+/** npm allows `Name <mail> (url)` or an object; ABOUT wants the three parts split. */
+function parseAuthor(raw: AuthorField | undefined): { name: string; email: string | null; url: string | null } | null {
+  if (!raw) return null;
+  if (typeof raw === "string") {
+    const email = /<([^>]*)>/.exec(raw)?.[1]?.trim() || null;
+    const url = /\(([^)]*)\)/.exec(raw)?.[1]?.trim() || null;
+    const name = raw.replace(/<[^>]*>/g, "").replace(/\([^)]*\)/g, "").trim();
+    if (!name && !email && !url) return null;
+    return { name: name || email || "unknown", email, url };
+  }
+  const name = raw.name?.trim() || raw.email?.trim() || raw.url?.trim() || "";
+  if (!name) return null;
+  return { name, email: raw.email?.trim() || null, url: raw.url?.trim() || null };
+}
+
+/** Best-effort: a tarball install or a non-git checkout simply has no commit. */
+function gitCommit(): string | null {
+  try {
+    const out = execFileSync("git", ["rev-parse", "--short", "HEAD"], {
+      cwd: fileURLToPath(ROOT),
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    return out.trim() || null;
+  } catch {
+    return null;
+  }
+}
 
 /** package.json is build metadata: a broken file must not take the build down. */
 function readJson(path: URL | string): PackageJson {
@@ -67,6 +100,9 @@ const appInfo = {
   license: pkg.license ?? "MIT",
   repo: pkg.repository?.url ?? null,
   homepage: pkg.homepage ?? null,
+  author: parseAuthor(pkg.author),
+  commit: gitCommit(),
+  builtAt: new Date().toISOString().slice(0, 10),
   deps: CREDITED.map(({ name, note }) => ({ name, note, ...packageInfo(name) })),
 };
 

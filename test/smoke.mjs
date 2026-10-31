@@ -83,6 +83,17 @@ try {
   const outside = await post("/api/open", { path: "../../etc/hosts" });
   check("open refuses paths outside the workspace", outside.status === 403 && outside.body?.code === "E_OUTSIDE");
 
+  /* ---------------- @ completion: flat, ranked, workspace-bounded ---------------- */
+  const all = await get("/api/files?limit=5");
+  check("GET /api/files returns rows", all.status === 200 && all.body?.data?.files?.length === 5, `${all.body?.data?.files?.length ?? "?"} rows`);
+  const ranked = await get("/api/files?q=registry");
+  const topHit = ranked.body?.data?.files?.[0]?.rel ?? "";
+  check("file search ranks by name before path", topHit === "server/pi/registry.mjs", topHit);
+  const noSkip = await get("/api/files?q=node_modules&limit=50");
+  check("file search skips node_modules", (noSkip.body?.data?.files ?? []).every((f) => !f.rel.includes("node_modules")), `${noSkip.body?.data?.files?.length ?? 0} rows`);
+  const emptyQ = await get("/api/files?q=zzz-no-such-file");
+  check("file search can return nothing", emptyQ.status === 200 && emptyQ.body?.data?.files?.length === 0);
+
   /* ------------- backdrop: the operator's own still, read in place ------------- */
   const PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==";
   const pngBytes = Buffer.from(PNG, "base64");
@@ -101,8 +112,7 @@ try {
   check("backdrop still is served from its own path", img.status === 200 && img.headers.get("content-type") === "image/png", String(img.status));
   check("backdrop still keeps its bytes", imgLen === pngBytes.length, `${imgLen} vs ${pngBytes.length}`);
 
-  const notImage = await get(`/api/backdrop/file?path=${encodeURIComponent(join(stills, "notes.txt"))}`);
-  check("backdrop refuses non-images", notImage.status === 415 && notImage.body?.code === "E_NOT_IMAGE", String(notImage.status));
+  const notImage = await get(`/api/backdrop/file?path=${encodeURIComponent(join(stills, "notes.txt"))}`);check("backdrop refuses non-images", notImage.status === 415 && notImage.body?.code === "E_NOT_IMAGE", String(notImage.status));
   const relative = await get(`/api/backdrop/file?path=stills/frame.png`);
   check("backdrop requires an absolute path", relative.status === 400 && relative.body?.code === "E_ARGS", String(relative.status));
   const bundled = await fetch(`${BASE}/backdrop.jpg`);
@@ -213,6 +223,16 @@ try {
   /* ---------------- guards ---------------- */
   const emptyPrompt = await post("/api/prompt", { text: "   " });
   check("prompt rejects empty", emptyPrompt.status === 400);
+  // an attachment-only turn is legal, but a bad attachment is not
+  const nilImages = await post("/api/prompt", { text: "", images: [] });
+  check("prompt rejects empty attachments too", nilImages.status === 400);
+  const badMime = await post("/api/prompt", { text: "hi", images: [{ mimeType: "image/tiff", data: "AAAA" }] });
+  check("prompt rejects unsupported image type", badMime.status === 400 && badMime.body?.code === "E_IMAGE", String(badMime.body?.error));
+  const tooMany = await post("/api/prompt", {
+    text: "hi",
+    images: Array.from({ length: 9 }, () => ({ mimeType: "image/png", data: "AAAA" })),
+  });
+  check("prompt caps the attachment count", tooMany.status === 400 && /too many/.test(tooMany.body?.error ?? ""), String(tooMany.body?.error));
   const badApprove = await post("/api/approve", { id: "ap-nope", decision: "approve" });
   check("approve rejects unknown", badApprove.status === 404);
   const badRoute = await get("/api/nope");

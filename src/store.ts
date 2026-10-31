@@ -1,4 +1,4 @@
-import { api, openStream, type Item, type Meta, type SessionSummary, type StreamEvent } from "./api";
+import { api, openStream, type ImageAttachment, type Item, type Meta, type SessionSummary, type StreamEvent } from "./api";
 
 export type State = {
   sessions: SessionSummary[];
@@ -167,10 +167,10 @@ async function withError<T>(fn: () => Promise<T>): Promise<T | null> {
 }
 
 export const actions = {
-  async send(text: string) {
+  async send(text: string, images?: ImageAttachment[]) {
     const trimmed = text.trim();
-    if (!trimmed) return;
-    await withError(() => api.prompt(trimmed));
+    if (!trimmed && !images?.length) return null;
+    return withError(() => api.prompt(trimmed, images));
   },
   async abort() {
     await withError(() => api.abort());

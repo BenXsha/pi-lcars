@@ -696,10 +696,13 @@ button { cursor: pointer; }
 /* ============================================================
    command bar — the input must read as an input
    ============================================================ */
+/* The bar is a floor, not a fixed height: the field grows with the draft (§4.3)
+   while ENTRY and the buttons stay anchored to the bottom edge. */
 .cmdbar {
-  flex: 0 0 96px;
-  height: 96px;
+  flex: 0 0 auto;
+  min-height: 96px;
   display: flex;
+  align-items: flex-end;
   gap: var(--gap);
 }
 .cmd-field {
@@ -739,6 +742,8 @@ button { cursor: pointer; }
   white-space: nowrap;
 }
 .cmd-help .live { color: var(--orange); }
+/* the hint is the only shrinkable part: the counter and the attach button stay put */
+.cmd-help > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .cmd-help .cnt { color: var(--t2); font-variant-numeric: tabular-nums; }
 
 /* the visible input surface: bottom readout bar + blinking caret */
@@ -765,8 +770,10 @@ button { cursor: pointer; }
   flex: 1 1 auto;
   width: 100%;
   min-height: 44px;
-  max-height: 44px;
+  max-height: none;
+  height: 44px;
   resize: none;
+  overflow-y: auto;
   border: 0;
   outline: 0;
   background: transparent;
@@ -780,7 +787,7 @@ button { cursor: pointer; }
 .cmdbar .entry-block {
   width: 84px;
   flex: 0 0 84px;
-  height: 100%;
+  height: 96px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -792,8 +799,8 @@ button { cursor: pointer; }
 .cmdbar .entry-block .el { font: 700 13.5px/1 var(--din); letter-spacing: 0.1em; }
 .cmdbar .entry-block .eh { font: 700 11px/1 var(--din); letter-spacing: 0.1em; opacity: 0.75; }
 
-.cmdbar .btns { display: flex; gap: var(--gap); }
-.cmdbar .btn { min-width: 88px; height: 100%; }
+.cmdbar .btns { display: flex; align-items: flex-end; gap: var(--gap); }
+.cmdbar .btn { min-width: 88px; height: 96px; }
 
 /* ============================================================
    layout chain (restored) — every level must be shrinkable and
@@ -1606,8 +1613,9 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 }
 @media (max-width: 900px) {
   .ctl[data-compact="1"] { display: none; }
-  .cmdbar { height: 84px; flex-basis: 84px; }
-  .cmdbar .entry-block { width: 64px; flex-basis: 64px; }
+  .cmdbar { min-height: 84px; }
+  .cmdbar .entry-block { width: 64px; flex-basis: 64px; height: 84px; }
+  .cmdbar .btn { height: 84px; }
 }
 
 /* ============================================================
@@ -2433,6 +2441,82 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 .cp .cn { font: 400 11.5px/1.4 var(--mono); color: var(--orange); }
 .cp .cd { font: 400 11px/1.4 var(--text); color: var(--g3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cp .ch { font: 400 9.5px/1.4 var(--mono); color: var(--g2); }
+/* `@` palette: same rows, but a path is a read-only reference → ice, not orange */
+.cpal[data-kind="file"] .cp .cn { color: var(--ice); }
+.cp-empty { font: 400 11px/1.6 var(--mono); color: var(--g2); padding: 5px 8px; }
+
+/* composer extras: attach button, image chips, drag/flash states
+   State lives in the spine colour (§4.3) — no rings, no shadows. */
+.cmd-help .ch-right { display: flex; align-items: center; gap: 8px; }
+.cmd-attach {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 16px;
+  padding: 0;
+  background: var(--g1);
+  color: var(--g3);
+  border-radius: var(--r-1) var(--r-1) 0 0;
+}
+.cmd-attach:hover:not(:disabled) { background: var(--ice); color: #000; }
+.cmd-attach:disabled { opacity: 0.4; }
+.cmdwrap[data-flash="1"] .cmd-field::before { background: var(--ice); }
+.cmdwrap[data-drop="1"] .cmd-field::before { background: var(--tang); }
+.cmdwrap[data-drop="1"] .inputline { border-bottom-color: var(--tang); }
+
+.attach-strip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 1px;
+}
+.attach-strip .as-lb {
+  flex: 0 0 auto;
+  padding: 4px 6px;
+  background: var(--g1);
+  border-radius: var(--r-1) var(--r-1) 0 0;
+  font: 700 10.5px/1 var(--din);
+  letter-spacing: 0.12em;
+  color: var(--amber);
+  white-space: nowrap;
+}
+.achip {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 6px 0 4px;
+  background: var(--g0);
+  border-radius: 0 var(--r-1) var(--r-1) 0;
+  box-shadow: inset 3px 0 0 var(--lavender);
+}
+.achip img { width: 22px; height: 22px; object-fit: cover; border-radius: 2px; }
+.achip .an {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 400 11px/1 var(--mono);
+  color: var(--w);
+}
+.achip .asz { font: 400 10.5px/1 var(--mono); color: var(--g3); }
+.achip .ax {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  background: transparent;
+  color: var(--g3);
+}
+.achip .ax:hover { color: var(--tomato); }
+/* the transcript only knows the counts — the bytes went to the model, not to us */
+.achip.static { height: 22px; box-shadow: inset 3px 0 0 var(--g2); }
+.achip.static .an { color: var(--g3); }
+.msg-attach { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 3px; }
 
 .sum { display: grid; grid-template-columns: 4px minmax(0, 1fr); gap: var(--gap); margin: 6px 0; }
 .sum > .st { background: var(--moon); border-radius: var(--r-pill) 0 0 var(--r-pill); }
@@ -2703,6 +2787,47 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 .about .pv-row .st { background: var(--g2); }
 .about .pv-row .st[data-tone="cyan"] { background: var(--cyan); }
 .about .pv-row .st[data-tone="ice"] { background: var(--ice); }
+.about .pv-row .st[data-tone="orange"] { background: var(--orange); }
+
+/* One author, one filled block — same row grammar as a credit line. */
+.about-author {
+  display: grid;
+  grid-template-columns: 4px 190px minmax(0, 1fr) auto;
+  gap: var(--gap);
+  align-items: center;
+  min-height: 40px;
+  margin: 0 0 6px;
+  padding-right: 10px;
+  background: var(--g0);
+}
+.about-author .bar {
+  align-self: stretch;
+  margin: 5px 0;
+  background: var(--orange);
+  border-radius: var(--r-pill);
+}
+.about-author .nm {
+  font: 700 15px/1.4 var(--din);
+  letter-spacing: 0.06em;
+  color: var(--w);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.about-author .role {
+  font: 700 11px/1.4 var(--din);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--amber);
+}
+.about-author .mail {
+  font: 400 11.5px/1.4 var(--mono);
+  color: var(--ice);
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--ice) 35%, transparent);
+}
+.about-author .mail.quiet { color: var(--g2); border-bottom-color: transparent; }
+.about-author .mail:hover { color: var(--w); }
 
 .about-credit {
   display: grid;

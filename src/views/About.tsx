@@ -1,7 +1,7 @@
 import { useEffect, useState } from "preact/hooks";
 import { api, type SystemInfo } from "../api";
 import { t } from "../i18n";
-import { appInfo, npmUrl, repoUrl, type Credit } from "../appInfo";
+import { appInfo, npmUrl, repoUrl, uiBuildStamp, type Author, type Credit } from "../appInfo";
 
 /** `[4px 条][标签][读数]` — the same row language as the config panels. */
 function Fact(props: { k: string; v: string; title?: string; tone?: string }) {
@@ -25,6 +25,25 @@ function CreditRow(props: Credit) {
       <span class="use">{props.note}</span>
       <span class="ver">{props.version}</span>
       <span class="lic">{props.license}</span>
+    </div>
+  );
+}
+
+function AuthorBlock(props: { author: Author }) {
+  const { author } = props;
+  const href = author.email ? `mailto:${author.email}` : (author.url ?? null);
+  return (
+    <div class="about-author">
+      <span class="bar" />
+      <span class="nm">{author.name}</span>
+      <span class="role">{t("about.authorRole")}</span>
+      {href ? (
+        <a class="mail" href={href} target="_blank" rel="noreferrer noopener">
+          {author.email ?? author.url}
+        </a>
+      ) : (
+        <span class="mail quiet">—</span>
+      )}
     </div>
   );
 }
@@ -59,7 +78,7 @@ export function AboutPanel() {
     <div class="pv about">
       <div class="pv-title">{t("about.title")}</div>
       <div class="pv-sub">
-        <b>{appInfo.name}</b> {appInfo.version} · {appInfo.license} ·{" "}
+        <b>{appInfo.name}</b> {uiBuildStamp()} · {appInfo.license} ·{" "}
         <a href={npmUrl} target="_blank" rel="noreferrer noopener">
           npm
         </a>
@@ -74,6 +93,8 @@ export function AboutPanel() {
       </div>
 
       <div class="set-section">{t("about.runtime")}</div>
+      <Fact k={t("about.uiVersion")} v={appInfo.version} tone="orange" />
+      <Fact k={t("about.uiBuild")} v={`${appInfo.builtAt} · ${appInfo.commit ? "git " + appInfo.commit : "no git"}`} />
       <Fact k="NODE" v={sys?.node ?? "—"} />
       <Fact
         k="PI SDK"
@@ -95,6 +116,13 @@ export function AboutPanel() {
         appInfo.deps.map((d) => <CreditRow key={d.name} {...d} />)
       ) : (
         <div class="about-note quiet">{t("about.devBuild")}</div>
+      )}
+
+      <div class="set-section">{t("about.author")}</div>
+      {appInfo.author ? (
+        <AuthorBlock author={appInfo.author} />
+      ) : (
+        <div class="about-note quiet">{t("about.noAuthor")}</div>
       )}
 
       <div class="set-section">{t("about.lcars")}</div>

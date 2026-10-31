@@ -1,11 +1,19 @@
 /** Typed client for the console server. */
 
+/** base64 payload of one image attachment, as the composer holds it. */
+export type ImageAttachment = { data: string; mimeType: string };
+
+/** What the transcript knows about an attachment: counts, never the bytes. */
+export type AttachmentMeta = { mimeType: string; bytes: number };
+
 export type Item =
   | {
       kind: "user";
       id: string;
       text: string;
       skill?: { name: string; location: string; lines: number; chars: number; head: string } | null;
+      /** images sent with this turn (metadata only) */
+      attachments?: AttachmentMeta[];
       steer?: boolean;
       queued?: boolean;
       ts: number;
@@ -324,7 +332,8 @@ export const api = {
   rename: (id: string, name: string) => post<Bootstrap>("/api/session", { op: "rename", id, name }),
   rewind: (turn: number) => post<Bootstrap>("/api/session", { op: "rewind", turn }),
   remove: (id: string) => post<Bootstrap>("/api/session", { op: "delete", id }),
-  prompt: (text: string) => post<{ mode: string }>("/api/prompt", { text }),
+  prompt: (text: string, images?: ImageAttachment[]) =>
+    post<{ mode: string }>("/api/prompt", images?.length ? { text, images } : { text }),
   abort: () => post<unknown>("/api/abort", {}),
   answer: (id: string, value: string | null) => post<{ answered: boolean }>("/api/answer", { id, value }),
   approve: (id: string, decision: "approve" | "deny" | "always") => post<unknown>("/api/approve", { id, decision }),
@@ -336,6 +345,10 @@ export const api = {
   system: () => call<SystemInfo>("/api/system"),
   commands: () => call<{ commands: { name: string; description: string; kind: string; hint?: string }[] }>("/api/commands"),
   compact: () => post<{ started: boolean }>("/api/session", { op: "compact" }),
+  files: (q = "", limit = 40) =>
+    call<{ query: string; total: number; scanned: number; truncated: boolean; files: { rel: string; base: string; dir: string; score: number }[] }>(
+      `/api/files?q=${encodeURIComponent(q)}&limit=${limit}`,
+    ),
   history: (q = "", refresh = false) =>
     call<HistoryResult>(`/api/history?q=${encodeURIComponent(q)}${refresh ? "&refresh=1" : ""}`),
   historyOp: (op: "rename" | "delete", payload: { path: string; name?: string }) => post<unknown>("/api/history", { op, ...payload }),

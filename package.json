@@ -3,6 +3,11 @@
   "version": "0.3.2",
   "description": "LCARS agent console for pi — one command boots the web UI and the in-process pi backend",
   "license": "MIT",
+  "author": {
+    "name": "BenShawn",
+    "email": "7319722@qq.com",
+    "url": "https://gitee.com/benshawn"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://gitee.com/benshawn/pi-lcars.git"

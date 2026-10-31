@@ -20,7 +20,7 @@ import { Dialogs } from "./pi/dialogs.mjs";
 import { listCommands } from "./pi/commands.mjs";
 import { now, summaryOf } from "./pi/format.mjs";
 import { mcpStatus, setEnabled, addServer, removeServer } from "./pi/mcpConfig.mjs";
-import { listTree, openPath, readTextFile, streamFile, listBackdropDir, backdropFile } from "./pi/fs.mjs";
+import { listTree, openPath, readTextFile, streamFile, listBackdropDir, backdropFile, searchFiles } from "./pi/fs.mjs";
 import { queryHistory, startHistoryScan, historyCache as historyCacheRef, deleteHistoryFile, renameHistoryFile } from "./pi/history.mjs";
 import { listSkills, reloadSkills } from "./pi/skills.mjs";
 import { listProviders, listProviderModels, testProvider, setDefaultModel, setProviderKey, addProvider, removeProvider, reloadProviders } from "./pi/providers.mjs";
@@ -77,12 +77,12 @@ const ok = (res, data) => json(res, 200, { ok: true, data });
 const fail = (res, code, error, extra = {}) =>
   json(res, code, { ok: false, error: String(error?.message || error), ...extra });
 
-const body = (req) =>
+const body = (req, limit = 4_000_000) =>
   new Promise((done, reject) => {
     let raw = "";
     req.on("data", (c) => {
       raw += c;
-      if (raw.length > 4_000_000) reject(new Error("body too large"));
+      if (raw.length > limit) reject(new Error("body too large"));
     });
     req.on("end", () => {
       if (!raw) return done({});
@@ -93,6 +93,31 @@ const body = (req) =>
       }
     });
   });
+
+// attachments travel as base64 inside the JSON body, so this route needs a
+// far larger buffer than the rest of the API
+const PROMPT_MAX_BYTES = 32_000_000;
+const IMAGE_MIMES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
+const MAX_IMAGES = 6;
+
+/** Validate attachments before they reach pi: bad input must not become a notice. */
+function normalizeImages(raw) {
+  if (!Array.isArray(raw) || !raw.length) return { images: [], error: null };
+  if (raw.length > MAX_IMAGES) return { images: [], error: `too many images (max ${MAX_IMAGES})` };
+  const images = [];
+  for (const item of raw) {
+    const mimeType = String(item?.mimeType ?? "");
+    const data = String(item?.data ?? "").replace(/^data:[^;]+;base64,/, "");
+    if (!IMAGE_MIMES.has(mimeType)) return { images: [], error: `unsupported image type: ${mimeType || "unknown"}` };
+    if (!data || data.length > 16_000_000) return { images: [], error: "image data missing or too large" };
+    images.push({ type: "image", data, mimeType });
+  }
+  return { images, error: null };
+}
+
+/** What the transcript shows about an attachment: counts only, never the bytes. */
+const attachmentMeta = (images) =>
+  images.map((im) => ({ mimeType: im.mimeType, bytes: Math.round((im.data.length * 3) / 4) }));
 
 /* ------------------------------------------------------------------- app */
 /** resolved in the listen callback; every route waits for it */
@@ -215,11 +240,15 @@ const routes = {
   },
 
   "POST /api/prompt": async (req, res) => {
-    const b = await body(req);
+    const b = await body(req, PROMPT_MAX_BYTES);
     const entry = registry.get(b.session);
     if (!entry) return fail(res, 404, "no session");
     const text = String(b.text || "").trim();
-    if (!text) return fail(res, 400, "empty prompt");
+    const { images, error: imageError } = normalizeImages(b.images);
+    if (imageError) return fail(res, 400, imageError, { code: "E_IMAGE" });
+    // an attachment-only turn is legal: the operator drops a screenshot and hits
+    // RUN without typing anything
+    if (!text && !images.length) return fail(res, 400, "empty prompt");
     // dialog-based tools (ask_user_question) and MCP tools only exist once the
     // extensions are bound; do it before the first turn rather than at boot
     if (!entry.bound) await entry.bind?.().catch(() => {});
@@ -250,18 +279,19 @@ const routes = {
       id: `u${++registry.counter}-${Math.random().toString(36).slice(2, 5)}`,
       text: skill ? text.split("</skill>")[1]?.trim() || "" : text,
       skill,
+      attachments: images.length ? attachmentMeta(images) : undefined,
       steer: steerable,
       queued: !steerable && (queue.depth > 0 || queue.runningId !== null),
       ts: now(),
     });
 
     if (!entry.title) {
-      entry.title = summaryOf(text);
+      entry.title = summaryOf(text) || (images.length ? `${images.length} image${images.length === 1 ? "" : "s"}` : "");
       entry.pushMeta();
     }
 
     if (steerable) {
-      entry.session.steer(text).catch((e) => {
+      entry.session.steer(text, images.length ? images : undefined).catch((e) => {
         entry.emit({ kind: "notice", id: `e${now()}`, tone: "error", label: "ERROR", text: String(e.message || e), ts: now() });
       });
       entry.pushMeta();
@@ -271,7 +301,7 @@ const routes = {
     queue.submit({
       sessionId: entry.id,
       text,
-      run: () => entry.session.prompt(text),
+      run: () => entry.session.prompt(text, images.length ? { images } : undefined),
     });
     entry.pushMeta();
     ok(res, { mode: queue.runningId === entry.id ? "started" : "queued" });
@@ -663,6 +693,15 @@ ${css ? `<link rel="stylesheet" href="${css}">` : ""}
       cwd: CWD,
       target: url.searchParams.get("path") || "",
       showHidden: url.searchParams.get("hidden") === "1",
+    }));
+  },
+
+  "GET /api/files": async (req, res) => {
+    const url = new URL(req.url, "http://x");
+    ok(res, await searchFiles({
+      cwd: CWD,
+      q: url.searchParams.get("q") || "",
+      limit: Math.min(Number(url.searchParams.get("limit") || 40) || 40, 200),
     }));
   },
 

@@ -106,6 +106,10 @@ let page;
 try {
   /* --------------------------------------------------------- 1. server */
   await (await import("node:fs/promises")).mkdir(workspace, { recursive: true });
+  // a couple of files so the composer's `@` palette has something to find
+  await (await import("node:fs/promises")).mkdir(join(workspace, "server", "pi"), { recursive: true });
+  await writeFile(join(workspace, "server", "pi", "registry.mjs"), "// fixture\n");
+  await writeFile(join(workspace, "notes.md"), "# fixture\n");
   const env = { ...process.env, CI: "1", LCARS_STATE_DIR: state, LCARS_SESSIONS: sessions, LCARS_TRUST_PROJECT: "0" };
   server = spawn(process.execPath, [BIN, "--json", "--no-open", "--port", String(PORT)], {
     cwd: workspace,
@@ -277,7 +281,7 @@ try {
   check("station combo is inert while typing", await inTranscript(), await h1());
 
   /* -------------------------------- 5. back to the session list (bug) */
-  const backBySession = await click(".lsessions .sess");
+  await click(".lsessions .sess");
   await sleep(300);
   check("session row returns to the transcript", await inTranscript(), await h1());
   check("session row clears the hash", (await hash()) === "", await hash());
@@ -422,6 +426,96 @@ try {
   await sleep(150);
   check("composer accepts text", (await evaluate(`document.querySelector('textarea').value`)) === "hello");
   await evaluate(`(() => { const t = document.querySelector('textarea'); t.value = ''; t.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+
+  /* ------------------------------------- 9b. composer capabilities */
+  // stub /api/prompt: these checks must never reach a real model
+  await evaluate(`(() => {
+    window.__calls = [];
+    window.__realFetch = window.fetch;
+    window.fetch = (u, o) => {
+      const url = String(u);
+      if (url.includes('/api/prompt')) {
+        try { window.__calls.push(JSON.parse(o?.body ?? '{}')); } catch { window.__calls.push({ unparsed: true }); }
+        return Promise.resolve(new Response(JSON.stringify({ ok: true, data: { mode: 'queued' } }), { status: 200, headers: { 'content-type': 'application/json' } }));
+      }
+      return window.__realFetch(u, o);
+    };
+    return true;
+  })()`);
+
+  const value = () => evaluate(`document.querySelector('textarea').value`);
+  const typeInto = async (text) => {
+    await evaluate(`document.querySelector('textarea').focus()`);
+    await cdp.send("Input.insertText", { text });
+    await sleep(180);
+  };
+  const keyIn = async (key) => {
+    await evaluate(
+      `document.querySelector('textarea')?.dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(key)}, bubbles: true, cancelable: true }))`,
+    );
+    await sleep(220);
+  };
+  const clearInput = async () => {
+    await evaluate(`(() => { const t = document.querySelector('textarea'); t.value = ''; t.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+    await sleep(120);
+  };
+
+  // auto-grow: rises with the draft, then stops at the cap
+  await typeInto("a\nb\nc\nd\n");
+  const grown = await evaluate(`document.querySelector('textarea').clientHeight`);
+  check("composer grows with the draft", grown > 44 && grown < 240, `${grown}px`);
+  await typeInto("x\n".repeat(60));
+  const capped = await evaluate(`document.querySelector('textarea').clientHeight`);
+  check("composer stops at its cap", capped > grown && capped <= 240, `${capped}px`);
+  check("a capped field scrolls instead of growing", await evaluate(`(() => { const t = document.querySelector('textarea'); return t.scrollHeight > t.clientHeight; })()`));
+  await clearInput();
+
+  // `@` palette → file reference
+  await typeInto("@registr");
+  await sleep(500);
+  const fileRows = await evaluate(`document.querySelectorAll('.cpal[data-kind="file"] .cp').length`);
+  check("@ opens the file palette", fileRows > 0, `${fileRows} rows`);
+  const firstName = await evaluate(`document.querySelector('.cpal[data-kind="file"] .cp .cn')?.textContent ?? ''`);
+  check("file palette leads with the best name match", firstName === "registry.mjs", firstName);
+  await keyIn("Enter");
+  check("picking a file inserts a path reference", /`server\/pi\/registry\.mjs`/.test(await value()), await value());
+  await clearInput();
+
+  // image attachment → prompt payload carries base64 + mime
+  await evaluate(`(() => {
+    const png = Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg=='), (c) => c.charCodeAt(0));
+    const input = document.querySelector('.cmd-field input[type=file]');
+    const dt = new DataTransfer();
+    dt.items.add(new File([png], 'pixel.png', { type: 'image/png' }));
+    input.files = dt.files;
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  })()`);
+  await sleep(400);
+  check("attaching an image shows a chip", await exists(".attach-strip .achip img"), await evaluate(`document.querySelector('.achip .an')?.textContent ?? ''`));
+  await evaluate(`document.querySelector('.btns .btn')?.click()`);
+  await sleep(400);
+  const sent = await evaluate(`window.__calls.length ? window.__calls[window.__calls.length - 1] : null`);
+  check("RUN sends the attachment with the prompt", !!sent?.images?.[0]?.data && sent.images[0].mimeType === "image/png", JSON.stringify(sent)?.slice(0, 80));
+  check("the composer clears the attachment after RUN", !(await exists(".achip")));
+
+  // sent-history: ↑ walks back through what was actually sent
+  await typeInto("history probe");
+  await keyIn("Enter");
+  check("Enter clears the field", (await value()) === "", await value());
+  await keyIn("ArrowUp");
+  check("↑ recalls the last prompt", (await value()) === "history probe", await value());
+  await keyIn("ArrowDown");
+  check("↓ returns to the draft", (await value()) === "", await value());
+  await clearInput();
+
+  // draft persistence survives a reload, per session
+  await typeInto("draft survives reload");
+  await sleep(700);
+  await cdp.send("Page.navigate", { url: process.env.UI_BASE || handshake.url });
+  await sleep(2000);
+  check("the draft survives a reload", (await value()) === "draft survives reload", await value());
+  await clearInput();
 
   /* ------------------------------------------------ 10. console errors */
   const errors = cdp.events

@@ -1,7 +1,7 @@
 import { readFile, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { applyEvent } from "./stream.mjs";
-import { shortArgs, textOf } from "./format.mjs";
+import { imagesOf, shortArgs, textOf } from "./format.mjs";
 import { httpError } from "./errors.mjs";
 
 /** Exit status from a persisted tool result: details first, then pi's own text. */
@@ -335,7 +335,14 @@ export class Registry {
     };
     for (const m of session.messages ?? []) {
       if (m.role === "user") {
-        push({ kind: "user", id: `u${m.timestamp}-${++n}`, text: textOf(m.content), ts: m.timestamp });
+        push({
+          kind: "user",
+          id: `u${m.timestamp}-${++n}`,
+          text: textOf(m.content),
+          // a re-opened transcript still says which turns carried images
+          attachments: imagesOf(m.content).length ? imagesOf(m.content) : undefined,
+          ts: m.timestamp,
+        });
       } else if (m.role === "assistant") {
         const content = m.content ?? [];
         for (const c of content) if (c?.type === "toolCall") calls.set(c.id, c);

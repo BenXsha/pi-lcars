@@ -59,6 +59,87 @@ export async function listTree({ cwd, target, showHidden = false }) {
   };
 }
 
+/* ------------------------------------------------------- @ completions */
+/*
+ * The composer's `@` palette needs a flat file list, not a per-directory tree:
+ * the operator types `@regist` and expects `server/pi/registry.mjs` even though
+ * they never expanded two folders. One walk, cached, so typing does not hammer
+ * the disk; the cache is invalidated by age, not by watchers.
+ */
+const INDEX_TTL_MS = 20_000;
+const fileIndex = new Map();
+
+async function walkFiles(root, maxFiles, maxDepth) {
+  const out = [];
+  const stack = [{ dir: root, depth: 0 }];
+  while (stack.length && out.length < maxFiles) {
+    const { dir, depth } = stack.pop();
+    let dirents;
+    try {
+      dirents = await readdir(dir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const d of dirents) {
+      if (d.name.startsWith(".") || SKIP.has(d.name)) continue;
+      const full = join(dir, d.name);
+      if (d.isDirectory()) {
+        if (depth + 1 <= maxDepth) stack.push({ dir: full, depth: depth + 1 });
+        continue;
+      }
+      if (!d.isFile()) continue;
+      out.push(relative(root, full).split(sep).join("/"));
+      if (out.length >= maxFiles) break;
+    }
+  }
+  return out;
+}
+
+/**
+ * Ranked workspace files for `@` completion.
+ *
+ * 0 = the file name starts with the query, 1 = it contains it, 2 = the path
+ * does. Ties fall back to depth then length, so `src/api.ts` beats
+ * `src/views/deep/nested/api.ts` for the same query.
+ */
+export async function searchFiles({ cwd, q = "", limit = 40, maxFiles = 8000, maxDepth = 12 }) {
+  const root = await realpath(cwd).catch(() => cwd);
+  const hit = fileIndex.get(root);
+  const fresh = hit && Date.now() - hit.at < INDEX_TTL_MS;
+  const files = fresh ? hit.files : await walkFiles(root, maxFiles, maxDepth);
+  if (!fresh) fileIndex.set(root, { at: Date.now(), files });
+
+  const needle = String(q).toLowerCase().replace(/^@/, "").trim();
+  const rows = [];
+  for (const rel of files) {
+    const lower = rel.toLowerCase();
+    const base = lower.slice(lower.lastIndexOf("/") + 1);
+    const score = !needle
+      ? rel.split("/").length - 1
+      : base.startsWith(needle)
+        ? 0
+        : base.includes(needle)
+          ? 1
+          : lower.includes(needle)
+            ? 2
+            : -1;
+    if (score < 0) continue;
+    rows.push({ rel, base: rel.slice(rel.lastIndexOf("/") + 1), dir: rel.includes("/") ? rel.slice(0, rel.lastIndexOf("/")) : "", score });
+  }
+  rows.sort((a, b) =>
+    a.score !== b.score ? a.score - b.score : a.rel.length - b.rel.length || a.rel.localeCompare(b.rel),
+  );
+
+  return {
+    query: needle,
+    root,
+    total: rows.length,
+    scanned: files.length,
+    truncated: files.length >= maxFiles,
+    files: rows.slice(0, limit),
+  };
+}
+
 /** Ordered candidates; the first one that actually spawns wins. */
 const TOOL = {
   editor: [

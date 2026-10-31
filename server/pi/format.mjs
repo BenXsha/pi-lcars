@@ -9,6 +9,14 @@ export const textOf = (content) => {
     .join("");
 };
 
+/** Image parts of a stored user message — counts only, the bytes are pi's. */
+export const imagesOf = (content) => {
+  if (!Array.isArray(content)) return [];
+  return content
+    .filter((c) => c && c.type === "image")
+    .map((c) => ({ mimeType: String(c.mimeType || "image/png"), bytes: Math.round(((c.data?.length ?? 0) * 3) / 4) }));
+};
+
 /** One-line argument summary per tool, mirroring how pi's TUI labels calls. */
 export function shortArgs(name, args) {
   if (!args || typeof args !== "object") return "";

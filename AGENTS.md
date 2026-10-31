@@ -237,8 +237,25 @@ LCARS 原版用 `Swiss 911 Ultra Compressed`（压缩粗体）。**本项目不�
 - 可见输入面：`--g0` 底面 + **2px 底部读数条**（空闲 `--g2`，聚焦 `--orange`）+ 左侧 4px 状态条（同上变色）。
 - 前置 2×18px 闪烁 caret，占位文字用 `--g3`（不是 `--g2`，要比装饰文字亮一档）。
 - 聚焦时**不出现 ring、不出现投影**：只变色，和配置字段同一套语言。
-- 输入区顶部一行 9.5px 元信息：左「快捷键提示」右「字符数 / INPUT」，运行态时左侧变 `--orange`。
-- 高度固定 96px，**永远贴在窗口底部**（footer），不随消息流滚动。
+- 输入区顶部一行 9.5px 元信息：左「快捷键提示」右「字符数 / INPUT」（最右是 attach 小按钮），运行态时左侧变 `--orange`。
+- **96px 是下限不是定高**：字段随草稿长高，见 §4.3b；**永远贴在窗口底部**（footer），不随消息流滚动。
+
+### 4.3b 输入区能力（草稿 / 历史 / 附件 / @ 引用 / 自增高）
+
+输入区是唯一需要「记住东西」的地方，四项能力的约定：
+
+| 能力 | 行为 | 落地规则 |
+|---|---|---|
+| **草稿** | 按**会话**存 `localStorage[lcars.draft.<id>]`，输入停止 400ms 落盘；发送 / 执行 `/命令` 后清空；切换会话先 flush 旧会话再读新会话 | 刷新、切站、切会话都不丢字；**不跨会话串字** |
+| **历史召回** | `↑` 从**光标在文首**时开始走 `lcars.hist.<id>`（最近 40 条，去连续重复），`↓` 走回去，到底恢复原草稿；随手输入即退出历史模式 | 不在任意位置劫持 `↑`，否则多行草稿没法用方向键 |
+| **附件** | 粘贴 / 拖入 / 点 attach 得到图片 chip（缩略图 + 名字 + 体积 + ×，上限 6 张） | 服务端只收 `png/jpeg/webp/gif`，`/api/prompt` 独立 32MB 缓冲；转录区**只显示数量与体积**，不回传字节 |
+| **@ 引用** | `@` + 若干字符 → 文件面板（同一套 `.cp` 条），`↑↓` 选、`Tab/Enter` 插入成 `` `rel/path` `` | 扁平索引 + 服务端排序（文件名前缀 > 文件名包含 > 路径包含），跳过 `node_modules/.git/dist` 与隐藏项，20s 缓存 |
+| **自增高** | `height:auto` 量 `scrollHeight`，夹在 `44px` 与 `min(240px, 26vh)` 之间，超限内部滚动 | 测量在 effect 里做，不用字符数估算；`ENTRY` 块与右侧按钮**固定 96px 贴底**，只有字段长高 |
+
+- 状态只用**脊色**表达（聚焦 `--orange`、拖入 `--tang`、引用闪回 `--ice`），不加 ring、不加投影（§2 R4 / §4.3）。
+- 附件 chip 的左脊是 `--lavender`（并行/外部输入位），转录里的静态 chip 降为 `--g2`。
+- `@` 面板的文件名用 `--ice`：路径是**只读引用**，不是可执行命令。
+
 
 ### 4.4 字号 / 字距 / 数字
 
@@ -590,6 +607,8 @@ composer 上方出现 `QUEUED n` 条带，逐条显示待投递文本 + `deliver
 - **运行时事实**来自 `GET /api/system`（node、pi SDK 版本、platform、workspace、port、policy），
   **构建期事实**来自 `vite.config.ts` 的 `define: __APP_INFO__`（版本、许可证、仓库地址、依赖清单）。
   依赖清单不是手写常量：构建时读每个包的 `package.json` 取 `version` + `license`，所以不会漂移。
+- **UI 身份是独立一段**：头部副标 `pi-lcars <version>+<git sha>`（构建时 `git rev-parse --short`，tarball 安装显示 `no-git`），运行时区再给 `UI VERSION`（package.json 版本）与 `UI BUILD`（构建日期 · git sha）——"我跑的是哪次构建"必须能直接读出来，不能靠翻 npm。
+- **作者段**（`AUTHOR & MAINTENANCE`）来自 `package.json` 的 `author`（字符串或对象都解析）：一块橙脊实心行，姓名 + `MAINTAINER` + mailto/主页。没有 author 字段就明写"没有"，不编一个名字。
 - **归属文案**必须写死三件事：LCARS 出自 TNG(1987)、Michael Okuda 与 Rick Sternbach；三处刻意偏离
   （一色一义 / 放弃压缩字体 / 编号只放真实数据）；Star Trek 与 LCARS 是 Paramount/CBS 商标、
   本项目为非官方爱好者作品、不复用原版素材。
@@ -760,11 +779,14 @@ composer 上方出现 `QUEUED n` 条带，逐条显示待投递文本 + `deliver
 | 2026-xx-xx | 新会话在 `#load()` 里补齐默认模型与思考档：`createAgentSession()` 不传 model 时 pi 会停在 `unknown/unknown`，导致 shelf 与 `pi-lcars status` 显示假值 | “unknown/unknown” 违反 §7.6 数字自洽；同时它让 pi-lens 把 situational 工具当默认激活，工具清单虚高 | `server/pi/registry.mjs`、`test/smoke.mjs` |
 | 2026-xx-xx | **内置壁纸移除**。背景改为用户自选本地图片：`SETTINGS → BACKDROP → CHOOSE…` 打开磁盘选择器（HOME / PICTURES / DESKTOP / DOWNLOADS / ROOT / 挂载卷，面包屑 + 图片行带缩略图），选定后 `settings.backdrop` 存绝对路径 | 随包分发壁纸无论自绘还是静帧都是替用户做审美决定，且要背素材来源；把选择权交给用户后包里零图片零版权负担。图片**原地读取**（`/api/backdrop/file`）不复制进项目，删掉文件即自动回到纯黑 | `server/pi/fs.mjs`（`listBackdropDir` / `backdropFile`）、`server/index.mjs`、`src/views/Console.tsx`（`BackdropPicker`）、`src/settings.ts`、`src/styles/lcars.css`、`test/smoke.mjs`、`test/ui.mjs`；删除 `public/backdrop.jpg`、`scripts/build-backdrop.mjs` |
 | 2026-xx-xx | 背景仍是**纹理而非壁纸**：40% 不透明度 + 55% 黑幕的合成上界与图片内容无关（任意像素最坏 rgb(46,46,46)），所以用户换成多亮的照片都不会突破 §2 R2；不做亮度/透明度滑杆，避免第二个变量破坏对比度 | 纯色块是 LCARS 的构图基础，背景只能“看得见舰体，读得清读数”；把上界做成常量就不需要每张图人工验对比度 | `src/styles/lcars.css`（`--backdrop-image`） |
+| 2026-xx-xx | ABOUT 站补齐 **UI 版本与作者**：头部副标成 `pi-lcars 0.3.2+261f880`（版本 + 构建时 git 短 sha），运行时区新增 `UI VERSION` / `UI BUILD`（构建日期 + commit），新增 `AUTHOR & MAINTENANCE` 段（姓名 + MAINTAINER + mailto） | 原来只有 package.json 的版本号，无法回答"这个标签页跑的是哪次构建"；作者与许可归属是可分发项目的基本义务，靠 npm 页面不算写明 | `vite.config.ts`（`parseAuthor`/`gitCommit`/`builtAt`）、`src/appInfo.ts`、`src/views/About.tsx`、`src/styles/lcars.css`、`package.json` 的 `author` |
+| 2026-xx-xx | 输入区四项能力：**草稿持久化 + ↑ 历史召回 + 图片附件 + `@` 文件引用 + 自增高**（详规进 §4.3b） | 这四项全是"一眼看得出该有、但现在没有"的输入区缺口；实现都靠真事件（`prompt(text, {images})` / `steer(text, images)`），不造第二条消息通道 | `src/views/Console.tsx`（`Composer`）、`src/drafts.ts`、`src/api.ts`、`src/store.ts`、`server/index.mjs`（`normalizeImages` + `GET /api/files`）、`server/pi/fs.mjs`（`searchFiles`）、`server/pi/format.mjs`（`imagesOf`）、`src/components/ui.tsx`（`fmtSize`、附件 chip） |
+| 2026-xx-xx | 输入区高度从"固定 96px"改为 **96px 下限 + 240px 上限的自增高**，`ENTRY` 块与按钮**固定 96 贴底** | 多行草稿（粘贴一段日志/报错）在两行高的字段里根本没法改；但整条 bar 一起长高会把按钮拉成色块板。只让字段长高、控件贴底，两个问题都解 | `src/styles/lcars.css`（`.cmdbar` / `.cmd-entry` / `.btn`）、`Composer` 的测量 effect、AGENTS §4.3 |
+| 2026-xx-xx | 附件在**转录区只留数量与体积**（`{mimeType, bytes}`），不回传 base64 | 一张截图 base64 就几百 KB，塞进 SSE 会让每次重渲染都搬运一遍；模型已经拿到字节，界面只需要回答"这轮带了什么" | `server/index.mjs`（`attachmentMeta`）、`server/pi/registry.mjs`（重开后从 session 里 `imagesOf` 还原）、`src/components/ui.tsx`（`.msg-attach`） |
 
 ---
 
 ## 11. Web 壳实现（`src/` + `server/`）
-
 > 工程已升级：`src/`（Vite + Preact + TS，正式客户端）/ `server/`（Node）/
 > `demo/`（v0 参考实现，保留对照）。构件与令牌在 `src/styles/tokens.css`，
 > 工艺层的可视化验收页在 `src/views/Craft.tsx`（`npm run dev` 打开）。
@@ -803,10 +825,11 @@ browser ──EventSource(/api/stream)──► server.mjs ──session.subscri
 | GET | `/api/bootstrap` | 会话列表 + active meta + policy + items |
 | GET | `/api/stream` | 单通道 SSE，事件带 `sessionId` |
 | POST | `/api/session` | `new / open / fork / activate / rename / delete` |
-| POST | `/api/prompt` | 目标会话在跑 → `steer()`；否则进全局队列 |
+| POST | `/api/prompt` | `{text, images?}`；目标会话在跑 → `steer(text, images)`；否则进全局队列。附件只收 `png/jpeg/webp/gif`，最多 6 张，独立 32MB 请求缓冲 |
 | POST | `/api/abort` · `/api/approve` · `/api/policy` | 中断 / 审批 / 策略 |
 | POST | `/api/model` · `/api/thinking` | 热切换，下一轮生效 |
 | GET | `/api/models` · `/api/fs` | 模型清单 / 目录浏览（仅目录） |
+| GET | `/api/files` | `@` 补全用的扁平文件索引（`?q=&limit=`，跳过 `node_modules/.git/dist` 与隐藏项，20s 缓存） |
 
 **踩过的坑（别再踩）**
 - **flex 高度链断一环，footer 就不贴底**：`#root` 必须显式 `height:100%`，且 `.main / .body / .center` 每层都要 `min-height:0`，
