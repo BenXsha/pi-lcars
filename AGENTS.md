@@ -510,10 +510,21 @@ TUI 的 `/tree` 对应物。服务端 `POST /api/session {op:"tree"}` 把 `manag
   | `THINKING` | assistant 的 `thinking`（非空） | `--moon` | 总词数；每块一条可展开（默认展开最新一条，折叠 6 行） |
   | `BASE` | `user`（含 skill / 附件）+ `summary`（压缩摘要） | `--orange` | `TURN n` |
   | `OUTPUT` | assistant 的 `text`（流式中也算） | `--w` | 流式时写 `生成中` |
-  | `ACTION` | `tool` / `approval` / `ask` / `notice` | `--tang` | 正在跑的工具数 |
+  | `ACTION`（标签 `TERMINAL`） | `tool` / `approval` / `ask` / `notice` | `--tang` | 正在跑的工具数 |
 
-- **布局**：`thinking` 压 `base` 在左列（360px），`output` 占右列两行，`action` 满宽 168px 条在底部。
-  ≤1180px 退成单列（每区最小 132px，`output` 220、`action` 168），整块滚动。区块之间只有黑缝，无描边。
+**ACTION 是终端，不是又一个卡片列表**（这是它占最多高度的原因）：
+
+- 每条工具 = **一行你本来会亲手敲的命令** + 它的原样输出。bash 用 `$` 前缀并显示**真实命令行**
+  （多行命令按终端的样子换行，不折叠成一行提要）；其它工具用 `▸ name args`。
+- 输出是 `pre` + 等宽 + `pre-wrap`：不缩进、不换字体、不加边框。行首符号照原样带（diff 的 `+`/`-` 保留），
+  并按语义上色（add=cyan / del=tomato / hunk=moon / 截断=amber），失败时整段 tomato。
+- 行尾读数只有真实字段：`T+01:12 · 0.8s · exit 1`；非 bash 没有 exit，diff 类显示 `+14 −2`（有 `onOpenDiff` 时再给 `VIEW`）。
+- 默认 14 行，超出给 `+ N MORE LINES`；`status: run` 的条目在末尾多一行 `$ ▊` 闪烁块——终端说“还在跑”的方式。
+- 审批/对话框仍用它们自己的阻断块（要能点），notice 降成同一套终端嗓音：`[TRUNCATED] 正文`。
+
+
+- **布局**：`thinking` 压 `base` 在左列（360px），`output` 占右列两行，`action`（终端）**满宽拿最大一份高度**：行高比 `0.78fr / 0.58fr / 1.55fr`（1600×1000 实测 189 / 141 / 376，终端正文 346px ≈ 22 行）。早期版本把终端压在 168px，命令一多就只看得到最后两条——终端是这个视图的用途，不是脚注。
+  ≤1180px 退成单列（每区最小 132px，`output` 220、`action` 260），整块滚动。区块之间只有黑缝，无描边。
 - **每个区独立滚动且独立跟随**：只有贴底时才自动滚（滚上去就不再被拽回去）；四区各自一个 `ResizeObserver` 不需要——按 `count` 变化跟随即可。
 - **空区必须自证**：四区各自的空态文案（`ws.empty*`）走 i18n，不留纯黑板。
 - 头部读数全部来自本次数据（词数、turn 数、运行中工具数），不写装饰数字（§7.6）。
@@ -795,9 +806,9 @@ composer 上方出现 `QUEUED n` 条带，逐条显示待投递文本 + `deliver
 | 2026-xx-xx | 模型列表按 provider 分组、全量展示、带 `ctx · $in/$out Mtok · reasoning`，46vh 内滚 | 原来只 `slice(0, 8)` 且不给成本/窗口，等于让人盲选；pi 的 model 对象本来就带 `contextWindow` 与 `cost` | `src/views/Console.tsx`、`server/index.mjs`（`/api/models`）、`src/api.ts` |
 | 2026-xx-xx | MCP 的 ADD 表单补齐 pi 的 server schema（args / env / cwd / headers / timeout / description / exposure / scope），解析放服务端 | 只有 command/url 两项时，带 env 的 stdio server 与需要鉴权头的 http server 根本写不出来；手改 mcp.json 又绕过了备份与校验 | `src/views/Console.tsx`、`server/pi/mcpConfig.mjs`、`server/index.mjs`、`test/mcp-config.mjs` |
 | 2026-xx-xx | 主题选项的左内距 12px（4px 选中脊 + 8px 呼吸），标签 11px | 原来左内距 4px，选中时 4px 橙脊正压在色板上；标签还是 10.5px | `src/styles/lcars.css` |
-| 2026-xx-xx | 工具读数行改为**一条 tone 驱动的色带**
-| 2026-xx-xx | 新增 `kelvin` / `picard` 两套主题
-| 2026-xx-xx | 背景图改为**自绘 SVG**（`scripts/build-backdrop.mjs` → `public/backdrop.svg`），随包按 MIT 分发；不再使用影视剧照 | 参考图能表达"舰体+星空"的味道，但素材版权不明，不能随开源包分发。自绘只用平涂与低透明度，符合 §2 R4（无渐变/发光） | `scripts/build-backdrop.mjs`、`public/backdrop.svg`、`src/styles/lcars.css` |，角色语义不变；色值来自 fan-canon 调色板（trekcolors / thelcars.com 的 Picard、Nemesis 等）并逐色提到"黑字可读"的亮度 | 用户要求跟进最近两部电影与新剧的配色；原四套已够用但没有"影视新作"的表达 | `src/styles/themes.css`、`src/theme.ts`、`scripts/check-themes.mjs` |：状态色同时决定 4px 状态条、名字块实色、正文 9% 透明底、读数块 22% 底 | 原来正文块无底色，实色名字块与灰读数块浮在黑底上，一行像两个岛，不是 LCARS 的连续条带 | `src/styles/lcars.css`（`.tool` 的 `--tone`） |
+| 2026-xx-xx | 工具读数行改为**一条 tone 驱动的色带**：状态色同时决定 4px 状态条、名字块实色、正文 9% 透明底、读数块 22% 底 | 原来正文块无底色，实色名字块与灰读数块浮在黑底上，一行像两个岛，不是 LCARS 的连续条带 | `src/styles/lcars.css`（`.tool` 的 `--tone`） |
+| 2026-xx-xx | 新增 `kelvin` / `picard` 两套主题，角色语义不变；色值来自 fan-canon 调色板（trekcolors / thelcars.com 的 Picard、Nemesis 等）并逐色提到"黑字可读"的亮度 | 用户要求跟进最近两部电影与新剧的配色；原四套已够用但没有"影视新作"的表达 | `src/styles/themes.css`、`src/theme.ts`、`scripts/check-themes.mjs` |
+| 2026-xx-xx | 背景图改为**自绘 SVG**（`scripts/build-backdrop.mjs` → `public/backdrop.svg`），随包按 MIT 分发；不再使用影视剧照 | 参考图能表达"舰体+星空"的味道，但素材版权不明，不能随开源包分发。自绘只用平涂与低透明度，符合 §2 R4（无渐变/发光） | `scripts/build-backdrop.mjs`、`public/backdrop.svg`、`src/styles/lcars.css` |
 | 2026-xx-xx | 背景图换成用户提供的舰体静帧（`public/backdrop.jpg`，1600px / 238 KB，40% 不透明度 + 55% 黑幕）；自绘 SVG 生成脚本保留作为可复现的替代方案 | 用户要的是这张图的实际观感；同一条"最坏合成 ≤ 46"的约束仍然成立（g3 4.9:1，g2 3.3:1 非文本） | `public/backdrop.jpg`、`src/styles/lcars.css`、`scripts/build-backdrop.mjs` |
 | 2026-xx-xx | 新会话在 `#load()` 里补齐默认模型与思考档：`createAgentSession()` 不传 model 时 pi 会停在 `unknown/unknown`，导致 shelf 与 `pi-lcars status` 显示假值 | “unknown/unknown” 违反 §7.6 数字自洽；同时它让 pi-lens 把 situational 工具当默认激活，工具清单虚高 | `server/pi/registry.mjs`、`test/smoke.mjs` |
 | 2026-xx-xx | **内置壁纸移除**。背景改为用户自选本地图片：`SETTINGS → BACKDROP → CHOOSE…` 打开磁盘选择器（HOME / PICTURES / DESKTOP / DOWNLOADS / ROOT / 挂载卷，面包屑 + 图片行带缩略图），选定后 `settings.backdrop` 存绝对路径 | 随包分发壁纸无论自绘还是静帧都是替用户做审美决定，且要背素材来源；把选择权交给用户后包里零图片零版权负担。图片**原地读取**（`/api/backdrop/file`）不复制进项目，删掉文件即自动回到纯黑 | `server/pi/fs.mjs`（`listBackdropDir` / `backdropFile`）、`server/index.mjs`、`src/views/Console.tsx`（`BackdropPicker`）、`src/settings.ts`、`src/styles/lcars.css`、`test/smoke.mjs`、`test/ui.mjs`；删除 `public/backdrop.jpg`、`scripts/build-backdrop.mjs` |
@@ -807,6 +818,7 @@ composer 上方出现 `QUEUED n` 条带，逐条显示待投递文本 + `deliver
 | 2026-xx-xx | 输入区高度从"固定 96px"改为 **96px 下限 + 240px 上限的自增高**，`ENTRY` 块与按钮**固定 96 贴底** | 多行草稿（粘贴一段日志/报错）在两行高的字段里根本没法改；但整条 bar 一起长高会把按钮拉成色块板。只让字段长高、控件贴底，两个问题都解 | `src/styles/lcars.css`（`.cmdbar` / `.cmd-entry` / `.btn`）、`Composer` 的测量 effect、AGENTS §4.3 |
 | 2026-xx-xx | 附件在**转录区只留数量与体积**（`{mimeType, bytes}`），不回传 base64 | 一张截图 base64 就几百 KB，塞进 SSE 会让每次重渲染都搬运一遍；模型已经拿到字节，界面只需要回答"这轮带了什么" | `server/index.mjs`（`attachmentMeta`）、`server/pi/registry.mjs`（重开后从 session 里 `imagesOf` 还原）、`src/components/ui.tsx`（`.msg-attach`） |
 | 2026-xx-xx | 新增实验视图 **四分区域工作区**（`STREAM` 徽标切换 / `#stream` 深链）：同一份 items 按种类切成 thinking / base / output / action 四区，各自滚动、各自跟随；**不替换 mission log**，`Esc` 或徽标退回 | 长跑里「在读什么、产出什么、机器在干什么」混在一条时间线里，扫不动；分区是 LCARS 多仪表盘的原始用法，而按时间顺序读仍然只有 log 一种正确方式，所以做成并列视图而不是改造 log | `src/views/Console.tsx`（`zonesOf`/`Zone`/`Workspace`、`wsOpen`、hash、Esc）、`src/styles/lcars.css`（`.ws*`）、`src/i18n.ts`（`ws.*`）、`test/ui.mjs`、AGENTS §7.6r |
+| 2026-xx-xx | ACTION 区**重画成终端**并拿到最大高度（行高比 `0.78 / 0.58 / 1.55`，标签改 `TERMINAL`）：bash 显示真实命令行 + 原样输出 + `exit N`，diff 显示 `+N −M` 与着色行，跑着的条目末尾追加闪烁 `$ ▊` | 168px 的底栏只够看两条命令，而“这把到底跑了什么、回来什么”正是分区视图存在的理由；终端是唯一既能提密度又能保留原文的形态，也不与 log 里的 LCARS 读数条重复 | `src/views/Console.tsx`（`TerminalEntry` / `termCommand` / `termBody`）、`src/styles/lcars.css`（`.term*` + 行高比）、`src/views/Craft.tsx`（`?craft#workspace` 样例流）、AGENTS §7.6r |
 
 ---
 

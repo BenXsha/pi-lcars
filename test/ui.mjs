@@ -533,6 +533,15 @@ try {
     "each zone carries a tone spine and a count",
     (await evaluate(`document.querySelectorAll('.ws-hd[data-tone] .n').length`)) === 4,
   );
+  // the ACTION zone is the terminal: it must get the most height of the four
+  const zoneHeights = await evaluate(
+    `Object.fromEntries([...document.querySelectorAll('.ws-zone')].map((z) => [z.dataset.zone, Math.round(z.getBoundingClientRect().height)]))`,
+  );
+  check(
+    "the terminal zone is the tallest",
+    zoneHeights.action > Math.max(zoneHeights.thinking, zoneHeights.base, zoneHeights.output),
+    JSON.stringify(zoneHeights),
+  );
   // the harness session is empty, so every zone must say so instead of rendering nothing
   check("empty zones explain themselves", (await evaluate(`document.querySelectorAll('.ws-empty').length`)) === 4);
   check("the workspace deep-links", (await hash()) === "#stream", await hash());

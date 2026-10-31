@@ -1200,7 +1200,7 @@ function Zone(props: {
   );
 }
 
-function Workspace({ items, onOpenDiff }: { items: Item[]; onOpenDiff?: (path: string, diff: DiffData) => void }) {
+export function Workspace({ items, onOpenDiff }: { items: Item[]; onOpenDiff?: (path: string, diff: DiffData) => void }) {
   const zones = useMemo(() => zonesOf(items), [items]);
   const [openThink, setOpenThink] = useState<Record<string, boolean>>({});
   const [openTool, setOpenTool] = useState<Record<string, boolean>>({});
@@ -1304,29 +1304,18 @@ function Workspace({ items, onOpenDiff }: { items: Item[]; onOpenDiff?: (path: s
       >
         {zones.action.map((it) => {
           if (it.kind === "tool") {
-            const state = it.status === "run" ? "run" : it.status === "error" ? "error" : it.truncated ? "warn" : "ok";
             return (
-              <ToolStrip
+              <TerminalEntry
                 key={it.id}
-                name={it.name}
-                icon={toolIcon(it.name)}
-                args={it.args}
-                output={it.output}
-                errorText={it.errorText}
-                state={state}
-                ms={it.ms}
-                exitCode={it.exitCode}
-                truncated={it.truncated}
-                diff={it.diff}
+                it={it}
+                t0={t0}
+                open={openTool[it.id] ?? false}
+                onToggle={() => setOpenTool((prev) => ({ ...prev, [it.id]: !prev[it.id] }))}
                 onOpenDiff={
                   it.diff && onOpenDiff
                     ? () => onOpenDiff(it.args.split(" / ")[0].split(" ")[0] || it.name, it.diff!)
                     : undefined
                 }
-                children={it.children}
-                agent={it.agent}
-                expanded={openTool[it.id] ?? false}
-                onToggle={() => setOpenTool((prev) => ({ ...prev, [it.id]: !prev[it.id] }))}
               />
             );
           }
@@ -1342,10 +1331,128 @@ function Workspace({ items, onOpenDiff }: { items: Item[]; onOpenDiff?: (path: s
             );
           }
           if (it.kind === "ask") return <AskBlock key={it.id} item={it} />;
-          if (it.kind === "notice") return <NoticeRow key={it.id} label={it.label} text={it.text} tone={it.tone} />;
+          if (it.kind === "notice") {
+            // a notice is the machine talking back: keep it in the same voice
+            return (
+              <div class="term-note" key={it.id} data-tone={it.tone ?? "info"}>
+                <span class="lb">{it.label}</span>
+                <span class="tx">{it.text}</span>
+              </div>
+            );
+          }
           return null;
         })}
       </Zone>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------ terminal */
+/*
+ * The ACTION zone reads as the machine's own screen: a prompt line you could
+ * have typed, then whatever came back. One rule keeps it honest — the text in
+ * the prompt is exactly what the tool was called with, and the body is exactly
+ * what it returned (diff lines for edit/write, raw output otherwise).
+ */
+const TERM_LINES = 14;
+
+type TermLine = { text: string; tone?: "add" | "del" | "hunk" | "warn" };
+
+/** bash gets its real command line; every other tool gets `name args`. */
+function termCommand(it: Extract<Item, { kind: "tool" }>): string {
+  const args = (it.args || "").trim();
+  if (it.name === "bash") return args || "bash";
+  return args ? `${it.name} ${args}` : it.name;
+}
+
+function termBody(it: Extract<Item, { kind: "tool" }>): TermLine[] {
+  const out: TermLine[] = [];
+  if (it.diff) {
+    for (const hunk of it.diff.hunks) {
+      if (hunk.hdr) out.push({ text: hunk.hdr, tone: "hunk" });
+      for (const line of hunk.lines) {
+        out.push({ text: `${line.t}${line.text}`, tone: line.t === "+" ? "add" : line.t === "-" ? "del" : undefined });
+      }
+    }
+    if (it.diff.truncated) out.push({ text: "… diff truncated", tone: "warn" });
+    return out;
+  }
+  const raw = ((it.status === "error" ? it.errorText || it.output : it.output) || "").replace(/\s+$/, "");
+  if (!raw) return out;
+  for (const text of raw.split("\n")) out.push({ text });
+  if (it.truncated) out.push({ text: "… output truncated by pi — the full tail is in the log", tone: "warn" });
+  return out;
+}
+
+function TerminalEntry({
+  it,
+  t0,
+  open,
+  onToggle,
+  onOpenDiff,
+}: {
+  it: Extract<Item, { kind: "tool" }>;
+  t0: number;
+  open: boolean;
+  onToggle: () => void;
+  /** edit/write: the diff is also worth a full-screen look */
+  onOpenDiff?: () => void;
+}) {
+  const body = termBody(it);
+  const shown = open ? body : body.slice(0, TERM_LINES);
+  const hidden = body.length - shown.length;
+  const state = it.status === "run" ? "run" : it.status === "error" ? "error" : it.truncated ? "warn" : "ok";
+  const stamp = it.ms != null ? `${(it.ms / 1000).toFixed(it.ms < 10_000 ? 1 : 0)}s` : null;
+  const stat = it.diff ? `+${it.diff.stat.add} −${it.diff.stat.del}` : null;
+  const outcome =
+    it.status === "run"
+      ? stat
+      : it.exitCode != null
+        ? `exit ${it.exitCode}`
+        : it.status === "error"
+          ? "FAILED"
+          : (stat ?? "OK");
+
+  return (
+    <div class="term" data-state={state}>
+      <div class="term-cmd">
+        <span class="ps">{it.name === "bash" ? "$" : "▸"}</span>
+        <pre class="cmd">{termCommand(it)}</pre>
+        <span class="meta">
+          T+{mmss(it.ts - t0)}
+          {stamp ? ` · ${stamp}` : ""}
+          {outcome ? ` · ${outcome}` : ""}
+          {it.diff && onOpenDiff ? (
+            <button type="button" class="term-view" title="open in the diff viewer" onClick={onOpenDiff}>
+              VIEW
+            </button>
+          ) : null}
+        </span>
+      </div>
+      {shown.length ? (
+        <pre class="term-out">
+          {shown.map((line, i) => (
+            <span class="ln" key={i} data-tone={line.tone ?? ""}>
+              {line.text || " "}
+            </span>
+          ))}
+        </pre>
+      ) : null}
+      {it.status === "run" ? (
+        <div class="term-cmd term-live">
+          <span class="ps">$</span>
+          <span class="cur" />
+        </div>
+      ) : null}
+      {hidden > 0 ? (
+        <button type="button" class="term-more" onClick={onToggle}>
+          + {hidden} MORE LINES
+        </button>
+      ) : open && body.length > TERM_LINES ? (
+        <button type="button" class="term-more" onClick={onToggle}>
+          COLLAPSE
+        </button>
+      ) : null}
     </div>
   );
 }

@@ -1,4 +1,6 @@
 import { useState } from "preact/hooks";
+import type { Item } from "../api";
+import { Workspace } from "./Console";
 import { ICONS, type IconName } from "../icons";
 import { THEMES, appliedTheme, applyTheme, type ThemeId } from "../theme";
 import { Icon } from "../components/Icon";
@@ -19,6 +21,105 @@ import {
   Station,
   ToolStrip,
 } from "../components/ui";
+
+/* --------------------------------------------------- four-zone workspace */
+/* Sample stream for the workspace view: the same shapes the live one produces
+ * (a command, a diff, a failure, a notice) so the terminals read like the real
+ * thing without a model behind them. */
+const WS_T0 = 1_700_000_000_000;
+const WS_ITEMS: Item[] = [
+  {
+    kind: "user",
+    id: "w1",
+    text: "给 /login 加个令牌桶限流，跑一遍测试，把改动列出来。",
+    ts: WS_T0,
+  },
+  {
+    kind: "assistant",
+    id: "w2",
+    text: "",
+    thinking:
+      "先确认中间件目录和测试怎么组织。限流要按 IP 建桶，得先看 req.ip 在这套 express 版本里拿到的是什么——如果反代在中间，直接取 ip 会把所有人算成一个桶。读完 server/middleware 再决定 key。",
+    streaming: false,
+    ts: WS_T0 + 6_000,
+  },
+  {
+    kind: "tool",
+    id: "w3",
+    callId: "c1",
+    name: "bash",
+    args: `rg -n "rate.?limit|token.?bucket" server/ --glob '!node_modules'`,
+    status: "ok",
+    output: "server/middleware/auth.ts:14:  // TODO: rate limit per ip before the token check\nserver/config.ts:31:  ttl: 60_000,\n\n2 files, 2 matches",
+    ms: 112,
+    exitCode: 0,
+    ts: WS_T0 + 12_000,
+  },
+  {
+    kind: "tool",
+    id: "w4",
+    callId: "c2",
+    name: "edit",
+    args: "server/middleware/ratelimit.ts",
+    status: "ok",
+    output: "",
+    ms: 41,
+    ts: WS_T0 + 20_000,
+    diff: {
+      path: "server/middleware/ratelimit.ts",
+      stat: { add: 14, del: 2 },
+      hunks: [
+        {
+          hdr: "@@ -8,7 +8,19 @@",
+          oldNo: 8,
+          newNo: 8,
+          lines: [
+            { t: " ", o: 8, n: 8, text: "export function ratelimit(opts: Opts) {" },
+            { t: "-", o: 9, text: "  const hits = new Map<string, number>();" },
+            { t: "+", n: 9, text: "  const buckets = new Map<string, Bucket>();" },
+            { t: "+", n: 10, text: "  return (req, res, next) => {" },
+            { t: "+", n: 11, text: "    const key = forwardedFor(req) ?? req.ip;" },
+            { t: "+", n: 12, text: "    if (!spend(buckets, key, opts)) return res.status(429).end();" },
+            { t: "+", n: 13, text: "    next();" },
+            { t: "+", n: 14, text: "  };" },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    kind: "tool",
+    id: "w5",
+    callId: "c3",
+    name: "bash",
+    args: "npm test -- --run test/login.test.ts",
+    status: "error",
+    output: "",
+    errorText:
+      "FAIL test/login.test.ts\n  ● POST /login › refuses the 11th attempt in a minute\n    expected 429, received 200\n      at Object.<anonymous> (test/login.test.ts:42:18)\n\nTests: 1 failed, 12 passed",
+    ms: 8_420,
+    exitCode: 1,
+    ts: WS_T0 + 40_000,
+  },
+  {
+    kind: "notice",
+    id: "w6",
+    label: "TRUNCATED",
+    tone: "warn",
+    text: "warning: truncated output (original token count: 11764) — full output at /var/folders/..",
+    ts: WS_T0 + 44_000,
+  },
+  {
+    kind: "assistant",
+    id: "w7",
+    text:
+      "限流加好了，但测试只走了 429 那条的一半：现有的 `login.test.ts` 在 11 次后仍拿到 200，因为桶的 key 取的是 `req.ip`，而测试用 `supertest` 打上来时是 `127.0.0.1:0` 同一个人。把 key 换成 forwarded-for 首段后重跑。",
+    thinking: "",
+    streaming: false,
+    usage: { input: 18_240, output: 412, cost: 0.002, total: 18_652 },
+    ts: WS_T0 + 52_000,
+  },
+];
 
 /* ---------------------------------------------------------------- helpers */
 function Section(props: { id: string; title: string; note?: string; children: any }) {
@@ -254,6 +355,12 @@ export function Craft() {
               />
               <MessageRow role="assistant" time="" model="DEEPSEEK" text="修好了：把 key 从 req.ip 换成 forwarded-for 首段。" streaming rate={41} />
               <NoticeRow label="RETRY" tone="warn" text="1/2 · tool timed out after 120s — retrying with a longer budget" />
+            </div>
+          </Section>
+
+          <Section id="workspace" title="WORKSPACE / 四区" note="同一份流的四种看法 · ACTION 是终端">
+            <div style={{ display: "flex", flexDirection: "column", height: "900px" }}>
+              <Workspace items={WS_ITEMS} />
             </div>
           </Section>
 
