@@ -563,14 +563,22 @@ try {
     "each zone carries a tone spine and a count",
     (await evaluate(`document.querySelectorAll('.ws-hd[data-tone] .n').length`)) === 4,
   );
-  // the ACTION zone is the terminal: it must get the most height of the four
-  const zoneHeights = await evaluate(
-    `Object.fromEntries([...document.querySelectorAll('.ws-zone')].map((z) => [z.dataset.zone, Math.round(z.getBoundingClientRect().height)]))`,
+  // the terminal owns the tall right column; the answer gets the full-width band
+  const zoneBox = await evaluate(
+    `Object.fromEntries([...document.querySelectorAll('.ws-zone')].map((z) => { const r = z.getBoundingClientRect(); return [z.dataset.zone, { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) }]; }))`,
   );
   check(
-    "the terminal zone is the tallest",
-    zoneHeights.action > Math.max(zoneHeights.thinking, zoneHeights.base, zoneHeights.output),
-    JSON.stringify(zoneHeights),
+    "the terminal owns the right column",
+    zoneBox.action.x > zoneBox.thinking.x &&
+      zoneBox.action.h > Math.max(zoneBox.thinking.h, zoneBox.base.h),
+    JSON.stringify(zoneBox),
+  );
+  check(
+    "output gets the full-width band under both columns",
+    zoneBox.output.w > zoneBox.action.w * 1.5 &&
+      zoneBox.output.y >= zoneBox.action.y + zoneBox.action.h &&
+      zoneBox.output.h > zoneBox.action.h,
+    JSON.stringify(zoneBox),
   );
   // the harness session is empty, so every zone must say so instead of rendering nothing
   check("empty zones explain themselves", (await evaluate(`document.querySelectorAll('.ws-empty').length`)) === 4);
