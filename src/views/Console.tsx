@@ -149,7 +149,7 @@ export function Console() {
   const [previewCwd, setPreviewCwd] = useState<string | null>(null);
   const [viewer, setViewer] = useState<{ path: string; diff?: DiffData } | null>(null);
   const [treeOpen, setTreeOpen] = useState(false);
-  // the four-zone workspace is a second view of the same stream (#stream deep-links it)
+  // the three-zone workspace is a second view of the same stream (#stream deep-links it)
   const [wsOpen, setWsOpen] = useState(() => (typeof location === "undefined" ? false : location.hash === "#stream"));
   const [activeTurn, setActiveTurn] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
@@ -1128,7 +1128,7 @@ function Transcript({
 
 /* ------------------------------------------------------------ workspace */
 /*
- * A second look at the *same* live stream, cut into four zones instead of one
+ * A second look at the *same* live stream, cut into three zones instead of one
  * scroll: what the model is reasoning about, what it was asked, what it
  * produced, and what the machine is doing or waiting on. The mission log stays
  * the source of truth — this view is for scanning a long run, not for reading
@@ -1136,8 +1136,8 @@ function Transcript({
  */
 type Zones = {
   thinking: Extract<Item, { kind: "assistant" }>[];
-  base: Item[];
-  output: Extract<Item, { kind: "assistant" }>[];
+  /** the conversation itself — what was asked and what came back, in order */
+  thread: Item[];
   action: Item[];
 };
 
@@ -1145,17 +1145,17 @@ const wordsOf = (text: string) => text.trim().split(/\s+/).filter(Boolean).lengt
 
 /** Split, don't invent: every item lands in exactly one zone. */
 function zonesOf(items: Item[]): Zones {
-  const zones: Zones = { thinking: [], base: [], output: [], action: [] };
+  const zones: Zones = { thinking: [], thread: [], action: [] };
   for (const it of items) {
     if (it.kind === "assistant") {
       if ((it.thinking ?? "").trim()) zones.thinking.push(it);
       // a message that only carries tool calls never produced output — showing it
       // while it streams leaves an empty caret row that then has to disappear
-      if ((it.text ?? "").trim()) zones.output.push(it);
+      if ((it.text ?? "").trim()) zones.thread.push(it);
       continue;
     }
-    // a user turn and a compaction summary are what the run stands on
-    if (it.kind === "user" || it.kind === "summary") zones.base.push(it);
+    // a user turn and a compaction summary are the other half of the exchange
+    if (it.kind === "user" || it.kind === "summary") zones.thread.push(it);
     // tools, approvals, dialogs and notices are machine activity
     else zones.action.push(it);
   }
@@ -1212,8 +1212,10 @@ export function Workspace({ items, onOpenDiff }: { items: Item[]; onOpenDiff?: (
 
   const words = zones.thinking.reduce((n, it) => n + wordsOf(it.thinking), 0);
   const running = zones.action.filter((it) => it.kind === "tool" && it.status === "run").length;
+  const turns = zones.thread.filter((it) => it.kind === "user").length;
   // the session is producing something, whether or not this zone has text yet
   const streaming = items.some((it) => it.kind === "assistant" && it.streaming);
+  const threadNote = [turns ? `TURN ${turns}` : "", streaming ? t("ws.streaming") : ""].filter(Boolean).join(" · ");
 
   return (
     <div class="ws">
@@ -1251,52 +1253,50 @@ export function Workspace({ items, onOpenDiff }: { items: Item[]; onOpenDiff?: (
       </Zone>
 
       <Zone
-        zone="base"
-        label={t("ws.zoneBase")}
+        zone="thread"
+        label={t("ws.zoneThread")}
         tone="orange"
-        count={zones.base.length}
-        note={zones.base.length ? `TURN ${zones.base.filter((it) => it.kind === "user").length}` : ""}
-        empty={t("ws.emptyBase")}
+        count={zones.thread.length}
+        note={threadNote}
+        empty={t("ws.emptyThread")}
       >
-        {zones.base.map((it) =>
-          it.kind === "user" ? (
+        {zones.thread.map((it) => {
+          if (it.kind === "user") {
+            return (
+              <div class="ws-item" key={it.id}>
+                {it.skill ? <SkillBlock skill={it.skill} /> : null}
+                <MessageRow
+                  role="user"
+                  time={`T+${mmss(it.ts - t0)}`}
+                  text={it.text}
+                  attachments={it.attachments}
+                />
+              </div>
+            );
+          }
+          if (it.kind === "summary") {
+            return (
+              <div class="ws-item" key={it.id}>
+                <SummaryBlock item={it} />
+              </div>
+            );
+          }
+          if (it.kind !== "assistant") return null;
+          // the answer sits right under the prompt it belongs to: one exchange,
+          // read as a conversation instead of two lists in two places
+          return (
             <div class="ws-item" key={it.id}>
-              {it.skill ? <SkillBlock skill={it.skill} /> : null}
               <MessageRow
-                role="user"
-                time={`T+${mmss(it.ts - t0)}`}
+                role="assistant"
+                time=""
+                model={it.usage ? `${fmtTok(it.usage.output)} TOK` : ""}
                 text={it.text}
-                attachments={it.attachments}
+                streaming={it.streaming}
               />
+              {it.errorMessage ? <div class="errbar">{it.errorMessage}</div> : null}
             </div>
-          ) : it.kind === "summary" ? (
-            <div class="ws-item" key={it.id}>
-              <SummaryBlock item={it} />
-            </div>
-          ) : null,
-        )}
-      </Zone>
-
-      <Zone
-        zone="output"
-        label={t("ws.zoneOutput")}
-        tone="w"
-        count={zones.output.length}
-        note={streaming ? t("ws.streaming") : ""}
-        empty={t("ws.emptyOutput")}
-      >
-        {zones.output.map((it) => (
-          <div class="ws-item" key={it.id}>
-            <MessageRow
-              role="assistant"
-              time=""
-              model={it.usage ? `${fmtTok(it.usage.output)} TOK` : ""}
-              text={it.text}
-              streaming={it.streaming}
-            />
-            {it.errorMessage ? <div class="errbar">{it.errorMessage}</div> : null}
-          </div>
-        ))}
+          );
+        })}
       </Zone>
 
       <Zone

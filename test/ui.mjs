@@ -547,41 +547,40 @@ try {
   check("the draft survives a reload", (await value()) === "draft survives reload", await value());
   await clearInput();
 
-  /* ---------------------------- 9c. four-zone workspace (test view) */
+  /* ----------------------------- 9c. three-zone workspace (test view) */
   const streamBadge = `[...document.querySelectorAll('.chips .badge')].find((b) => /STREAM|LOG/.test(b.textContent))`;
   check("the stream badge is offered in the log", !!(await evaluate(`!!${streamBadge}`)));
   await evaluate(`${streamBadge}?.click()`);
   await sleep(400);
   check("the workspace replaces the log", await exists(".ws"));
   check(
-    "it has exactly the four zones",
+    "it has exactly the three zones",
     (await evaluate(`[...document.querySelectorAll('.ws-zone')].map((z) => z.dataset.zone).join(',')`)) ===
-      "thinking,base,output,action",
+      "thinking,thread,action",
     await evaluate(`[...document.querySelectorAll('.ws-zone')].map((z) => z.dataset.zone).join(',')`),
   );
   check(
     "each zone carries a tone spine and a count",
-    (await evaluate(`document.querySelectorAll('.ws-hd[data-tone] .n').length`)) === 4,
+    (await evaluate(`document.querySelectorAll('.ws-hd[data-tone] .n').length`)) === 3,
   );
-  // the terminal owns the tall right column; the answer gets the full-width band
+  // thinking fills the left column, the terminal the right one, the exchange the bottom band
   const zoneBox = await evaluate(
     `Object.fromEntries([...document.querySelectorAll('.ws-zone')].map((z) => { const r = z.getBoundingClientRect(); return [z.dataset.zone, { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) }]; }))`,
   );
   check(
     "the terminal owns the right column",
-    zoneBox.action.x > zoneBox.thinking.x &&
-      zoneBox.action.h > Math.max(zoneBox.thinking.h, zoneBox.base.h),
+    zoneBox.action.x > zoneBox.thinking.x && zoneBox.action.y === zoneBox.thinking.y && zoneBox.action.h > 0,
     JSON.stringify(zoneBox),
   );
   check(
-    "output gets the full-width band under both columns",
-    zoneBox.output.w > zoneBox.action.w * 1.5 &&
-      zoneBox.output.y >= zoneBox.action.y + zoneBox.action.h &&
-      zoneBox.output.h > zoneBox.action.h,
+    "the conversation gets the full-width band under both columns",
+    zoneBox.thread.w > zoneBox.action.w * 1.5 &&
+      zoneBox.thread.y >= zoneBox.action.y + zoneBox.action.h &&
+      zoneBox.thread.h > zoneBox.action.h,
     JSON.stringify(zoneBox),
   );
   // the harness session is empty, so every zone must say so instead of rendering nothing
-  check("empty zones explain themselves", (await evaluate(`document.querySelectorAll('.ws-empty').length`)) === 4);
+  check("empty zones explain themselves", (await evaluate(`document.querySelectorAll('.ws-empty').length`)) === 3);
   check("the workspace deep-links", (await hash()) === "#stream", await hash());
   check(
     "the badge turns into a way back",

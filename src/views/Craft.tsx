@@ -22,7 +22,7 @@ import {
   ToolStrip,
 } from "../components/ui";
 
-/* --------------------------------------------------- four-zone workspace */
+/* -------------------------------------------------- three-zone workspace */
 /* Sample stream for the workspace view: the same shapes the live one produces
  * (a command, a diff, a failure, a notice) so the terminals read like the real
  * thing without a model behind them. */

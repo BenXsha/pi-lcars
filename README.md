@@ -85,7 +85,7 @@ src/               Vite + Preact + TS client
   styles/          tokens (structure) + themes (colour) + lcars (components)
   components/      Elbow · ToolStrip · ApprovalDeck · FieldRow · Icon …
   drafts.ts        per-session composer drafts + sent-history (localStorage)
-  views/Console.tsx console shell, mission log, and the four-zone workspace
+  views/Console.tsx console shell, mission log, and the three-zone workspace
   views/Craft.tsx  craft layer, the visual contract in one page
   icons.ts         generated: remixicon -fill paths (64 icons, no font)
 demo/              v0 vanilla implementation, kept for reference
@@ -121,12 +121,13 @@ PLAN.md            milestone plan (M0..M9) (repo only, not published)
 - `/` — the console: left rail (session list + MCP / SKILLS / PROVIDERS / HISTORY / SYSTEM / ABOUT),
   shelf controls (model / thinking), live transcript, pinned composer, resources rail.
   Stations are hash-addressable: `/#about`, `/#providers`, …
-- `/#stream` — the **four-zone workspace**: the same live stream cut by kind instead of by time.
-  `THINKING` (reasoning) over `BASE` (prompts + compactions) on the left, `OUTPUT` (answers) on the right,
-  and `TERMINAL` across the bottom: bash shows the real command line after a `$`, its raw output, and
-  `T+01:12 · 0.8s · exit 1`; diffs keep their `+`/`-` lines; anything still running ends in a blinking `$ ▊`.
+- `/#stream` — the **three-zone workspace**: the same live stream cut by kind instead of by time.
+  `THINKING` (reasoning) holds the left column, `TERMINAL` (tools, approvals, notices) the right one, and
+  `CONVERSATION` (prompts + answers + compactions, in order) the full-width band across the bottom: bash shows
+  the real command line after a `$`, its raw output, and `T+01:12 · 0.8s · exit 1`; diffs keep their `+`/`-`
+  lines; anything still running ends in a blinking `$ ▊`.
   Each zone scrolls and follows on its own. The `STREAM` badge toggles it, `Esc` goes back — the mission log
-  stays the only place that reads a thread in order.
+  stays the only place that reads the whole session, tools included, in one pass.
 - `/?craft` — the primitive sheet (elbows, motion, icons, form language, themes, the zone layout),
   i.e. the visual contract on one page.
 

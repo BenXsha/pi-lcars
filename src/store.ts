@@ -73,7 +73,7 @@ function setBootstrap(b: {
 
 /**
  * Live events must land as *new* arrays and *new* items, never as in-place
- * edits: the four-zone workspace, the outline and the loadout memos key off
+ * edits: the three-zone workspace, the outline and the loadout memos key off
  * `items`, and mutating through a shared identity froze them for the whole
  * run — a response would stream in the log while the zones stayed on the
  * membership they had when the run started.

@@ -497,10 +497,10 @@ TUI 的 `/tree` 对应物。服务端 `POST /api/session {op:"tree"}` 把 `manag
 - 切换前必须二次确认（行内 `SWITCH HERE / CANCEL`）——它会把后续对话从当前视图移走。
 - 入口是 center header 的 `TREE` 徽标，视图与文件查看器同级（替换 transcript 列，composer 不动）。
 
-### 7.6r 四分区域工作区（STREAM，实验视图）
+### 7.6r 三分区域工作区（STREAM，实验视图）
 
 **同一份 `items` 的第二种看法**，不是替代品：mission log 仍是唯一按时间顺序读的地方。
-用途是扫一场长跑——「它在想什么 / 我要它做什么 / 它给出了什么 / 机器现在在干什么」四件事分别可扫。
+用途是扫一场长跑——「它在想什么 / 一来一回说了什么 / 机器现在在干什么」三件事分别可扫。
 
 - **入口**：center header 的 `STREAM` 徽标（开着时变 `LOG`，`data-on="1"` 用 ice 实心），`Esc` 退回日志，
   `#stream` 可深链（与 `TREE` 同级：替换 transcript 区，composer 不动）。
@@ -509,12 +509,14 @@ TUI 的 `/tree` 对应物。服务端 `POST /api/session {op:"tree"}` 把 `manag
   | 区 | 收什么 | 脊色 | 头部读数 |
   |---|---|---|---|
   | `THINKING` | assistant 的 `thinking`（非空） | `--moon` | 总词数；每块一条可展开（默认展开最新一条，折叠 6 行） |
-  | `BASE` | `user`（含 skill / 附件）+ `summary`（压缩摘要） | `--orange` | `TURN n` |
-  | `OUTPUT` | assistant 的 `text`（非空；只有 toolCall 的 assistant 消息不进） | `--w` | 会话正在生成时写 `生成中` |
-  | `ACTION`（标签 `TERMINAL`） | `tool` / `approval` / `ask` / `notice` | `--tang` | 正在跑的工具数 |
+  | `CONVERSATION`（`thread`） | `user`（含 skill / 附件）+ `summary` + assistant 的 `text`（非空），**按时间顺序** | `--orange` | `TURN n`（user 条数）；会话正在生成时追加 `生成中` |
+  | `TERMINAL`（`action`） | `tool` / `approval` / `ask` / `notice` | `--tang` | 正在跑的工具数 |
+
+> `BASE` 与 `OUTPUT` 曾经是两个区（左下列指令、底栏列回答），2026-xx-xx 合并为 `CONVERSATION`：
+> 问答被分到屏幕两角时，读一条回答得先记住上面的问题；合成一个区后它按时间顺序就是一段对话。
+> 代价是头部的脊色只有一个：取 `--orange`（这串交换是由操作员的指令立起来的）。
 
 **ACTION 是终端，不是又一个卡片列表**（右列两行高都是它的）：
-
 - 每条工具 = **一行你本来会亲手敲的命令** + 它的原样输出。bash 用 `$` 前缀并显示**真实命令行**
   （多行命令按终端的样子换行，不折叠成一行提要）；其它工具用 `▸ name args`。
 - 输出是 `pre` + 等宽 + `pre-wrap`：不缩进、不换字体、不加边框。行首符号照原样带（diff 的 `+`/`-` 保留），
@@ -524,12 +526,12 @@ TUI 的 `/tree` 对应物。服务端 `POST /api/session {op:"tree"}` 把 `manag
 - 审批/对话框仍用它们自己的阻断块（要能点），notice 降成同一套终端嗓音：`[TRUNCATED] 正文`。
 
 
-- **布局**：`thinking` 压 `base` 在左列（360px），`action`（终端）占右列两行，`output` **满宽拿底栏最大一份高度**：行高比 `0.78fr / 0.58fr / 1.55fr`（1600×1000 实测 189 / 141 / 376：终端 189+141+黑缝 ≈ 334，输出 376）。早期版本把终端压在 168px，命令一多就只看得到最后两条；现在终端拿满右列，正文靠到底栏，两者都不再是脚注。
-  ≤1180px 退成单列（每区最小 132px，`output` 220、`action` 260），整块滚动。区块之间只有黑缝，无描边。
+- **布局**：`thinking` 占满左列（360px，两行高），`action`（终端）占满右列，`thread`（对话）**满宽拿底栏最大一份高度**：行高比 `0.78fr / 0.58fr / 1.55fr`（1600×1000 实测左右两列各 ≈ 278/334，而底栏 312×920）。早期版本把终端压在 168px，命令一多就只看得到最后两条；现在终端拿满右列，对话靠到底栏，两者都不再是脚注。
+  ≤1180px 退成单列（每区最小 132px，`thread` 220、`action` 260），整块滚动。区块之间只有黑缝，无描边。
 - **每个区独立滚动且独立跟随**：只有贴底时才自动滚（滚上去就不再被拽回去）。**跟随的触发是内容增长，不是 `count`**：
   流式正文、流式 thinking、正在跑的命令输出都是“item 数不变、高度在长”，只按条数跟随等于看着答案长到屏幕外。
   实现是 `Zone` 里每次渲染后的 effect（`pinned` 为真才写 `scrollTop`），不需要 `ResizeObserver`。
-- **空区必须自证**：四区各自的空态文案（`ws.empty*`）走 i18n，不留纯黑板。
+- **空区必须自证**：三区各自的空态文案（`ws.empty*`）走 i18n，不留纯黑板。
 - 头部读数全部来自本次数据（词数、turn 数、运行中工具数），不写装饰数字（§7.6）。
 
 
@@ -822,6 +824,7 @@ composer 上方出现 `QUEUED n` 条带，逐条显示待投递文本 + `deliver
 | 2026-xx-xx | 附件在**转录区只留数量与体积**（`{mimeType, bytes}`），不回传 base64 | 一张截图 base64 就几百 KB，塞进 SSE 会让每次重渲染都搬运一遍；模型已经拿到字节，界面只需要回答"这轮带了什么" | `server/index.mjs`（`attachmentMeta`）、`server/pi/registry.mjs`（重开后从 session 里 `imagesOf` 还原）、`src/components/ui.tsx`（`.msg-attach`） |
 | 2026-xx-xx | 新增实验视图 **四分区域工作区**（`STREAM` 徽标切换 / `#stream` 深链）：同一份 items 按种类切成 thinking / base / output / action 四区，各自滚动、各自跟随；**不替换 mission log**，`Esc` 或徽标退回 | 长跑里「在读什么、产出什么、机器在干什么」混在一条时间线里，扫不动；分区是 LCARS 多仪表盘的原始用法，而按时间顺序读仍然只有 log 一种正确方式，所以做成并列视图而不是改造 log | `src/views/Console.tsx`（`zonesOf`/`Zone`/`Workspace`、`wsOpen`、hash、Esc）、`src/styles/lcars.css`（`.ws*`）、`src/i18n.ts`（`ws.*`）、`test/ui.mjs`、AGENTS §7.6r |
 | 2026-xx-xx | STREAM 视图对齐真实会话响应（三处）：① 客户端 store 的 `item` / `patch` / `delta` 不再原地改数组与对象，改发布**新数组 + 新 item**；② `Zone` 的跟随从“按 `count`”改为“每次渲染按内容高度”（贴底才跟）；③ `OUTPUT` 区只收真正有 `text` 的 assistant 消息，`生成中` 改由会话的 `streaming` 推导。服务端 `#load()` 也调用 `#hydrate()`（原先只有 rewind/goto 的 `#rebuild()` 才从 `session.messages` 重建） | 三条都是“真实响应到来时视图不真实”：memo 用的 `items` 身份在整场运行里不变，四区的**成员**被冻结在开跑那一刻（只有 log 在长）；流式正文/thinking/命令输出“条数不变、高度在长”，按条数跟随等于让答案长到屏幕外；只有 toolCall 的 assistant 消息会先占一条空 caret 再消失。而历史/恢复的会话 `items` 恒为 0——真实的 `session.messages` 从来没有被读回界面 | `src/store.ts`、`src/views/Console.tsx`（`zonesOf` / `Zone` / `Workspace`）、`server/pi/registry.mjs`（`#hydrate`）、`server/pi/stream.mjs`（导出 `agentMeta` / `nestedChildren`）、`test/smoke.mjs`、AGENTS §7.6r |
+| 2026-xx-xx | `BASE` 与 `OUTPUT` **合并为 `CONVERSATION`（`thread`）**：user / summary / assistant-text 按时间顺序落同一个区，脊色取 `--orange`；栅格从四区变三区（`thinking` 占满左列、`action` 占满右列、`thread` 满宽底栏） | 问答被拆到屏幕左下与底栏两处，读一条回答得先记住上面的问题——它不是四分区的信息密问题，而是切分轴选错了：“谁在说”不该跟“说的是什么”分开。合并后的区天然是一段对话，同时三区各自都能拿满一维（不再有碎块） | `src/views/Console.tsx`（`zonesOf` / `Workspace`）、`src/styles/lcars.css`（`.ws` 栅格）、`src/i18n.ts`（`ws.zoneThread` / `ws.emptyThread`）、`test/ui.mjs`、`README.md`、AGENTS §7.6r |
 | 2026-xx-xx | TERMINAL 与 OUTPUT **换位**：终端占右列（两行高），输出改满宽底栏（行高比不变：`0.78/0.58/1.55`） | 操作员要的是“命令在上、结果在下”的阅读顺序：终端是看“现在在干什么”的，贴右上就不用跨整屏回到左下；正文（markdown、宽段落）在满宽底栏读起来更顺，而终端在 360px 以上宽度下 `pre-wrap` 本来就够用。代价：终端不再是四区最大一块（输出 376px > 终端 ≈ 334px），`test/ui.mjs` 的断言同步改成“终端占右列 / 输出占满宽底栏” | `src/styles/lcars.css`（`.ws` 各 `grid-area`）、`test/ui.mjs`、AGENTS §7.6r |
 | 2026-xx-xx | 输入区适配输入法（IME）：组字期间 `value` 与 DOM 逐键同步（不再“组字期间不改 state”）；`onKeyDown` 顶部统一 `imeBusy()` 短路（`composing` ref / `isComposing` / `keyCode 229`），`Enter` `↑↓` `Tab` `Esc` 让给候选窗；`growth` 改为公共 `grow()` 并在 `input` / `compositionupdate` 里量；所有全局 Esc（中断运行、关覆盖层、壁纸选择器）与其它 Enter 提交框同样短路 | 两个真实病灶：① Preact 在 `value !== dom.value` 时**每次渲染回写** `value`，而渲染由 `setCaret` 触发——于是每敲一个拼音就把半个词吐回去，字段也停在 2 行高；② 组字时的 Enter/Esc 是“选词/关候选”，被当成“发送/中断”，半成品直接发出、跑着的回合被意外停掉 | `src/views/Console.tsx`（`imeBusy` / `Composer` 的 `grow` / 各 keydown）、`test/ui.mjs`（组字四检）、AGENTS §4.3b |
 | 2026-xx-xx | ACTION 区**重画成终端**并拿到最大高度（行高比 `0.78 / 0.58 / 1.55`，标签改 `TERMINAL`）：bash 显示真实命令行 + 原样输出 + `exit N`，diff 显示 `+N −M` 与着色行，跑着的条目末尾追加闪烁 `$ ▊` | 168px 的底栏只够看两条命令，而“这把到底跑了什么、回来什么”正是分区视图存在的理由；终端是唯一既能提密度又能保留原文的形态，也不与 log 里的 LCARS 读数条重复 | `src/views/Console.tsx`（`TerminalEntry` / `termCommand` / `termBody`）、`src/styles/lcars.css`（`.term*` + 行高比）、`src/views/Craft.tsx`（`?craft#workspace` 样例流）、AGENTS §7.6r |
