@@ -121,13 +121,21 @@ PLAN.md            milestone plan (M0..M9) (repo only, not published)
 - `/` — the console: left rail (session list + MCP / SKILLS / PROVIDERS / HISTORY / SYSTEM / ABOUT),
   shelf controls (model / thinking), live transcript, pinned composer, resources rail.
   Stations are hash-addressable: `/#about`, `/#providers`, …
-- `/#stream` — the **three-zone workspace**: the same live stream cut by kind instead of by time.
-  `THINKING` (reasoning) holds the left column, `TERMINAL` (tools, approvals, notices) the right one, and
-  `CONVERSATION` (prompts + answers + compactions, in order) the full-width band across the bottom: bash shows
-  the real command line after a `$`, its raw output, and `T+01:12 · 0.8s · exit 1`; diffs keep their `+`/`-`
-  lines; anything still running ends in a blinking `$ ▊`.
-  Each zone scrolls and follows on its own. The `STREAM` badge toggles it, `Esc` goes back — the mission log
-  stays the only place that reads the whole session, tools included, in one pass.
+- `/#stream` — the **three-zone workspace**: the same live stream cut by *role* instead of by time, and
+  numbered by the cycle an exchange runs through — `I` CONVERSATION (instruction, and where the result comes
+  back), `II` THINKING (retrieval and reasoning), `III` TERMINAL (execution). Each zone is an instrument: a
+  numbered strip with a live state block (`SCANNING`, `AWAITING YOU`, `1 RUNNING`), its own scroll, and its
+  own tone.
+  - CONVERSATION is grouped per exchange. Each exchange closes with a footer that joins the three zones:
+    `1 REASONING` / `3 COMMANDS` are real tallies — clicking one dims every other exchange in all three zones
+    and jumps them to the same number, and the acknowledge pill is what closes the cycle ("I read this").
+  - TERMINAL is a command channel: the real command line after a `$`, its raw output, a solid return-code
+    lamp (`exit 0` / `exit 1` / `FAILED`), an `EXCH 0n` divider when the session has more than one exchange,
+    and a blinking `$ ▊` while a command still runs.
+  - THINKING reads as a state, not as prose: each block says `SCANNING` or `SETTLED`, and the zone's readout
+    strip names the file currently being read (`READING · test/login.test.ts`).
+  The `STREAM` badge toggles it, `Esc` goes back — the mission log stays the only place that reads the whole
+  session, tools included, in one pass.
 - `/?craft` — the primitive sheet (elbows, motion, icons, form language, themes, the zone layout),
   i.e. the visual contract on one page.
 

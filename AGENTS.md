@@ -500,40 +500,91 @@ TUI 的 `/tree` 对应物。服务端 `POST /api/session {op:"tree"}` 把 `manag
 ### 7.6r 三分区域工作区（STREAM，实验视图）
 
 **同一份 `items` 的第二种看法**，不是替代品：mission log 仍是唯一按时间顺序读的地方。
-用途是扫一场长跑——「它在想什么 / 一来一回说了什么 / 机器现在在干什么」三件事分别可扫。
+用途是扫一场长跑——三个区各回答一个问题，而且**用编号把它们的先后关系写在头上**：
+
+| 编号 | 区 | 回答的问题 | 定位 |
+|---|---|---|---|
+| `I` | `CONVERSATION`（`thread`） | 让我做什么？结果我认不认？ | 指令与会话问询交互、**结果确认** |
+| `II` | `THINKING` | 它在检索什么、想到哪了？ | 检索与思考**状态** |
+| `III` | `TERMINAL`（`action`） | 机器此刻在跑什么？回来什么？ | 实时命令执行**反馈** |
+
+编号是**一次交换跑过的顺序**（指令 → 推理 → 执行 → 结果回到指令），不是装饰编号：
+`I` 是操作员立的因，`II/III` 是它引出的两半，最后仍落回 `I` 等一句确认。罗马数字刻意与左轨
+`01`–`06` 的快捷键编号区分开，避免"编号即快捷键"（§3 R9）被误读。
 
 - **入口**：center header 的 `STREAM` 徽标（开着时变 `LOG`，`data-on="1"` 用 ice 实心），`Esc` 退回日志，
   `#stream` 可深链（与 `TREE` 同级：替换 transcript 区，composer 不动）。
 - **切分是纯函数**（`zonesOf()`），每条 item 只落一个区，不复制、不编造：
 
-  | 区 | 收什么 | 脊色 | 头部读数 |
-  |---|---|---|---|
-  | `THINKING` | assistant 的 `thinking`（非空） | `--moon` | 总词数；每块一条可展开（默认展开最新一条，折叠 6 行） |
-  | `CONVERSATION`（`thread`） | `user`（含 skill / 附件）+ `summary` + assistant 的 `text`（非空），**按时间顺序** | `--orange` | `TURN n`（user 条数）；会话正在生成时追加 `生成中` |
-  | `TERMINAL`（`action`） | `tool` / `approval` / `ask` / `notice` | `--tang` | 正在跑的工具数 |
+  | 区 | 收什么 | 色调 |
+  |---|---|---|
+  | `THINKING` | assistant 的 `thinking`（非空） | `--moon` |
+  | `CONVERSATION`（`thread`） | `user`（含 skill / 附件）+ `summary` + assistant 的 `text`（非空），**按时间顺序** | `--orange` |
+  | `TERMINAL`（`action`） | `tool` / `approval` / `ask` / `notice` | `--tang` |
 
 > `BASE` 与 `OUTPUT` 曾经是两个区（左下列指令、底栏列回答），2026-xx-xx 合并为 `CONVERSATION`：
 > 问答被分到屏幕两角时，读一条回答得先记住上面的问题；合成一个区后它按时间顺序就是一段对话。
 > 代价是头部的脊色只有一个：取 `--orange`（这串交换是由操作员的指令立起来的）。
 
-**ACTION 是终端，不是又一个卡片列表**（右列两行高都是它的）：
-- 每条工具 = **一行你本来会亲手敲的命令** + 它的原样输出。bash 用 `$` 前缀并显示**真实命令行**
-  （多行命令按终端的样子换行，不折叠成一行提要）；其它工具用 `▸ name args`。
-- 输出是 `pre` + 等宽 + `pre-wrap`：不缩进、不换字体、不加边框。行首符号照原样带（diff 的 `+`/`-` 保留），
-  并按语义上色（add=cyan / del=tomato / hunk=moon / 截断=amber），失败时整段 tomato。
-- 行尾读数只有真实字段：`T+01:12 · 0.8s · exit 1`；非 bash 没有 exit，diff 类显示 `+14 −2`（有 `onOpenDiff` 时再给 `VIEW`）。
-- 默认 14 行，超出给 `+ N MORE LINES`；`status: run` 的条目在末尾多一行 `$ ▊` 闪烁块——终端说“还在跑”的方式。
-- 审批/对话框仍用它们自己的阻断块（要能点），notice 降成同一套终端嗓音：`[TRUNCATED] 正文`。
+**每个区是一台仪器，不是一张卡片**（`Zone`）：
 
-
-- **布局**：`thinking` 占满左列（360px，两行高），`action`（终端）占满右列，`thread`（对话）**满宽拿底栏最大一份高度**：行高比 `0.78fr / 0.58fr / 1.55fr`（1600×1000 实测左右两列各 ≈ 278/334，而底栏 312×920）。早期版本把终端压在 168px，命令一多就只看得到最后两条；现在终端拿满右列，对话靠到底栏，两者都不再是脚注。
-  ≤1180px 退成单列（每区最小 132px，`thread` 220、`action` 260），整块滚动。区块之间只有黑缝，无描边。
+- 头部是**三段带黑缝的条**：`[34px 实心色调编号块 | 标签 + 定位 + 条数 | 实时状态块]`。
+  状态块是唯一允许整块变实色的元素：`SCANNING`（moon）/ `STREAMING`（orange）/ `1 RUNNING`（tang）/
+  `AWAITING YOU`（orange，等操作员确认）——空闲时退回 `--g1` 灰底。`亲和力`在这里：不用点开也知道
+  这台仪器忙不忙、要不要求你。
+- 编号块、状态块都只做**单侧圆角**（右端）；正文体用 `--r-2`（14px），对话区同样是 `--r-2`——
+  圆角尺寸随块的大小走，不做四角同半径（§3 R5）。
+- **两条接缝里的接头**（`.ws-joint`，96×8px，`--g1`）：左列与右列各一条，正好落在
+  两列与对话区之间的 8px 黑缝里，让两根柱子"接入"底栏——这就是本视图的**肘**预算（§3 R6：
+  一个手势镜像使用，左主结构 + 右状态区），不再加第三个 L 形装饰。
+- **空区必须自证**：三区各自的空态文案（`ws.empty*`）走 i18n，前面配一个小 `Elbow`（真曲线，`currentColor`
+  取该区色调），不留纯黑板。
 - **每个区独立滚动且独立跟随**：只有贴底时才自动滚（滚上去就不再被拽回去）。**跟随的触发是内容增长，不是 `count`**：
   流式正文、流式 thinking、正在跑的命令输出都是“item 数不变、高度在长”，只按条数跟随等于看着答案长到屏幕外。
   实现是 `Zone` 里每次渲染后的 effect（`pinned` 为真才写 `scrollTop`），不需要 `ResizeObserver`。
-- **空区必须自证**：三区各自的空态文案（`ws.empty*`）走 i18n，不留纯黑板。
-- 头部读数全部来自本次数据（词数、turn 数、运行中工具数），不写装饰数字（§7.6）。
 
+**三者的联系 = 交换（exchange），且只在对话区的 footer 里显形**：
+
+- `cyclesOf()` 给每条 item 打上"第几次交换"（一条 `user` 开一次），`tallyOf()` 数出每次交换产生了几块
+  推理、几条命令。二者都从数据推出来，不写死。
+- 对话区按交换分组（`.exc`，交换之间 12px 黑缝）。每个交换末尾一条 24px footer：
+  `[序号实心块] [◇ N REASONING] [▸ N COMMANDS] [T+…] [ACKNOWLEDGE]`。
+  - 两个 tap 是**真的联动**：点它 → 另外两个区把该次交换的条目留住、其余降到 26% 不透明度，
+    并滚到该次交换的第一条；三区头部同时把定位文字换成 `▸ EXCH 03`，说明"为什么别的都暗了"。
+    再点一次（或点另一次交换）解除。计数为 0 的 tap `disabled`，不假装有内容。
+  - `ACKNOWLEDGE` 是**结果确认的落点**：本地记账（`lcars.ack`，item id → 时间戳，上限 200 条），
+    点完变 `ACKED 10:31`，不发给模型、不进 transcript——它只是"我看过这轮结果了"。
+  - 只有**最新一次**交换的序号块会亮成实心 `--orange`：老交换即便没确认也保持灰，避免一屏橙色。
+- 会话还在生成时，最新交换的序号块是实心橙 + 尾部 `STREAMING`。
+
+**THINKING 读作状态，不读作散文**：
+
+- 每块头部：`[实心 moon 序号] REASONING · N W · T+mm:ss · [SCANNING|SETTLED]`，右侧 chevron。
+  `SCANNING` 用 `--tang` 实色并挂 `scan` 三步循环（§5），`SETTLED` 退回灰字——**推理是否还在长，肉眼可判**。
+- 正文默认展开最新一条、折叠 6 行；展开态左侧 2px `--moon` 脊，收起态 `--g1`。
+- 区底部一条读数带（`.ws-foot`）：若有一个**检索类工具**正在跑（`read/grep/glob/ls/find/web_search/
+  fetch_content/symbol_search/ffgrep/fffind/code_search/lens_diagnostics`），就写
+  `READING · read test/login.test.ts`；否则写 `N W · N BLOCKS · RETRIEVAL`。
+  这条带是"思考正依赖着执行"的唯一可见证据，所以它读的是**真的在跑的那条工具**，不是最近一条。
+
+**ACTION 是终端，不是又一个卡片列表**（右列两行高都是它的）：
+- 每条工具 = **一行你本来会亲手敲的命令** + 它的原样输出。bash 用 `$` 前缀并显示**真实命令行**
+  （多行命令按终端的样子换行，不折叠成一行提要）；其它工具用 `▸ name args`。
+- 行尾：`T+01:12 · 0.8s` 之后是一枚**实心返回码灯**——`exit 0`（cyan）/ `exit 1`·`FAILED`（tomato）/
+  `RUN`（tang）/`+14 −2`（diff 统计）/ `OK`。返回码是终端唯一不能省略的读数，所以它独占一块。
+- 输出是 `pre` + 等宽 + `pre-wrap`：不缩进、不换字体、不加边框。行首符号照原样带（diff 的 `+`/`-` 保留），
+  并按语义上色（add=cyan / del=tomato / hunk=moon / 截断=amber），失败时整段 tomato。
+- **交换分隔条**：一次会话里有多次交换时，每次交换的第一条工具前插一条 `EXCH 0n · N REASONING` 小条
+  （`--g1` 底 + `--tang` 字），把命令挂回发起它的那条指令；只有一次交换时不插，不制造假结构。
+- 默认 14 行，超出给 `+ N MORE LINES`；`status: run` 的条目在末尾多一行 `$ ▊` 闪烁块——终端说“还在跑”的方式。
+- 审批/对话框仍用它们自己的阻断块（要能点），notice 降成同一套终端嗓音：`[TRUNCATED] 正文`。
+
+- **布局**：`thinking` 占满左列（360px，两行高），`action`（终端）占满右列，`thread`（对话）**满宽拿底栏最大一份高度**：行高比 `0.78fr / 0.58fr / 1.55fr`（1600×1000 实测左右两列各 ≈ 278/334，而底栏 312×920）。早期版本把终端压在 168px，命令一多就只看得到最后两条；现在终端拿满右列，对话靠到底栏，两者都不再是脚注。
+  ≤1180px 退成单列（每区最小 132px，`thread` 220、`action` 260），整块滚动；单列时接头隐藏（否则指向空处）。
+  区块之间只有黑缝，无描边。
+- 头部读数全部来自本次数据（词数、turn 数、运行中工具数、返回码），不写装饰数字（§7.6）。
+- **动效**：分区不淡入（§5 R11）；唯一的时间性过渡是 `data-dim` 的 `opacity` 240ms linear——它表达
+  "焦点被移来了"，不是装饰。
 
 ### 7.6n 斜杠命令与压缩摘要
 
@@ -828,6 +879,11 @@ composer 上方出现 `QUEUED n` 条带，逐条显示待投递文本 + `deliver
 | 2026-xx-xx | TERMINAL 与 OUTPUT **换位**：终端占右列（两行高），输出改满宽底栏（行高比不变：`0.78/0.58/1.55`） | 操作员要的是“命令在上、结果在下”的阅读顺序：终端是看“现在在干什么”的，贴右上就不用跨整屏回到左下；正文（markdown、宽段落）在满宽底栏读起来更顺，而终端在 360px 以上宽度下 `pre-wrap` 本来就够用。代价：终端不再是四区最大一块（输出 376px > 终端 ≈ 334px），`test/ui.mjs` 的断言同步改成“终端占右列 / 输出占满宽底栏” | `src/styles/lcars.css`（`.ws` 各 `grid-area`）、`test/ui.mjs`、AGENTS §7.6r |
 | 2026-xx-xx | 输入区适配输入法（IME）：组字期间 `value` 与 DOM 逐键同步（不再“组字期间不改 state”）；`onKeyDown` 顶部统一 `imeBusy()` 短路（`composing` ref / `isComposing` / `keyCode 229`），`Enter` `↑↓` `Tab` `Esc` 让给候选窗；`growth` 改为公共 `grow()` 并在 `input` / `compositionupdate` 里量；所有全局 Esc（中断运行、关覆盖层、壁纸选择器）与其它 Enter 提交框同样短路 | 两个真实病灶：① Preact 在 `value !== dom.value` 时**每次渲染回写** `value`，而渲染由 `setCaret` 触发——于是每敲一个拼音就把半个词吐回去，字段也停在 2 行高；② 组字时的 Enter/Esc 是“选词/关候选”，被当成“发送/中断”，半成品直接发出、跑着的回合被意外停掉 | `src/views/Console.tsx`（`imeBusy` / `Composer` 的 `grow` / 各 keydown）、`test/ui.mjs`（组字四检）、AGENTS §4.3b |
 | 2026-xx-xx | ACTION 区**重画成终端**并拿到最大高度（行高比 `0.78 / 0.58 / 1.55`，标签改 `TERMINAL`）：bash 显示真实命令行 + 原样输出 + `exit N`，diff 显示 `+N −M` 与着色行，跑着的条目末尾追加闪烁 `$ ▊` | 168px 的底栏只够看两条命令，而“这把到底跑了什么、回来什么”正是分区视图存在的理由；终端是唯一既能提密度又能保留原文的形态，也不与 log 里的 LCARS 读数条重复 | `src/views/Console.tsx`（`TerminalEntry` / `termCommand` / `termBody`）、`src/styles/lcars.css`（`.term*` + 行高比）、`src/views/Craft.tsx`（`?craft#workspace` 样例流）、AGENTS §7.6r |
+| 2026-xx-xx | STREAM 三区改为**按角色定位 + 用编号写清先后**：`I CONVERSATION`（指令/问询/结果确认）、`II THINKING`（检索与思考状态）、`III TERMINAL`（实时执行反馈）；头部从一条 26px 灰条换成**三段带黑缝的仪器条**（实心色调编号块 + 标签/定位/条数 + 实时状态块，状态块是唯一允许整块变实色的元素：`SCANNING` / `STREAMING` / `N RUNNING` / `AWAITING YOU`） | 三区原本只有色调区分，读者得自己推断"谁先谁后、谁在等谁"。编号把一次交换的循环（指令 → 推理 → 执行 → 结果回到指令）直接写在头上；状态块让人不用点开就知道哪台仪器忙、哪台在等操作员——这是"亲和力"的可实现形式，而不是加圆角或加淡入。罗马数字刻意避开左轨 `01`–`06` 的快捷键编号 | `src/views/Console.tsx`（`Zone`）、`src/styles/lcars.css`（`.ws-hd`）、`src/i18n.ts`（`ws.note*` / `ws.st*`）、`test/ui.mjs`、AGENTS §7.6r |
+| 2026-xx-xx | 新增**交换（exchange）模型**把三区连起来：`cyclesOf()` 给每条 item 打"第几次交换"，`tallyOf()` 数出每轮产生几块推理/几条命令；对话区按交换分组，每组末尾一条 24px footer `[序号][◇N REASONING][▸N COMMANDS][T+…][ACKNOWLEDGE]`。点 tap → 另两区**降到 26% 并滚到同一次交换**、三区头部同时显示 `▸ EXCH 0n`；`ACKNOWLEDGE` 写本地 `lcars.ack`（item id → 时间戳，上限 200），不发给模型 | 原来三区只是"同一份流的三种切片"，彼此没有任何可见联系，读起来像三台没接线的仪表。交换是数据里本来就存在的边界，用它做联系物既不用编造，又让"结果确认"有了落点：确认是操作员的动作，不该塞进 transcript。dim 用 `opacity` 240ms linear 表达"焦点被移来了"（§5 R11 允许的唯一时间性过渡） | `src/views/Console.tsx`（`cyclesOf` / `tallyOf` / `exchangesOf` / `Exchange` / `Zone` 的 focus effect）、`src/styles/lcars.css`（`.exc*`）、`src/i18n.ts`（`ws.ack` / `ws.acked` / `ws.reasoning` / `ws.commands`）、`test/ui.mjs`、AGENTS §7.6r |
+| 2026-xx-xx | TERMINAL 补齐三件事：**实心返回码灯**（`exit 0` cyan / `exit 1`·`FAILED` tomato / `RUN` tang / `+N −M` / `OK`）、**交换分隔条** `EXCH 0n · N REASONING`（只在多于一次交换时插）、命令行整条给 `--g0` 底 + `--r-2` 右端。THINKING 补齐状态：每块 `SCANNING`（tang 实色 + `scan` 三步循环）/ `SETTLED`，区底读数带在检索类工具运行时写 `READING · read <file>` | 返回码是终端唯一不能省略的读数，藏在灰字尾串里等于没有；命令挂不回发起它的指令，长跑里就分不清哪几条是"这次让我跑的"。读数带是"思考正依赖着执行"的唯一可见证据，所以读的是**真的在跑的那条工具**，不是最近一条 | `src/views/Console.tsx`（`TerminalEntry` 的 `lamp`、`term-turn`、`.ws-foot`）、`src/styles/lcars.css`（`.lamp` / `.term-turn` / `.ws-foot` / `.ws-t .stt`）、AGENTS §7.6r |
+| 2026-xx-xx | 曲线语言收敛到三处：**接头**（`96×8px` `--g1`，落在两列与底栏之间的 8px 黑缝里，镜像使用 = §3 R6 的两个肘）、**空态小肘**（`Elbow` SVG，取该区色调）、**单侧圆角升一档**（仪器体与终端行 `/ 对话体` 取 `--r-2` 14px，状态块取 `--r-pill` 做条带末端）。不引入第四处装饰弧 | 用户要求"更像 LCARS 的分区曲线"。原版的分区感来自**构件相接处的肘**与**条带末端半圆**，不是给矩形加四角圆角；把这两件事做对，比再画一圈装饰线更接近原版。§3 R6 的肘预算仍是 2：一个手势镜像使用，不再加第三个 L 形 | `src/styles/lcars.css`（`.ws-joint` / `.ws-empty` / `.ws-hd .st` / `.ws-body` / `.ws-t` / `.term-cmd`）、`src/views/Console.tsx`（`Elbow` import） |
+| 2026-xx-xx | `?craft#workspace` 的样例流补到**两次交换**（第二段含 read / edit / 运行中的 bash + 流式 thinking） | 只有一次交换时"交换"这个结构看不出来：没有分隔条、没有第二个 footer、dim 也没东西可暗。工艺页是视觉契约的验收页，样例流必须覆盖它要表达的结构 | `src/views/Craft.tsx`（`WS_ITEMS`） |
 
 ---
 

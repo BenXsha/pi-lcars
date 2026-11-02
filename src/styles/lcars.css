@@ -2887,47 +2887,79 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 .about .pv-row .v a:hover { color: var(--w); }
 
 /* ============================================================
-   workspace — the same stream, cut into three zones
+   workspace — one stream, three instruments
    ------------------------------------------------------------
-   One grid, three regions: THINKING holds the left column, the TERMINAL
-   (action) the right one, and the CONVERSATION (thread) gets the
-   full-width band at the bottom. The zones are blocks with black seams
-   between them (no borders), and every zone header carries its own tone
-   spine — the only colour here.
+   The cycle decides the reading order, not the layout:
+
+     I  CONVERSATION  instruction, and where the result returns
+     II THINKING      retrieval and reasoning
+     III TERMINAL     execution, live
+
+   Each zone is one instrument: a numbered strip (numeral block, label,
+   state readout) over a body with its own scroll. Bodies are separated by
+   black seams only — no borders, no cards. Two joints sit in the seam
+   between the columns and the conversation band, so the columns visibly
+   feed the band where the answer comes back to be confirmed.
    ============================================================ */
 .ws {
   flex: 1 1 auto;
   min-height: 0;
   display: grid;
-  gap: var(--gap);
+  gap: var(--seam);
   grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
   grid-template-rows: minmax(120px, 0.78fr) minmax(90px, 0.58fr) minmax(196px, 1.55fr);
   padding: 4px 8px 8px; /* same gutters as .log, so the zones line up with it */
 }
-.ws-zone { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 4px; }
+.ws-zone {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
 .ws-zone[data-zone="thinking"] { grid-area: 1 / 1 / 3 / 2; }
 .ws-zone[data-zone="action"] { grid-area: 1 / 2 / 3 / 3; }
 .ws-zone[data-zone="thread"] { grid-area: 3 / 1 / 4 / 3; }
+.ws-zone[data-tone="moon"] { --tone: var(--moon); }
+.ws-zone[data-tone="orange"] { --tone: var(--orange); }
+.ws-zone[data-tone="tang"] { --tone: var(--tang); }
 
+/* ---- the strip: numeral | label + note + count | live state ---- */
+/* three blocks with black seams, not one grey bar: the numeral is the cycle
+   order, and the state block is the only thing allowed to go solid when busy */
 .ws-hd {
-  --tone: var(--g2);
+  flex: 0 0 28px;
+  display: flex;
+  gap: var(--gap);
+  height: 28px;
+  min-width: 0;
+}
+.ws-hd .idx {
+  flex: 0 0 34px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  height: 26px;
-  flex: 0 0 26px;
-  padding: 0 8px 0 12px;
+  justify-content: center;
+  background: var(--tone);
+  color: #000;
+  border-radius: 0 var(--r-1) var(--r-1) 0;
+  font: 700 12.5px/1 var(--din);
+  letter-spacing: 0.04em;
+}
+.ws-hd .lb {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px;
   background: var(--g1);
   border-radius: 0 var(--r-1) var(--r-1) 0;
-  box-shadow: inset 4px 0 0 var(--tone);
 }
-.ws-hd[data-tone="moon"] { --tone: var(--moon); }
-.ws-hd[data-tone="orange"] { --tone: var(--orange); }
-.ws-hd[data-tone="w"] { --tone: var(--w); }
-.ws-hd[data-tone="tang"] { --tone: var(--tang); }
-.ws-hd .lb {
+.ws-hd .tx {
+  flex: 0 0 auto;
   font: 700 11px/1 var(--din);
-  letter-spacing: 0.14em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--tone);
   white-space: nowrap;
@@ -2937,9 +2969,9 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font: 400 10.5px/1 var(--mono);
-  text-transform: uppercase;
-  color: var(--g2);
+  font: 400 11px/1.2 var(--text);
+  font-style: normal;
+  color: var(--g3);
 }
 .ws-hd .n {
   margin-left: auto;
@@ -2947,54 +2979,180 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
   color: var(--t3);
   font-variant-numeric: tabular-nums;
 }
+.ws-hd .st {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  padding: 0 12px 0 10px;
+  background: var(--g1);
+  color: var(--g2);
+  border-radius: 0 var(--r-pill) var(--r-pill) 0;
+  font: 700 10.5px/1 var(--din);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.ws-hd .st[data-live="1"] { background: var(--tone); color: #000; }
 
+/* ---- the body: the only scrolling surface in each instrument ---- */
 .ws-body {
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 6px;
+  gap: var(--gap);
+  padding: 8px;
   overflow-y: auto;
   overflow-x: hidden;
   background: var(--g0);
-  border-radius: 0 var(--r-1) var(--r-1) 0;
+  border-radius: 0 var(--r-2) var(--r-2) 0;
   scrollbar-width: thin;
   scrollbar-color: var(--g1) transparent;
 }
 .ws-body::-webkit-scrollbar { width: 4px; }
 .ws-body::-webkit-scrollbar-thumb { background: var(--g1); }
 .ws-item { display: flex; flex-direction: column; gap: 2px; }
-.ws-empty { padding: 4px 2px; font: 400 11px/1.7 var(--mono); color: var(--g2); }
+
+/* the conversation is the deck, so it gets the larger radius and the wider
+   seam between exchanges: one instruction per block, not one row per line */
+.ws-zone[data-zone="thread"] .ws-body {
+  gap: 12px;
+  padding: 10px;
+  border-radius: 0 var(--r-2) var(--r-2) 0;
+}
+
+/* "show me exchange n": everything outside it steps back, nothing is hidden */
+.ws-body [data-dim="1"] { opacity: 0.26; }
+.ws-t,
+.term,
+.exc,
+.ws-body [data-dim] { transition: opacity var(--t-2) var(--ease); }
+
+/* empty instruments still speak LCARS: a small elbow, then the sentence */
+.ws-empty {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 4px;
+  color: var(--tone);
+}
+.ws-empty .elbow { flex: 0 0 auto; opacity: 0.6; }
+.ws-empty span { padding-top: 2px; font: 400 11px/1.7 var(--mono); color: var(--g2); }
+
+/* ---- the readout strip under an instrument ---- */
+.ws-foot {
+  flex: 0 0 22px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 22px;
+  padding: 0 10px;
+  background: var(--g1);
+  border-radius: 0 var(--r-1) var(--r-1) 0;
+  box-shadow: inset 4px 0 0 var(--tone);
+}
+.ws-read { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.ws-read b {
+  flex: 0 0 auto;
+  font: 700 10.5px/1 var(--din);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tone);
+}
+.ws-read em {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 400 10.5px/1.4 var(--mono);
+  font-style: normal;
+  color: var(--g3);
+}
+
+/* ---- the two joints (§3 R6: one gesture, mirrored) ---- */
+.ws-joint { display: none; }
+.ws-zone[data-zone="thinking"] .ws-joint,
+.ws-zone[data-zone="action"] .ws-joint {
+  display: block;
+  position: absolute;
+  bottom: calc(-1 * var(--seam));
+  width: 96px;
+  height: var(--seam);
+  background: var(--g1);
+}
+.ws-zone[data-zone="thinking"] .ws-joint { left: 0; border-radius: 0 0 0 var(--r-1); }
+.ws-zone[data-zone="action"] .ws-joint { right: 0; border-radius: 0 0 var(--r-1) 0; }
+
 /* the zones are denser than the log: the same rows, tighter padding */
 .ws-body .row .cell { padding: 8px 10px; }
 .ws-body .row .txt { font-size: 14.5px; }
+.ws-body .row.turn { margin-top: 0; }
 
-/* thinking rows: quiet asides, six lines until opened */
+/* ---- THINKING: an aside that says whether it is still reading ---- */
 .ws-t {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  padding: 5px 8px 6px;
+  gap: 4px;
+  padding: 6px 8px 7px;
   text-align: left;
   background: transparent;
   border: 0;
-  border-radius: 0 var(--r-1) var(--r-1) 0;
+  border-radius: 0 var(--r-2) var(--r-2) 0;
   box-shadow: inset 2px 0 0 var(--g1);
 }
 .ws-t:hover { background: var(--g1); }
+.ws-t[data-open="1"] {
+  background: color-mix(in srgb, var(--g0) 55%, #000);
+  box-shadow: inset 2px 0 0 var(--moon);
+}
 .ws-t .hd {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+}
+.ws-t .ix {
+  flex: 0 0 auto;
+  padding: 1px 5px;
+  background: var(--moon);
+  color: #000;
+  border-radius: 0 var(--r-1) var(--r-1) 0;
+  font: 700 10.5px/1.4 var(--din);
+  font-variant-numeric: tabular-nums;
+}
+.ws-t .lb {
+  flex: 0 0 auto;
   font: 700 10.5px/1 var(--din);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--t3);
+}
+.ws-t .w {
+  flex: 0 0 auto;
+  font: 400 10.5px/1 var(--mono);
+  color: var(--g3);
+  font-variant-numeric: tabular-nums;
+}
+.ws-t .tm {
+  margin-left: auto;
+  font: 400 10.5px/1 var(--mono);
+  color: var(--g2);
+  font-variant-numeric: tabular-nums;
+}
+.ws-t .stt {
+  flex: 0 0 auto;
+  padding: 1px 5px;
+  border-radius: var(--r-1);
+  font: 700 10px/1.4 var(--din);
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--g3);
+  color: var(--g2);
 }
-.ws-t .hd .num { font-family: var(--mono); color: var(--moon); }
-.ws-t .hd .w { color: var(--g3); font-variant-numeric: tabular-nums; }
-.ws-t .hd .tm { margin-left: auto; font-family: var(--mono); color: var(--g2); }
+.ws-t .stt[data-live="1"] {
+  background: var(--tang);
+  color: #000;
+  animation: scan var(--t-4) steps(3) infinite;
+}
 .ws-t .bd {
   display: -webkit-box;
   -webkit-line-clamp: 6;
@@ -3007,20 +3165,115 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 }
 .ws-t[data-open="1"] .bd { -webkit-line-clamp: initial; color: var(--w); }
 
-/* ACTION is a terminal: darker body, mono text, a prompt you could have typed.
-   The extra height is the point — this is where command + response live (§7.6r). */
+/* ---- CONVERSATION: one exchange per block, joined by its own footer ---- */
+.exc {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+  min-width: 0;
+}
+.exc-body { display: flex; flex-direction: column; gap: var(--gap); min-width: 0; }
+
+/* The footer is where the three instruments visibly meet: two taps that make
+   the other zones show their half of this exchange, and the acknowledge mark
+   that closes the cycle. The count on each tap is the real tally. */
+.exc-ft {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 24px;
+  background: var(--g1);
+  border-radius: 0 var(--r-1) var(--r-1) 0;
+}
+.exc-ft .en {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 24px;
+  background: var(--g2);
+  color: #000;
+  border-radius: 0 var(--r-1) var(--r-1) 0;
+  font: 700 11px/1 var(--din);
+  font-variant-numeric: tabular-nums;
+}
+.exc[data-live="1"] .exc-ft .en,
+.exc[data-focus="1"] .exc-ft .en { background: var(--orange); }
+.exc-ft .tap {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 18px;
+  padding: 0 8px;
+  background: var(--g0);
+  color: var(--g3);
+  border-radius: var(--r-pill);
+  font: 700 10.5px/1 var(--din);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.exc-ft .tap i {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: var(--g2);
+}
+.exc-ft .tap:hover:not(:disabled) { background: var(--g2); color: #000; }
+.exc-ft .tap:disabled { opacity: 0.4; }
+.exc-ft .tap[data-tone="moon"] i { background: var(--moon); }
+.exc-ft .tap[data-tone="tang"] i { background: var(--tang); }
+.exc-ft .tap[data-tone="moon"][aria-pressed="true"] { background: var(--moon); color: #000; }
+.exc-ft .tap[data-tone="tang"][aria-pressed="true"] { background: var(--tang); color: #000; }
+.exc-ft .sp { flex: 1 1 auto; }
+.exc-ft .tm {
+  flex: 0 0 auto;
+  font: 400 10.5px/1 var(--mono);
+  color: var(--g3);
+  font-variant-numeric: tabular-nums;
+}
+.exc-ft .ack {
+  flex: 0 0 auto;
+  height: 18px;
+  padding: 0 10px;
+  background: var(--orange);
+  color: #000;
+  border-radius: var(--r-pill);
+  font: 700 10.5px/1 var(--din);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.exc-ft .ack:hover { filter: brightness(1.18); }
+.exc-ft .akd,
+.exc-ft .wrk {
+  flex: 0 0 auto;
+  padding: 0 6px;
+  font: 700 10.5px/1 var(--din);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--g3);
+}
+.exc-ft .wrk { color: var(--tang); }
+
+/* ---- TERMINAL: a command channel, not a card list ---- */
+/* ACTION is a terminal: darker body, mono text, a prompt you could have typed,
+   and the real return code as a solid lamp at the end of the line. */
 .ws-zone[data-zone="action"] .ws-body {
   gap: 6px;
   background: color-mix(in srgb, var(--g0) 55%, #000);
 }
-
 .term { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .term-cmd {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
   min-width: 0;
   padding: 3px 6px 3px 8px;
+  background: var(--g0);
+  border-radius: 0 var(--r-2) var(--r-2) 0;
   box-shadow: inset 2px 0 0 var(--g1);
 }
 .term-cmd .ps { flex: 0 0 auto; font: 700 12px/1.5 var(--mono); color: var(--orange); }
@@ -3035,12 +3288,30 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 }
 .term-cmd .meta {
   flex: 0 0 auto;
-  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font: 400 10.5px/1.5 var(--mono);
   color: var(--g3);
   white-space: nowrap;
   text-transform: uppercase;
 }
+.term-cmd .lamp {
+  flex: 0 0 auto;
+  padding: 2px 7px;
+  border-radius: var(--r-1);
+  background: var(--g1);
+  color: var(--t3);
+  font: 700 10.5px/1.3 var(--din);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.term-cmd .lamp[data-tone="ok"] { background: var(--cyan); color: #000; }
+.term-cmd .lamp[data-tone="error"] { background: var(--tomato); color: #000; }
+.term-cmd .lamp[data-tone="run"] { background: var(--tang); color: #000; }
+.term-cmd .lamp[data-tone="warn"] { background: var(--amber); color: #000; }
 .term-out {
   display: flex;
   flex-direction: column;
@@ -3058,6 +3329,19 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 .term[data-state="error"] .term-out { color: var(--tomato); }
 .term[data-state="run"] .term-cmd .ps { color: var(--tang); }
 .term[data-state="error"] .term-cmd { box-shadow: inset 2px 0 0 var(--tomato); }
+
+/* one strip per exchange, so a long terminal still says which instruction
+   the command belonged to */
+.term-turn { display: flex; align-items: center; min-width: 0; }
+.term-turn b {
+  padding: 2px 8px;
+  background: var(--g1);
+  color: var(--tang);
+  border-radius: 0 var(--r-1) var(--r-1) 0;
+  font: 700 10px/1.4 var(--din);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
 
 /* the blinking block: how a real terminal says "still here" */
 .term-live .cur {
@@ -3106,6 +3390,8 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
   .ws-zone[data-zone] { grid-area: auto; }
   .ws-zone[data-zone="thread"] { min-height: 220px; }
   .ws-zone[data-zone="action"] { min-height: 260px; }
+  /* stacked, the joints would point at nothing */
+  .ws-zone .ws-joint { display: none; }
 }
 
 /* ------------------------------------------------- panel action language */

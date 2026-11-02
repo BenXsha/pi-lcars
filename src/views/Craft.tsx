@@ -119,6 +119,82 @@ const WS_ITEMS: Item[] = [
     usage: { input: 18_240, output: 412, cost: 0.002, total: 18_652 },
     ts: WS_T0 + 52_000,
   },
+  /* ---- second exchange: the cycle read twice is what makes it a cycle ---- */
+  {
+    kind: "user",
+    id: "w8",
+    text: "那就把 key 换成 forwarded-for，再跑一次；顺带把那两个被吃掉的测试改成断言 429。",
+    ts: WS_T0 + 60_000,
+  },
+  {
+    kind: "assistant",
+    id: "w9",
+    text: "",
+    thinking:
+      "forwarded-for 可能有多段（client, proxy1, proxy2），只取首段；测试里要显式带 X-Forwarded-For 才能复现不同的人。先看测试文件怎么造请求。",
+    streaming: false,
+    ts: WS_T0 + 66_000,
+  },
+  {
+    kind: "tool",
+    id: "w10",
+    callId: "c4",
+    name: "read",
+    args: "test/login.test.ts",
+    status: "ok",
+    output: "1  import request from 'supertest';\n2  import { app } from '../server/app';\n…\n38  it('refuses the 11th attempt in a minute', async () => {",
+    ms: 18,
+    ts: WS_T0 + 70_000,
+  },
+  {
+    kind: "tool",
+    id: "w11",
+    callId: "c5",
+    name: "edit",
+    args: "test/login.test.ts",
+    status: "ok",
+    output: "",
+    ms: 55,
+    ts: WS_T0 + 74_000,
+    diff: {
+      path: "test/login.test.ts",
+      stat: { add: 4, del: 1 },
+      hunks: [
+        {
+          hdr: "@@ -38,7 +38,10 @@",
+          oldNo: 38,
+          newNo: 38,
+          lines: [
+            { t: " ", o: 38, n: 38, text: "  it('refuses the 11th attempt in a minute', async () => {" },
+            { t: "-", o: 39, text: "    await request(app).post('/login');" },
+            { t: "+", n: 39, text: "    const send = (n: number) =>" },
+            { t: "+", n: 40, text: "      request(app).post('/login').set('X-Forwarded-For', `10.0.0.${n}`);" },
+            { t: "+", n: 41, text: "    for (let i = 1; i <= 11; i++) await send(i);" },
+            { t: "+", n: 42, text: "    expect((await send(12)).status).toBe(429);" },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    kind: "tool",
+    id: "w12",
+    callId: "c6",
+    name: "bash",
+    args: "npm test -- --run test/login.test.ts",
+    status: "run",
+    output: " RUN  v3.2.4 /Users/liuyunkai/Projects/design\n\n ✓ test/login.test.ts (2 tests) 41ms",
+    ms: undefined,
+    ts: WS_T0 + 82_000,
+  },
+  {
+    kind: "assistant",
+    id: "w13",
+    text: "",
+    thinking: "测试在跑，先把结论写一半：key 取 forwarded-for 首段后，每个虚拟 IP 一个桶。",
+    streaming: true,
+    ts: WS_T0 + 88_000,
+  },
 ];
 
 /* ---------------------------------------------------------------- helpers */
@@ -358,7 +434,7 @@ export function Craft() {
             </div>
           </Section>
 
-          <Section id="workspace" title="WORKSPACE / 四区" note="同一份流的四种看法 · ACTION 是终端">
+          <Section id="workspace" title="WORKSPACE / 三区" note="I 指令 · II 推理 · III 执行 — 交换的 footer 把三者连起来">
             <div style={{ display: "flex", flexDirection: "column", height: "900px" }}>
               <Workspace items={WS_ITEMS} />
             </div>

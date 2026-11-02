@@ -563,6 +563,29 @@ try {
     "each zone carries a tone spine and a count",
     (await evaluate(`document.querySelectorAll('.ws-hd[data-tone] .n').length`)) === 3,
   );
+  // the strip numbers the cycle (I conversation, II thinking, III terminal) and
+  // ends in a state block: that block is the only thing allowed to go solid
+  const strips = await evaluate(
+    `[...document.querySelectorAll('.ws-hd')].map((h) => ({ zone: h.closest('.ws-zone').dataset.zone, idx: h.querySelector('.idx')?.textContent ?? '', st: h.querySelector('.st')?.textContent ?? '', tone: h.querySelector('.idx') ? getComputedStyle(h.querySelector('.idx')).backgroundColor : '' }))`,
+  );
+  check(
+    "each strip numbers the cycle and reports a live state",
+    Array.isArray(strips) &&
+      strips.map((s) => s.idx).join(",") === "II,I,III" &&
+      strips.every((s) => s.st.length > 0 && s.tone !== "rgba(0, 0, 0, 0)"),
+    JSON.stringify(strips),
+  );
+  // the two joints fill exactly the seam between the columns and the band
+  const joints = await evaluate(
+    `(() => { const band = Math.round(document.querySelector('.ws-zone[data-zone="thread"]').getBoundingClientRect().y);
+      return { band, rows: [...document.querySelectorAll('.ws-joint')].map((j) => { const r = j.getBoundingClientRect(); return { y: Math.round(r.y), h: Math.round(r.height), w: Math.round(r.width) }; }) }; })()`,
+  );
+  check(
+    "the columns feed the conversation band through two joints",
+    joints?.rows?.length === 2 &&
+      joints.rows.every((j) => j.h === 8 && j.w > 0 && j.y + j.h === joints.band),
+    JSON.stringify(joints),
+  );
   // thinking fills the left column, the terminal the right one, the exchange the bottom band
   const zoneBox = await evaluate(
     `Object.fromEntries([...document.querySelectorAll('.ws-zone')].map((z) => { const r = z.getBoundingClientRect(); return [z.dataset.zone, { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) }]; }))`,
