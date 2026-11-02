@@ -1,0 +1,76 @@
+/* ============================================================
+   Bundled typefaces — SIL Open Font License 1.1, shipped verbatim.
+
+   Three families, 74.6 KB of woff2 total (AGENTS §4.1):
+
+     D-DIN 400/700          instrument — labels, numerals, readouts
+     Michroma 400           deco       — wordmark, cycle numerals
+     IBM Plex Mono 400/600  code       — commands, paths, diffs
+
+   These are the only font files in the package, and they are the ones the
+   design actually depends on: without them every label width was a host
+   dialect (macOS "DIN Alternate" vs Windows "Bahnschrift" vs Linux nothing),
+   so the same 1600px board could clip on one machine and breathe on another.
+
+   CJK is deliberately NOT bundled: a usable MiSans/PingFang subset is
+   megabytes over the wire for a console that mostly shows Latin readouts, and
+   `--text` keeps the platform stack (see tokens.css). Glyph fallback is
+   per-character, so Mixed 中文/Latin strings still get D-DIN on the Latin runs
+   and the platform CJK face on the Han runs.
+
+   Licence texts travel next to the files (public/fonts/OFL-*.txt) because
+   OFL §1 requires them to ship with the font — and D-DIN/Plex carry Reserved
+   Font Names, so the files are unmodified and never renamed.
+   Regenerate: node scripts/fetch-fonts.mjs
+   ============================================================ */
+
+/* latin — the range the console's readouts actually use */
+@font-face {
+  font-family: "D-DIN";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/d-din-400.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308,
+    U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "D-DIN";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/d-din-700.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308,
+    U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Michroma";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/michroma-400.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308,
+    U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/ibm-plex-mono-400.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308,
+    U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/ibm-plex-mono-600.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308,
+    U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}

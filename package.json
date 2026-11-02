@@ -5,7 +5,7 @@
   "license": "MIT",
   "author": {
     "name": "BenShawn",
-    "email": "7319722@qq.com",
+    "email": "benxshare@hotmail.com",
     "url": "https://gitee.com/benshawn"
   },
   "repository": {
@@ -40,13 +40,15 @@
     "prepack": "vite build",
     "start": "node bin/pi-lcars.mjs",
     "icons": "node scripts/build-icons.mjs",
+    "fonts": "node scripts/fetch-fonts.mjs",
     "server": "node server/index.mjs",
-    "test": "node test/pi-env.mjs && node test/mcp-config.mjs && node test/smoke.mjs && node test/launch.mjs && node test/ui.mjs",
+    "test": "node test/pi-env.mjs && node test/fonts.mjs && node test/mcp-config.mjs && node test/smoke.mjs && node test/launch.mjs && node test/ui.mjs",
     "test:smoke": "node test/smoke.mjs",
     "test:launch": "node test/launch.mjs",
     "check:themes": "node scripts/check-themes.mjs",
     "test:ui": "node test/ui.mjs",
-    "test:mcp": "node test/mcp-config.mjs"
+    "test:mcp": "node test/mcp-config.mjs",
+    "test:fonts": "node test/fonts.mjs"
   },
   "devDependencies": {
     "@preact/preset-vite": "^2.10.6",

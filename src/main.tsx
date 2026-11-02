@@ -1,4 +1,5 @@
 import { render } from "preact";
+import "./styles/fonts.css";
 import "./styles/themes.css";
 import "./styles/lcars.css";
 import { restoreTheme } from "./theme";

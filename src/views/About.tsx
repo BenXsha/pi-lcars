@@ -1,7 +1,10 @@
 import { useEffect, useState } from "preact/hooks";
 import { api, type SystemInfo } from "../api";
 import { t } from "../i18n";
-import { appInfo, npmUrl, repoUrl, uiBuildStamp, type Author, type Credit } from "../appInfo";
+import { appInfo, authorEmail, npmUrl, repoUrl, uiBuildStamp, type Author, type Credit } from "../appInfo";
+import { DECO_CANDIDATES, decoFace } from "../fonts";
+import { FONT_PACK, FONT_PACK_BYTES, type FontPackEntry } from "../fontPack";
+import { fmtSize } from "../components/ui";
 
 /** `[4px 条][标签][读数]` — the same row language as the config panels. */
 function Fact(props: { k: string; v: string; title?: string; tone?: string }) {
@@ -29,17 +32,67 @@ function CreditRow(props: Credit) {
   );
 }
 
+/* font rows reuse the credit grid: [bar][family + weights][role][bytes][licence] */
+function FontRow(props: { font: FontPackEntry }) {
+  const { font } = props;
+  const role =
+    font.role === "instrument"
+      ? t("about.roleInstrument")
+      : font.role === "deco"
+        ? t("about.roleDeco")
+        : t("about.roleCode");
+  return (
+    <div class="about-credit fontrow">
+      <span class="bar" />
+      <span class="nm" title={`${font.family} ${font.weights.join("/")} — ${font.project}`}>
+        {font.family} <span class="wt">{font.weights.join(" / ")}</span>
+      </span>
+      <span class="use">{role}</span>
+      <span class="ver">{fmtSize(font.bytes)}</span>
+      <span class="lic">{font.license}</span>
+    </div>
+  );
+}
+
+/**
+ * Spam has to scrape, people can click. The address is printed as
+ * `name [at] host` and never as a `mailto:` — that href is exactly the token a
+ * harvester collects — while a click hands the real string to the clipboard.
+ * The literal never sits in the DOM, and the bundle carries only the two halves
+ * (see `Author`), so a regex over either finds nothing to harvest.
+ */
 function AuthorBlock(props: { author: Author }) {
   const { author } = props;
-  const href = author.email ? `mailto:${author.email}` : (author.url ?? null);
+  const [copied, setCopied] = useState(false);
+  const address = authorEmail(author);
+  const copyEmail = () => {
+    if (!address) return;
+    navigator.clipboard?.writeText(address).then(
+      () => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1200);
+      },
+      () => {},
+    );
+  };
   return (
     <div class="about-author">
       <span class="bar" />
       <span class="nm">{author.name}</span>
       <span class="role">{t("about.authorRole")}</span>
-      {href ? (
-        <a class="mail" href={href} target="_blank" rel="noreferrer noopener">
-          {author.email ?? author.url}
+      {author.email ? (
+        <button
+          type="button"
+          class="mail"
+          data-copied={copied ? "1" : undefined}
+          title={t("about.copyEmail")}
+          onClick={copyEmail}
+        >
+          {copied ? t("about.emailCopied") : `${author.email.local} [at] ${author.email.domain}`}
+        </button>
+      ) : author.url ? (
+        <a class="mail" href={author.url} target="_blank" rel="noreferrer noopener">
+          {author.url}
         </a>
       ) : (
         <span class="mail quiet">—</span>
@@ -65,11 +118,21 @@ function LinkRow(props: { k: string; href: string; label: string }) {
 
 export function AboutPanel() {
   const [sys, setSys] = useState<SystemInfo | null>(null);
+  const [deco, setDeco] = useState<string | null>(null);
   useEffect(() => {
     api
       .system()
       .then(setSys)
       .catch(() => {});
+    // measured, not assumed: wrong answer here would be a fake readout. It waits
+    // for the bundled woff2, so a slow first paint cannot report the fallback.
+    let live = true;
+    void decoFace().then((face) => {
+      if (live) setDeco(face);
+    });
+    return () => {
+      live = false;
+    };
   }, []);
 
   const repo = repoUrl(appInfo.repo);
@@ -131,6 +194,21 @@ export function AboutPanel() {
 
       <div class="set-section">{t("about.fonts")}</div>
       <p class="about-note">{t("about.fontsBody")}</p>
+      {FONT_PACK.map((font) => (
+        <FontRow key={font.family} font={font} />
+      ))}
+      {/* two real readouts: what actually shipped, and which face is rendering */}
+      <Fact
+        k={t("about.fontPayload")}
+        v={`${FONT_PACK.reduce((n, f) => n + f.weights.length, 0)} woff2 · ${fmtSize(FONT_PACK_BYTES)}`}
+        title={`${t("about.fontLicences")}: public/fonts/OFL-*.txt`}
+      />
+      <Fact
+        k={t("about.deco")}
+        tone={deco ? "ice" : ""}
+        v={deco ?? t("about.decoNone")}
+        title={deco ?? `${t("about.decoNone")} — ${DECO_CANDIDATES.join(" / ")}`}
+      />
 
       <div class="set-section">{t("about.network")}</div>
       <p class="about-note">{t("about.networkBody")}</p>

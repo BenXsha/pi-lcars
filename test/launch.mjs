@@ -30,6 +30,12 @@ const tmp = await mkdtemp(join(tmpdir(), "lcars-launch-"));
 const state = join(tmp, "state");
 const sessions = join(tmp, "sessions");
 const workspace = join(tmp, "workspace");
+/** macOS: tmpdir() is /var/folders/… but a process reports the resolved
+ *  /private/var/folders/… — compare realpaths, not strings */
+const real = async (p) => {
+  const { realpath } = await import("node:fs/promises");
+  return realpath(p).catch(() => p);
+};
 await import("node:fs/promises").then((fs) => fs.mkdir(workspace, { recursive: true }));
 
 const env = {
@@ -109,7 +115,7 @@ try {
   if (info) {
     check("handshake has url", /^http:\/\/127\.0\.0\.1:\d+$/.test(info.url), info.url);
     check("handshake has pid", info.pid === child.pid, `${info.pid} vs ${child.pid}`);
-    check("handshake cwd is the workspace", info.cwd === workspace, info.cwd);
+    check("handshake cwd is the workspace", info.cwd === (await real(workspace)), info.cwd);
     check("handshake reports build", typeof info.builtMs === "number", String(info.builtMs));
   }
   const base = info?.url ?? `http://127.0.0.1:${PORT}`;
@@ -121,7 +127,7 @@ try {
 
   const sys = await get(`${base}/api/system`);
   check("GET /api/system reports the bound port", sys.body?.data?.port === (info?.port ?? PORT), String(sys.body?.data?.port));
-  check("GET /api/system reports the cwd", sys.body?.data?.cwd === workspace, String(sys.body?.data?.cwd));
+  check("GET /api/system reports the cwd", sys.body?.data?.cwd === (await real(workspace)), String(sys.body?.data?.cwd));
   check("GET /api/system resolves the sdk", Boolean(sys.body?.data?.sdk), String(sys.body?.data?.sdk));
 
   const shell = await fetch(`${base}/`);

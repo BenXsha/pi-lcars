@@ -16,12 +16,12 @@ export function onComposerRequest(fn: (intent: ComposerIntent) => void) {
 }
 
 /** Ask the shell to open one of its decks (used by slash commands). */
-export function askDeck(deck: "new" | "model" | "think") {
+export function askDeck(deck: "new" | "model" | "think" | "quick") {
   window.dispatchEvent(new CustomEvent<{ deck: string }>("lcars:deck", { detail: { deck } }));
 }
 
-export function onDeckRequest(fn: (deck: "new" | "model" | "think") => void) {
-  const handler = (e: Event) => fn((e as CustomEvent<{ deck: "new" | "model" | "think" }>).detail.deck);
+export function onDeckRequest(fn: (deck: "new" | "model" | "think" | "quick") => void) {
+  const handler = (e: Event) => fn((e as CustomEvent<{ deck: "new" | "model" | "think" | "quick" }>).detail.deck);
   window.addEventListener("lcars:deck", handler);
   return () => window.removeEventListener("lcars:deck", handler);
 }

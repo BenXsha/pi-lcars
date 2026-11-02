@@ -8,8 +8,19 @@
   --t2: color-mix(in srgb, var(--w) 78%, #000);
   --t3: color-mix(in srgb, var(--w) 70%, #000);
 
-  /* type */
-  --din: "DIN Alternate", "DIN Condensed", "Helvetica Neue", Arial, sans-serif;
+  /* type — the three bundled faces lead every stack (§4.1). They are OFL and
+     ship in public/fonts with their licence texts, so label widths are the same
+     on macOS, Windows and Linux instead of following the host's DIN. */
+  --din: "D-DIN", "DIN Alternate", "Bahnschrift", "DIN Condensed", "Helvetica Neue", Arial, sans-serif;
+  /* Decorative display face — used ONLY on the wordmark and the cycle numerals.
+     Michroma is bundled (SIL OFL) so this is deterministic; the rest of the
+     shelf is only there if the operator happens to have installed it. Nothing
+     here is Star Trek IP: the real LCARS face is Helvetica Ultra Compressed
+     (commercial) and every "Star Trek" fan face is personal-use or derivative. */
+  --deco: "Michroma", "Orbitron", "Chakra Petch", "Rajdhani", var(--din);
+  /* CJK is deliberately not bundled (megabytes for a Latin-heavy console);
+     glyph fallback is per-character, so 中文 gets the platform face while the
+     Latin runs in the same node stay on D-DIN. */
   --text: "MiSans", "PingFang SC", "Source Han Sans SC", "Noto Sans SC", "Helvetica Neue", Arial, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
 

@@ -52,7 +52,7 @@ platform-correct install command instead of failing with a stack trace.
 npm install
 npm run dev      # client at :5173, proxies /api → :4173
 npm run server   # in another shell: real pi session, SSE on :4173
-npm test         # pi-env (18) + mcp-config (27) + endpoints (59) + launcher (28) + ui (100) checks
+npm test         # pi-env (18) + fonts (12) + mcp-config (27) + endpoints (66) + launcher (28) + ui (160) checks
 
 SMOKE_MODEL=1 npm test   # also does one real turn + fork (costs a model call)
 ```
@@ -82,12 +82,14 @@ server/            Node, no runtime deps beyond the pi SDK
   pi/approval.mjs  blocking tool approval gate (inline pi extension)
   pi/stream.mjs    pi events → UI items
 src/               Vite + Preact + TS client
-  styles/          tokens (structure) + themes (colour) + lcars (components)
+  styles/          tokens (structure) + themes (colour) + fonts (@font-face) + lcars (components)
   components/      Elbow · ToolStrip · ApprovalDeck · FieldRow · Icon …
   drafts.ts        per-session composer drafts + sent-history (localStorage)
   views/Console.tsx console shell, mission log, and the three-zone workspace
   views/Craft.tsx  craft layer, the visual contract in one page
   icons.ts         generated: remixicon -fill paths (64 icons, no font)
+  fontPack.ts      generated: bundled families, weights, byte counts, licences
+public/fonts/      5 woff2 (74.6 KB) + 3 OFL texts — SIL Open Font License 1.1
 demo/              v0 vanilla implementation, kept for reference
 boards/            MasterGo frames (v1 skeleton, v2 real stream)
 AGENTS.md          the design contract — read before touching UI (repo only, not published)
@@ -196,6 +198,13 @@ class of report: if `/probe` dies, the console is not involved.
 
 ## Non-obvious behaviour
 
+- **Fonts ship inside the package.** `public/fonts/` holds D-DIN (labels, numerals), Michroma (wordmark)
+  and IBM Plex Mono (code) — 5 woff2 files, 74.6 KB, all SIL OFL 1.1, with `OFL-*.txt` next to them.
+  They are unmodified downloads from the upstream that publishes both glyphs and licence
+  (`node scripts/fetch-fonts.mjs`, `--check` verifies what is on disk); catalogue sites such as
+  fontspace.io redistribute commercial faces as "free", so they are useful for discovery and useless
+  for provenance. CJK is deliberately not bundled — Chinese text uses the platform face while the Latin
+  runs inside the same string stay on D-DIN.
 - **One run at a time.** A second prompt queues and starts when the slot frees. Prompts aimed at the
   running session are steered into it instead of queueing.
 - **The approval gate is a pi extension**, not a transport hack: it awaits the operator inside the

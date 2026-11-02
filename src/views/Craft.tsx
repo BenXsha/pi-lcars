@@ -4,6 +4,7 @@ import { Workspace } from "./Console";
 import { ICONS, type IconName } from "../icons";
 import { THEMES, appliedTheme, applyTheme, type ThemeId } from "../theme";
 import { Icon } from "../components/Icon";
+import { Markdown } from "../components/Markdown";
 import {
   ApprovalDeck,
   BarButton,
@@ -196,6 +197,34 @@ const WS_ITEMS: Item[] = [
     ts: WS_T0 + 88_000,
   },
 ];
+
+/* ---------------------------------------------------------------- markdown */
+/* The one surface §3.5b is about: prose rhythm, an aligned table, a fenced
+ * block and inline code in a sentence. Kept here so the file viewer's PREVIEW
+ * and the transcript's prose can both be eyeballed without a session. */
+const MD_SAMPLE = `### 限流接入说明
+
+按 IP 建令牌桶，\`60\` 秒 \`10\` 次，超限返回 \`429\`。中间件按路由挂载，现有接口行为不变；
+细节见 [README](https://example.com/readme)。
+
+| 字段 | 类型 | 默认值 | 说明 |
+|:-----|:----:|------:|------|
+| \`key\` | string | \`req.ip\` | 令牌桶键 |
+| \`limit\` | number | 10 | 窗口内允许次数 |
+| \`windowMs\` | number | 60000 | 窗口长度 |
+
+\`\`\`ts
+import { Router } from "express";
+
+const router = Router();
+router.post("/login", handler);   // 429 when the bucket is empty
+export default router;
+\`\`\`
+
+1. 挂载中间件到 \`/login\`
+2. 补一条 429 的测试
+
+> 拒绝不等于报错：超限是有意的返回，不进 error 分支。`;
 
 /* ---------------------------------------------------------------- helpers */
 function Section(props: { id: string; title: string; note?: string; children: any }) {
@@ -408,11 +437,13 @@ export function Craft() {
             </div>
           </Section>
 
-          <Section id="tools" title="TOOL STRIPS / 读数条" note="4 种状态，高度随内容">
+          <Section id="tools" title="TOOL STRIPS / 读数条" note="4 种状态 · 长工具名占满整条臂，不截断">
             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
               <ToolStrip name="bash" icon="tool-bash" args='rg -n "login" src/ --type ts' output={"src/auth/login.ts:14\nsrc/routes/index.ts:9"} state="ok" ms={412} />
               <ToolStrip name="read" icon="tool-read" args="src/auth/login.ts / lines 1-48" output={"1  import { Router } from 'express'\n2  const router = Router()\n3  router.post('/login', handler)"} state="ok" ms={12} count={2} expanded={toolOpen} onToggle={() => setToolOpen(!toolOpen)} />
               <ToolStrip name="bash" icon="tool-bash" args="npm test -- --run" state="run" />
+              <ToolStrip name="SubagentWorkflow" icon="tool-workflow" args='{"steps":[{"agent":"explore","prompt":"find the login handler"},{"agent":"general-purpose","prompt":"write the limiter"}]}' output={"running 2 subagents in parallel"} state="run" />
+              <ToolStrip name="get_subagent_result" icon="tool-agent" args="agent_id: auth-audit, wait: false" output={"still running · 14 tool calls"} state="ok" ms={38} />
               <ToolStrip name="edit" icon="tool-edit" args="src/middleware/limit.ts / +18 -2" errorText={"Error: string not found in file\n  at edit (tools/edit.ts:88)"} state="error" />
               <ToolStrip name="grep" icon="tool-grep" args="tests/**/*.ts" output={"148 matches"} state="warn" ms={140} truncated />
             </div>
@@ -437,6 +468,23 @@ export function Craft() {
           <Section id="workspace" title="WORKSPACE / 三区" note="I 指令 · II 推理 · III 执行 — 交换的 footer 把三者连起来">
             <div style={{ display: "flex", flexDirection: "column", height: "900px" }}>
               <Workspace items={WS_ITEMS} />
+            </div>
+          </Section>
+
+          <Section id="markdown" title="MARKDOWN / 文档" note="16/1.6 正文 · 13.5/1.55 代码 · 表格对着作者的 :-- 对齐">
+            <div style={{ display: "flex", gap: "16px", alignItems: "flex-start" }}>
+              <div style={{ width: "760px", maxWidth: "100%" }}>
+                <Markdown text={MD_SAMPLE} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px", maxWidth: "300px" }}>
+                <span style={{ font: "400 11px/1.6 var(--mono)", color: "var(--g2)" }}>
+                  聊天视图用 breaks:true（单换行即是换行）；查看器里的 .md 用 breaks:false
+                  （软换行折成一段，否则每个源码行都变成 &lt;br&gt;，读起来就是“间距过大”）。
+                </span>
+                <span style={{ font: "400 11px/1.6 var(--mono)", color: "var(--g2)" }}>
+                  表格包在 .md-tbl 里横向滚动：宽表不得把消息列撑宽。
+                </span>
+              </div>
             </div>
           </Section>
 
@@ -474,13 +522,7 @@ export function Craft() {
                 <Meter segments={[{ tone: "sys", pct: 8 }, { tone: "tool", pct: 4 }, { tone: "hist", pct: 22 }, { pct: 62 }]} />
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "4px", flex: "1 1 auto" }}>
-                <div class="tool" data-state="ok">
-                  <div class="st" />
-                  <div class="ic"><Icon name="station-context" size={15} /></div>
-                  <div class="nm">CTX</div>
-                  <div class="bd"><div class="args">compaction at 80% · auto</div></div>
-                  <div class="mt">38%</div>
-                </div>
+                <ToolStrip name="context" icon="station-context" args="compaction at 80% · auto" state="warn" />
               </div>
             </div>
           </Section>
@@ -494,8 +536,12 @@ export function Craft() {
             <div style={{ display: "flex", gap: "8px", alignItems: "center", height: "48px" }}>
               <div key={motionKey} class={motion === "wipe" ? "anim-wipe" : motion === "swap" ? "anim-swap" : "anim-pulse"} style={{ width: "260px", height: "40px", background: "var(--orange)", borderRadius: "0 var(--r-2) var(--r-2) 0" }} />
               <div key={`${motionKey}-b`} class={motion === "wipe" ? "anim-wipe-down" : ""} style={{ width: "120px", height: "40px", background: "var(--lav)", borderRadius: "0 var(--r-1) var(--r-1) 0", animationDelay: "60ms" }} />
+              {/* the third move: BUSY scans in three stepped phases, 900ms loop */}
+              <div style={{ position: "relative", width: "180px", height: "40px", background: "var(--g0)", borderRadius: "0 var(--r-1) var(--r-1) 0", overflow: "hidden" }}>
+                <i class="sweep-strip" />
+              </div>
               <span style={{ font: "400 11px/1.6 var(--mono)", color: "var(--g2)", maxWidth: "440px" }}>
-                block-wipe（左脊向右展开）/ hard-swap（跳两帧再亮）/ pulse（审批 2 次）
+                block-wipe（左脊向右展开）/ hard-swap（跳两帧再亮）/ pulse（审批 2 次）/ sweep（运行态三段扫描）
                 打开系统「减弱动效」时全部降为瞬时。
               </span>
             </div>

@@ -109,7 +109,23 @@ try {
   // a couple of files so the composer's `@` palette has something to find
   await (await import("node:fs/promises")).mkdir(join(workspace, "server", "pi"), { recursive: true });
   await writeFile(join(workspace, "server", "pi", "registry.mjs"), "// fixture\n");
-  await writeFile(join(workspace, "notes.md"), "# fixture\n");
+  // a document, not a chat message: the paragraph is soft-wrapped on purpose so
+  // the viewer's PREVIEW can be checked for stray <br>s (AGENTS §3.5b)
+  await writeFile(
+    join(workspace, "notes.md"),
+    [
+      "# fixture",
+      "",
+      "这一段在源码里换行，但渲染后必须是同一段，不能被拆成两行。",
+      "检查点就是这里：软换行折成一段，不是每行一个 <br>。",
+      "",
+      "| 字段 | 值 |",
+      "|:-----|----:|",
+      "| rows | 12 |",
+      "| size | 3.4K |",
+      "",
+    ].join("\n"),
+  );
   const env = { ...process.env, CI: "1", LCARS_STATE_DIR: state, LCARS_SESSIONS: sessions, LCARS_TRUST_PROJECT: "0" };
   server = spawn(process.execPath, [BIN, "--json", "--no-open", "--port", String(PORT)], {
     cwd: workspace,
@@ -493,7 +509,7 @@ try {
   })()`);
   await sleep(400);
   check("attaching an image shows a chip", await exists(".attach-strip .achip img"), await evaluate(`document.querySelector('.achip .an')?.textContent ?? ''`));
-  await evaluate(`document.querySelector('.btns .btn')?.click()`);
+  await evaluate(`document.querySelector('.aux-primary .btn')?.click()`);
   await sleep(400);
   const sent = await evaluate(`window.__calls.length ? window.__calls[window.__calls.length - 1] : null`);
   check("RUN sends the attachment with the prompt", !!sent?.images?.[0]?.data && sent.images[0].mimeType === "image/png", JSON.stringify(sent)?.slice(0, 80));
@@ -508,6 +524,38 @@ try {
   await keyIn("ArrowDown");
   check("↓ returns to the draft", (await value()) === "", await value());
   await clearInput();
+
+  /* ------------------------- 9b1. quick prompts (macro pad + editor) */
+  const padCount = await evaluate(`document.querySelectorAll('.aux-matrix .qp').length`);
+  check("the run row keeps its two primary keys", (await evaluate(`document.querySelectorAll('.aux-primary .btn').length`)) === 2);
+  check("FORK is gone from the command bar", !(await evaluate(`/FORK/.test(document.querySelector('.cmdbar')?.textContent ?? '')`)));
+  check("the quick matrix renders pads plus the edit key", padCount >= 2, `${padCount} keys`);
+  const padLabel = await evaluate(`document.querySelector('.aux-matrix .qp .lb')?.textContent ?? ''`);
+  const callsBefore = await evaluate(`window.__calls.length`);
+  await evaluate(`document.querySelector('.aux-matrix .qp')?.click()`);
+  await sleep(200);
+  const drafted = await value();
+  check("a pad appends its prompt to the draft", drafted.length > 0 && drafted !== padLabel, `${padLabel} → ${drafted.slice(0, 40)}`);
+  check("a pad does not send by itself", (await evaluate(`window.__calls.length`)) === callsBefore);
+  await clearInput();
+  await evaluate(`document.querySelector('.qp.is-edit')?.click()`);
+  await sleep(300);
+  check("EDIT opens the quick-prompt deck", await exists(".qp-row input.kl"));
+  const rowCount = await evaluate(`document.querySelectorAll('.qp-row').length`);
+  check("the deck lists every pad", rowCount === padCount - 1, `${rowCount} rows / ${padCount} keys`);
+  await evaluate(`(() => {
+    const r = document.querySelector('.qp-row input.kl');
+    r.value = 'PROBE';
+    r.dispatchEvent(new Event('input', { bubbles: true }));
+    return true;
+  })()`);
+  await sleep(200);
+  await evaluate(`[...document.querySelectorAll('.deck .btn')].find((b) => /SAVE/.test(b.textContent ?? ''))?.click()`);
+  await sleep(300);
+  check("saving rewrites the pad label", (await evaluate(`document.querySelector('.aux-matrix .qp .lb')?.textContent`)) === "PROBE", await evaluate(`document.querySelector('.aux-matrix .qp .lb')?.textContent ?? ''`));
+  check("a saved pad survives a reload", (await evaluate(`localStorage.getItem('lcars.quick') ?? ''`)).includes("PROBE"));
+  await evaluate(`localStorage.removeItem('lcars.quick'); window.dispatchEvent(new CustomEvent('lcars:quick'))`);
+  await sleep(200);
 
   /* ---------------------------------- 9b2. IME (composition) safety */
   // Enter commits a candidate, Esc dismisses the window: neither may reach the
@@ -548,8 +596,14 @@ try {
   await clearInput();
 
   /* ----------------------------- 9c. three-zone workspace (test view) */
-  const streamBadge = `[...document.querySelectorAll('.chips .badge')].find((b) => /STREAM|LOG/.test(b.textContent))`;
-  check("the stream badge is offered in the log", !!(await evaluate(`!!${streamBadge}`)));
+  const streamBadge = `[...document.querySelectorAll('.vsw-b')].find((b) => /STREAM/.test(b.textContent))`;
+  const logBadge = `[...document.querySelectorAll('.vsw-b')].find((b) => /^LOG$/.test(b.textContent))`;
+  check("the view switch offers both positions", !!(await evaluate(`!!${streamBadge} && !!${logBadge}`)));
+  check(
+    "the log position starts selected",
+    (await evaluate(`document.querySelectorAll('.vsw-b')[0].getAttribute('aria-pressed')`)) === "true",
+    await evaluate(`document.querySelectorAll('.vsw-b')[0].getAttribute('aria-pressed')`),
+  );
   await evaluate(`${streamBadge}?.click()`);
   await sleep(400);
   check("the workspace replaces the log", await exists(".ws"));
@@ -606,22 +660,60 @@ try {
   check("empty zones explain themselves", (await evaluate(`document.querySelectorAll('.ws-empty').length`)) === 3);
   check("the workspace deep-links", (await hash()) === "#stream", await hash());
   check(
-    "the badge turns into a way back",
-    /LOG/.test(await evaluate(`${streamBadge}?.textContent ?? ''`)),
-    await evaluate(`${streamBadge}?.textContent ?? ''`),
+    "the switch moves to STREAM while the workspace is open",
+    (await evaluate(`document.querySelectorAll('.vsw-b')[1].getAttribute('aria-pressed')`)) === "true" &&
+      (await evaluate(`document.querySelectorAll('.vsw-b')[0].getAttribute('aria-pressed')`)) === "false",
+    await evaluate(`[...document.querySelectorAll('.vsw-b')].map((b) => b.getAttribute('aria-pressed')).join('/')`),
   );
   await evaluate(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`);
   await evaluate(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`);
   await sleep(400);
   check("escape returns to the mission log", !(await exists(".ws")) && (await inTranscript()));
   check("leaving the workspace clears the hash", (await hash()) === "", await hash());
-  // and it is reachable again from the badge
+  // and it is reachable again from the same switch
   await evaluate(`${streamBadge}?.click()`);
   await sleep(300);
   check("the workspace reopens", await exists(".ws"));
-  await evaluate(`${streamBadge}?.click()`);
+  await evaluate(`${logBadge}?.click()`);
   await sleep(300);
-  check("the badge toggles the workspace off too", !(await exists(".ws")));
+  check("picking LOG switches the workspace off", !(await exists(".ws")));
+
+  /* ------------------------------------- 9d. markdown file preview */
+  // the reported bug lived here: a .md opened in the viewer used `breaks: true`,
+  // so every hard-wrapped source line became a <br> and prose read as double-spaced
+  await evaluate(`[...document.querySelectorAll('.lseg button')].find((b) => /FILES/.test(b.textContent))?.click()`);
+  await sleep(900);
+  check("FILES mode swaps the rail", await exists(".ft-row"));
+  await evaluate(`[...document.querySelectorAll('.ft-row.is-file')].find((r) => /notes\\.md$/.test(r.querySelector('.nm')?.textContent ?? ''))?.click()`);
+  await sleep(1200);
+  const view = await evaluate(`(() => {
+    const md = document.querySelector('.fv-md .md');
+    if (!md) return null;
+    const p = md.querySelector('p');
+    const s = p ? getComputedStyle(p) : null;
+    return {
+      brs: md.querySelectorAll('p br').length,
+      paragraphs: md.querySelectorAll('p').length,
+      // geometry is not the point (the preview is wide enough to fit on one
+      // line); what must hold is that both source lines landed in ONE paragraph
+      merged: p ? p.textContent.includes('这一段') && p.textContent.includes('检查点就是这里') : false,
+      tables: md.querySelectorAll('table').length,
+      inPort: md.querySelectorAll('.md-tbl table').length,
+      rightCol: md.querySelector('td[align="right"]') ? getComputedStyle(md.querySelector('td[align="right"]')).textAlign : null,
+    };
+  })()`);
+  check("the markdown viewer previews the file", !!view);
+  if (view) {
+    check("soft wraps fold instead of becoming <br>", view.brs === 0, `${view.brs} <br> in ${view.paragraphs} paragraphs`);
+    check("both source lines fold into one paragraph", view.merged === true && view.paragraphs === 1, `${view.merged} / ${view.paragraphs}`);
+    check("tables render inside the scroll port", view.tables === 1 && view.inPort === 1, `${view.tables}/${view.inPort}`);
+    check("the viewer keeps the author's alignment", view.rightCol === "right", String(view.rightCol));
+  }
+  await evaluate(`[...document.querySelectorAll('.pv-btn')].find((b) => /CLOSE/.test(b.textContent))?.click()`);
+  await sleep(500);
+  check("closing the viewer returns to the transcript", await inTranscript());
+  await evaluate(`[...document.querySelectorAll('.lseg button')].find((b) => /SESSIONS/.test(b.textContent))?.click()`);
+  await sleep(400);
 
   /* ------------------------------------------------ 10. console errors */
   const errors = cdp.events
@@ -634,9 +726,12 @@ try {
   check("no console errors", logged.length === 0, logged.slice(0, 2).join(" | "));
 
   /* ------------------------------------- 10b. branch tree panel */
-  await evaluate(`[...document.querySelectorAll('.chips .badge')].find((b) => /TREE/.test(b.textContent))?.click()`);
+  const treeBadge = `[...document.querySelectorAll('.chips .badge')].find((b) => /TREE/.test(b.textContent))`;
+  check("the tree button reports its state", (await evaluate(`${treeBadge}?.getAttribute('aria-pressed')`)) === "false");
+  await evaluate(`${treeBadge}?.click()`);
   await sleep(1200);
   check("tree opens with tree semantics", await exists('.tv-body[role="tree"]'));
+  check("the tree button lights up while open", (await evaluate(`${treeBadge}?.getAttribute('aria-pressed')`)) === "true");
   const treeRows = await evaluate(`document.querySelectorAll('.tnode[role="treeitem"]').length`);
   if (treeRows === 0) {
     // the harness runs on a throwaway session, so the tree is legitimately empty
@@ -657,9 +752,56 @@ try {
     await sleep(200);
     check("arrow keys move the tree cursor", await exists('.tnode[data-cursor="1"]'));
   }
-  await evaluate(`[...document.querySelectorAll('.fv-hd .pv-btn')].find((b) => /CLOSE/.test(b.textContent))?.click()`);
+  // the same button closes it again — CLOSE inside the panel is only a second way out
+  await evaluate(`${treeBadge}?.click()`);
   await sleep(400);
-  check("tree closes back to the transcript", await inTranscript());
+  check("clicking TREE again closes the tree", !(await exists(".tv-body")) && (await inTranscript()));
+  check("the tree button clears its state", (await evaluate(`${treeBadge}?.getAttribute('aria-pressed')`)) === "false");
+
+  /* ------------------------------------- 10c. markdown surface */
+  // the craft page carries the markdown fixture, so prose/code/table rhythm is
+  // measurable without a model: §3.5b is a contract, not a taste
+  await cdp.send("Page.navigate", { url: `${process.env.UI_BASE || handshake.url}?craft#markdown` });
+  await sleep(2200);
+  const md = await evaluate(`(() => {
+    const box = document.querySelector('#markdown .md');
+    if (!box) return null;
+    const g = (sel) => { const el = box.querySelector(sel); return el ? getComputedStyle(el) : null; };
+    const para = g('p');
+    const probe = (html) => {
+      const d = document.createElement('div');
+      d.className = 'md'; d.style.position = 'absolute'; d.style.left = '-9999px'; d.style.width = '600px';
+      d.innerHTML = html; document.body.appendChild(d);
+      const h = d.querySelector('p').getBoundingClientRect().height; d.remove(); return Math.round(h * 10) / 10;
+    };
+    const plain = probe('<p>按 IP 建令牌桶，60 秒 10 次，超限返回 429。中间件按路由挂载。</p>');
+    const withCode = probe('<p>按 IP 建令牌桶，<code>60</code> 秒 <code>10</code> 次，超限返回 <code>429</code>。</p>');
+    const tbl = box.querySelector('.md-tbl');
+    const th = [...box.querySelectorAll('th')].map((e) => e.getAttribute('align') + ':' + getComputedStyle(e).textAlign);
+    const right = box.querySelector('td[align="right"]');
+    return {
+      prose: parseFloat(para.lineHeight) / parseFloat(para.fontSize),
+      plain, withCode,
+      codeLH: parseFloat(g('.cb-bd').lineHeight) / parseFloat(g('.cb-bd').fontSize),
+      codePad: g('.cb-bd code').paddingTop,
+      align: th.join(' '),
+      rightAlign: right ? getComputedStyle(right).textAlign : null,
+      scrollPort: tbl ? getComputedStyle(tbl).overflowX : null,
+      fits: tbl ? tbl.scrollWidth <= tbl.clientWidth : null,
+    };
+  })()`);
+  check("markdown fixture renders", !!md);
+  if (md) {
+    check("prose line-height is 1.5–1.7", md.prose >= 1.5 && md.prose <= 1.7, md.prose.toFixed(2));
+    check("inline code does not inflate the line box", Math.abs(md.withCode - md.plain) < 0.6, `${md.plain} vs ${md.withCode}`);
+    check("code block line-height is 1.4–1.7", md.codeLH >= 1.4 && md.codeLH <= 1.7, md.codeLH.toFixed(2));
+    check("the block's <code> adds no inline padding", md.codePad === "0px", md.codePad);
+    check("table honours the author's alignment", /center:center/.test(md.align) && /right:right/.test(md.align), md.align);
+    check("right-aligned cells use tabular numerals", md.rightAlign === "right", String(md.rightAlign));
+    check("a wide table scrolls inside its own port", md.scrollPort === "auto" && md.fits !== false, `${md.scrollPort} fits=${md.fits}`);
+  }
+  await cdp.send("Page.navigate", { url: process.env.UI_BASE || handshake.url });
+  await sleep(1800);
 
   /* -------------------------- 11. a crash surfaces, and reports to the server */
   await cdp.send("Page.navigate", { url: process.env.UI_BASE || handshake.url });

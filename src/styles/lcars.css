@@ -169,8 +169,14 @@ button { cursor: pointer; }
   height: var(--h, 52px);
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 12px;
+  /* air around the label. --st-gap is the gap on the leader side (numeral↔text);
+     --st-gap-r is the trailing side (text↔icon), which is wider on purpose —
+     a label that touches its icon reads as cramped even when the bar is long. */
+  --st-gap: 24px;
+  --st-gap-r: 40px;
+  --st-pad: 16px;
+  gap: var(--st-gap);
+  padding: 0 var(--st-pad);
   background: var(--g1);
   color: var(--g3);
   border-radius: 0 var(--r-pill) var(--r-pill) 0;
@@ -178,6 +184,8 @@ button { cursor: pointer; }
 .station .num { font: 700 18px/1 var(--din); letter-spacing: -0.02em; min-width: 24px; }
 .station .lbl { font: 700 12.5px/1 var(--din); letter-spacing: 0.16em; flex: 1 1 auto; }
 .station .ic { display: flex; opacity: 0.85; }
+/* the trailing side takes the difference: gap already supplies --st-gap */
+.station.is-full .lbl { margin-right: calc(var(--st-gap-r) - var(--st-gap)); }
 .station:hover { filter: brightness(1.4); }
 .station[data-tone="orange"] { background: var(--orange); color: #000; }
 .station[data-tone="amber"] { background: var(--amber); color: #000; }
@@ -188,46 +196,87 @@ button { cursor: pointer; }
 .station[aria-current="true"] { box-shadow: inset 5px 0 0 #fff; }
 
 /* ============================================================
-   tool readout strip
+   tool row — a bent arm: full-width header arm, then a spine
    ============================================================ */
 .tool {
   --tone: var(--cyan);
-  display: grid;
-  grid-template-columns: 4px var(--name) minmax(0, 1fr) var(--meta);
-  gap: var(--gap);
-  align-items: stretch;
-  min-height: 36px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 .tool[data-state="run"] { --tone: var(--tang); }
 .tool[data-state="error"] { --tone: var(--tomato); }
 .tool[data-state="warn"] { --tone: var(--amber); }
 
-.tool > .st { background: var(--tone); border-radius: var(--r-pill) 0 0 var(--r-pill); }
-/* the icon lives inside the name block so the coloured strip stays unbroken */
-.tool > .nm .icon { color: #000; opacity: 0.85; }
-.tool > .nm > .lb { display: flex; flex-direction: column; align-items: center; gap: 1px; }
-.tool > .nm {
+/* The header arm carries the tool name on the first line. It is as long as the
+   name needs (§7.5: length is information, not a fixed column) and capped at
+   the row width, so a long name ellipsizes only at the very end. */
+.tool > .th {
+  align-self: flex-start;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
+  gap: 8px;
+  width: fit-content;
+  min-width: 148px;
+  max-width: 100%;
+  height: 26px;
+  padding: 0 13px 0 8px;
   background: var(--tone);
   color: #000;
   font: 700 12.5px/1 var(--din);
-  letter-spacing: 0.08em;
-  border-radius: 0 var(--r-1) var(--r-1) 0;
-  overflow: hidden;
+  letter-spacing: 0.1em;
+  text-align: left;
+  border-radius: 0 var(--r-pill) var(--r-pill) 0;
 }
-.tool > .nm small { font: 700 11px/1 var(--din); letter-spacing: 0.06em; opacity: 0.72; font-variant-numeric: tabular-nums; }
+/* the icon lives inside the arm so the coloured strip stays unbroken */
+.tool > .th .icon { flex: 0 0 auto; opacity: 0.85; }
+.tool > .th .nm {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tool > .th .nm small {
+  margin-left: 7px;
+  font: 700 11px/1 var(--din);
+  letter-spacing: 0.06em;
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+.tool > .th .mt {
+  margin-left: auto;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  font: 700 11px/1 var(--din);
+  letter-spacing: 0.08em;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.72;
+}
+/* the spine is the arm's vertical leg; the join fills the concave corner */
 .tool > .bd {
+  position: relative;
   display: flex;
   flex-direction: column;
-  justify-content: center;
   gap: 3px;
-  padding: 6px 12px;
+  padding: 6px 12px 7px 22px;
   min-width: 0;
+  border-left: 8px solid var(--tone);
   background: color-mix(in srgb, var(--tone) 9%, transparent);
+  border-radius: 0 0 var(--r-2) 0;
 }
+.tool > .bd > .join {
+  position: absolute;
+  left: -8px;
+  top: 0;
+  width: 18px;
+  height: 10px;
+  color: var(--tone);
+  pointer-events: none;
+}
+.tool > .bd > .join svg { display: block; }
+.tool > .bd > .join path { fill: currentColor; }
 /* args are metadata, not body copy: smaller than the output, dimmed */
 .tool > .bd .args {
   font: 400 12.5px/1.9 var(--mono);
@@ -262,23 +311,13 @@ button { cursor: pointer; }
   box-shadow: inset 2px 0 0 var(--amber);
   padding-left: 6px;
 }
-.tool > .mt {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: color-mix(in srgb, var(--tone) 22%, #000);
-  font: 400 13.5px/1 var(--din);
-  font-variant-numeric: tabular-nums;
-  color: var(--tone);
-  border-radius: 0 var(--r-pill) var(--r-pill) 0;
-}
 
 
 
 
 
 
-.tool[data-state="error"] > .mt { background: var(--tomato); color: #000; font-weight: 700; font-size: 11.5px; letter-spacing: 0.08em; }
+.tool[data-state="error"] > .th .mt { font-weight: 700; }
 
 
 
@@ -469,6 +508,9 @@ button { cursor: pointer; }
 }
 @keyframes swap { 0%, 45% { opacity: 0; } 46%, 100% { opacity: 1; } }
 @keyframes busy { 0% { transform: translateX(0); } 100% { transform: translateX(200%); } }
+/* a stepped sweep: three jumps across the bar in 900ms, so the moving block
+   stays inside its parent (translate would paint past the right edge). */
+@keyframes sweep { from { left: 0; } to { left: 67%; } }
 
 .anim-wipe { animation: wipe var(--t-2) var(--ease) backwards; }
 .anim-wipe-down { animation: wipe-down var(--t-2) var(--ease) backwards; }
@@ -476,6 +518,84 @@ button { cursor: pointer; }
 .anim-swap { animation: swap var(--t-1) steps(1, end); }
 .anim-pulse { animation: pulse 300ms var(--ease) 2; }
 .anim-blink { animation: blink 1s steps(1) infinite; }
+
+/* ============================================================
+   page-level micro-motion — one grammar, three moves, all linear
+
+   ENTER  a block wipes in from its spine (90–140ms)
+   CHANGE a state swaps in two frames (steps(1)) — never a crossfade
+   BUSY   something scans in three phases (900ms steps(3))
+
+   Anything that cannot say which of the three it is does not get to move.
+   Hover stays instant (§5): these are mounts and transitions, not decoration.
+   [data-motion="reduced"] and prefers-reduced-motion already flatten all of it.
+   ============================================================ */
+
+/* the station's own title drops in; the body underneath still swaps (steps(1))
+   so the eye gets a cadence instead of a flash */
+.center-head .ttl { animation: wipe-down var(--t-1) var(--ease) backwards; }
+
+/* left rail: the chosen station re-forms its bar, the chosen session fills */
+.station[aria-current="true"] { animation: wipe var(--t-1) var(--ease) backwards; }
+.sess[data-active="1"] { animation: wipe var(--t-1) var(--ease) backwards; }
+.lseg button[aria-selected="true"] { animation: swap var(--t-2) steps(1, end); }
+
+/* rows arrive as a block (no stagger — simultaneous, 60ms behind their head) */
+.phead { animation: wipe-down var(--t-2) var(--ease) backwards; }
+.panel .rows > .mrow,
+.hrow,
+.mcp-card,
+.sk,
+.pv-model { animation: wipe var(--t-1) var(--ease) backwards; }
+.panel .rows > .mrow { animation-delay: 60ms; }
+
+/* a tool's result lands when the call settles: the state flip is what fires it */
+.tool[data-state="ok"] > .bd .out,
+.tool[data-state="error"] > .bd .err { animation: wipe var(--t-1) var(--ease) backwards; }
+/* nested calls of a subagent append one at a time as the run advances */
+.sub { animation: wipe var(--t-1) var(--ease) backwards; }
+
+/* full-column overlays (viewer / branch tree / stream) replace the transcript:
+   they slide out from the spine rather than fading in */
+.fv, .tv, .ws { animation: wipe var(--t-2) var(--ease) backwards; }
+
+/* the "jump to newest" bar only exists while you are reading history, so its
+   arrival is itself the message */
+.jumpbar { animation: wipe-down var(--t-1) var(--ease) backwards; }
+
+/* the floor scans while a turn is in flight — same three-phase strip as a tool
+   header, so "busy" reads the same at the top and the bottom of the column */
+.cmdbar[data-run="1"]::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 33%;
+  height: 2px;
+  background: var(--tang);
+  animation: sweep var(--t-4) steps(3, end) infinite;
+}
+
+/* a link that is retrying is not a caption — it scans */
+.badge[data-scan="1"] { animation: scan var(--t-4) steps(3) infinite; }
+
+/* exposed as a class so the craft page can show the same strip as the floor */
+.sweep-strip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 33%;
+  height: 2px;
+  background: var(--tang);
+  animation: sweep var(--t-4) steps(3, end) infinite;
+}
+
+/* the shelf's control chips are instruments: a new reading swaps, it does not
+   slide — the value span is keyed on its own text in ControlChip */
+.ctl .v { animation: swap var(--t-1) steps(1, end); }
+
+/* the address swaps to COPIED in two frames, like every other state change */
+.about-author .mail[data-copied="1"] { animation: swap var(--t-1) steps(1, end); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -576,7 +696,34 @@ button { cursor: pointer; }
   letter-spacing: 0.12em;
   color: var(--g3);
 }
-.chips { display: flex; gap: 6px; }
+.chips { display: flex; gap: 6px; align-items: center; }
+
+/* ---- view switch (LOG / STREAM) ------------------------------------
+   A two-state control has to LOOK like one: both positions are always on
+   screen, the current one is filled, and the pair sits under a quiet label so
+   the action buttons next to it (TREE) keep reading as actions. */
+.vsw { display: flex; align-items: center; gap: 3px; height: 26px; }
+.vsw .k {
+  margin-right: 4px;
+  font: 700 11px/1 var(--din);
+  letter-spacing: 0.16em;
+  color: var(--g2);
+  white-space: nowrap;
+}
+.vsw-b {
+  height: 26px;
+  padding: 0 11px;
+  background: var(--g1);
+  color: var(--g3);
+  border-radius: 0 var(--r-1) var(--r-1) 0;
+  font: 700 11px/1 var(--din);
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+}
+.vsw-b:hover:not([aria-pressed="true"]) { filter: brightness(1.35); color: var(--w); }
+/* the selected position is the only filled block in the pair */
+.vsw-b[aria-pressed="true"] { background: var(--ice); color: #000; }
+.vsw-b:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--w); }
 
 /* transcript blocks */
 .log { display: flex; flex-direction: column; padding: 4px 8px 8px; }
@@ -699,6 +846,7 @@ button { cursor: pointer; }
 /* The bar is a floor, not a fixed height: the field grows with the draft (§4.3)
    while ENTRY and the buttons stay anchored to the bottom edge. */
 .cmdbar {
+  position: relative;
   flex: 0 0 auto;
   min-height: 96px;
   display: flex;
@@ -735,16 +883,17 @@ button { cursor: pointer; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
   font: 700 11px/2 var(--din);
   letter-spacing: 0.13em;
   color: var(--t3);
   white-space: nowrap;
 }
-.cmd-help .live { color: var(--orange); }
-/* the hint is the only shrinkable part: the counter and the attach button stay put */
-.cmd-help > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.cmd-help .cnt { color: var(--t2); font-variant-numeric: tabular-nums; }
+.cmd-help .hint { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.cmd-help .hint.live { color: var(--orange); }
+/* the chip strip lives in the help row, so attaching never costs a line */
+.cmd-help .attach-strip { flex: 1 1 auto; min-width: 0; }
+.cmd-help .cnt { flex: 0 0 auto; color: var(--t2); font-variant-numeric: tabular-nums; }
 
 /* the visible input surface: bottom readout bar + blinking caret */
 .inputline {
@@ -779,7 +928,33 @@ button { cursor: pointer; }
   background: transparent;
   color: var(--w);
   font: 400 16px/2 var(--text);
+  letter-spacing: 0;
+  padding: 0;
   caret-color: var(--orange);
+}
+/* Autosize probe. Measuring the real textarea means collapsing it to
+   `height:auto` first, which on a 2-row `rows` box is 64px against a 44px rest
+   height: the composer grew 20px and shrank back on EVERY keystroke, twice, and
+   each of those toggles re-laid out and repainted the whole transcript
+   (measured: 38ms/key with a 2.5k-node transcript vs 16.7ms flat). The mirror is
+   off-screen and absolutely positioned, so its height changes move nothing: the
+   real field is written only when the needed height actually changes. */
+.cmd-field .grow-mirror {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  width: 0;
+  visibility: hidden;
+  pointer-events: none;
+  height: auto;
+  max-height: none;
+  overflow: hidden;
+  font: 400 16px/2 var(--text);
+  letter-spacing: 0;
+  padding: 0;
+  border: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .cmd-field textarea::placeholder { color: var(--g3); }
 .cmd-field textarea:disabled { color: var(--g2); }
@@ -798,9 +973,134 @@ button { cursor: pointer; }
 }
 .cmdbar .entry-block .el { font: 700 13.5px/1 var(--din); letter-spacing: 0.1em; }
 .cmdbar .entry-block .eh { font: 700 11px/1 var(--din); letter-spacing: 0.1em; opacity: 0.75; }
+.cmdbar .entry-block .eh[data-live="1"] { opacity: 1; color: #3a1000; }
+/* the input modes live inside the ENTRY block: black cut-outs on the orange
+   block, the same contract the shelf's control chips use */
+.entry-acts { display: flex; gap: 4px; }
+.iact {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  background: #000;
+  color: var(--amber);
+  border-radius: 0 var(--r-1) var(--r-1) 0;
+}
+.iact:hover:not(:disabled) { background: var(--amber); color: #000; }
+.iact:disabled { opacity: 0.35; }
+.iact[data-on="1"] { background: var(--tang); color: #000; animation: pulse var(--t-4) steps(2) infinite; }
+[data-motion="reduced"] .iact[data-on="1"] { animation: none; }
 
 .cmdbar .btns { display: flex; align-items: flex-end; gap: var(--gap); }
 .cmdbar .btn { min-width: 88px; height: 96px; }
+
+/* ============================================================
+   the auxiliary column: primary actions over a quick-prompt matrix
+   ============================================================ */
+.cmdbar .cmd-aux {
+  flex: 0 0 336px;
+  width: 336px;
+  height: 96px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+/* the two actions become one 44px bar: a row, not a stacked label */
+.cmdbar .aux-primary { flex: 0 0 44px; display: flex; gap: 4px; }
+.cmdbar .cmd-aux .btn {
+  flex-direction: row;
+  gap: 8px;
+  height: 44px;
+  min-width: 0;
+  padding: 0 12px;
+}
+.cmdbar .cmd-aux .btn b { font-size: 12.5px; }
+.cmdbar .cmd-aux .btn em { font-size: 10.5px; }
+.cmdbar .aux-primary > .btn:first-child { flex: 1 1 auto; }
+.cmdbar .aux-primary > .btn:last-child { flex: 0 0 108px; }
+
+/* 3 x 2 pad matrix. A pad is a dark cell with a tone tick on its left edge;
+   hovering lights it solid — the same read as a console keypad. */
+.aux-matrix {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+}
+.qp {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 0 8px;
+  /* a padded cell, not text floating on black: the matrix has to read as keys */
+  background: color-mix(in srgb, var(--amber) 26%, transparent);
+  color: var(--amber);
+  box-shadow: inset 3px 0 0 var(--amber);
+  border-radius: 0 var(--r-1) var(--r-1) 0;
+  font: 700 11px/1 var(--din);
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+}
+.qp .lb { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.qp:hover { background: var(--amber); color: #000; box-shadow: none; }
+.qp:active { filter: brightness(0.86); }
+.qp:focus-visible { outline: none; background: var(--amber); color: #000; box-shadow: inset 0 0 0 2px #000; }
+/* the editor key is pinned to the bottom-right corner, like a console SET key */
+.qp.is-edit {
+  grid-column: 3;
+  grid-row: 2;
+  color: var(--g3);
+  background: var(--g0);
+  box-shadow: inset 3px 0 0 var(--g2);
+}
+.qp.is-edit:hover { background: var(--ice); color: #000; box-shadow: none; }
+
+/* ---- the quick-prompt editor (deck) ---- */
+.qp-rows { display: flex; flex-direction: column; gap: 4px; }
+.qp-row { display: grid; grid-template-columns: 26px 132px minmax(0, 1fr) 30px; gap: 4px; align-items: center; }
+.qp-row .n { font: 700 11px/1 var(--din); color: var(--amber); text-align: right; font-variant-numeric: tabular-nums; }
+.qp-row input {
+  height: 30px;
+  min-width: 0;
+  padding: 0 10px;
+  background: var(--g0);
+  color: var(--w);
+  box-shadow: inset 3px 0 0 var(--g1);
+  border-radius: 0 var(--r-1) var(--r-1) 0;
+  font: 400 12px/1 var(--mono);
+}
+.qp-row input.kl { font: 700 11.5px/1 var(--din); letter-spacing: 0.1em; color: var(--amber); }
+.qp-row input::placeholder { color: var(--g2); letter-spacing: 0.06em; }
+.qp-row input:focus { outline: none; box-shadow: inset 3px 0 0 var(--orange); }
+.qp-row[data-bad="1"] input.tx { box-shadow: inset 3px 0 0 var(--tomato); }
+.qp-row .del {
+  display: grid;
+  place-items: center;
+  height: 30px;
+  background: var(--g0);
+  color: var(--g3);
+  border-radius: 0 var(--r-1) var(--r-1) 0;
+}
+.qp-row .del:hover { background: var(--tomato); color: #000; }
+.qp-add {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  background: var(--g0);
+  color: var(--ice);
+  box-shadow: inset 3px 0 0 var(--ice);
+  border-radius: 0 var(--r-1) var(--r-1) 0;
+  font: 700 11px/1 var(--din);
+  letter-spacing: 0.14em;
+}
+.qp-add:hover { background: var(--ice); color: #000; box-shadow: none; }
+.qp-note { padding: 6px 2px 0; font: 400 11px/1.6 var(--mono); color: var(--g2); }
 
 /* ============================================================
    layout chain (restored) — every level must be shrinkable and
@@ -896,7 +1196,21 @@ button { cursor: pointer; }
 .sess[data-active="1"] .nm { color: var(--w); }
 .sess[data-run="1"] .st { background: var(--tang); animation: blink 1s steps(1) infinite; }
 .lnav { display: flex; flex-direction: column; gap: 3px; flex: 0 0 auto; padding-top: var(--gap); }
-.station.is-full { width: 100%; flex: 0 0 auto; border-radius: 0 var(--r-pill) var(--r-pill) 0; }
+/* Navigation is a bar STACK (§3 R9): each bar is as long as its own label, so the
+   column reads as LCARS bars of different lengths instead of six equal rows.
+   The bars still share the left edge, and a very long label is capped by the
+   column width. */
+.station.is-full {
+  width: fit-content;
+  min-width: 88px;
+  max-width: 100%;
+  flex: 0 0 auto;
+  border-radius: 0 var(--r-pill) var(--r-pill) 0;
+}
+/* the label itself never collapses below a readable run */
+.station.is-full .lbl { min-width: 0; }
+/* icon-only narrow rail: the bar fills the 64px rail again, icon centred */
+.app[data-left="0"] .lnav .station.is-full { width: 100%; min-width: 0; }
 .station .bdg { font: 700 11px/1 var(--din); padding: 2px 5px; background: #000; color: var(--amber); border-radius: var(--r-1); }
 
 /* ============================================================
@@ -926,7 +1240,12 @@ button { cursor: pointer; }
   white-space: nowrap;
 }
 .cap .cap-text b {
-  font: 700 15px/1.1 var(--din);
+  /* 13px is what Michroma needs to fit the cap's 186px text slot; a face that
+     renders wider is ellipsized rather than pushing the plaque out of shape */
+  max-width: 186px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font: 400 13px/1.1 var(--deco);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -1096,19 +1415,16 @@ button { cursor: pointer; }
   box-shadow: none;
 }
 .tool[data-toggle="1"] > .bd { cursor: pointer; }
-/* the name block is the primary handle: it must look pressable */
-.tool[data-toggle="1"] > .nm { cursor: pointer; }
-.tool[data-toggle="1"]:hover > .nm { filter: brightness(1.14); }
-.tool > .nm:focus-visible { outline: none; box-shadow: inset 0 0 0 2px #000; }
-.tool[data-expanded="1"] > .nm { filter: brightness(1.08); }
-/* the name block doubles as the expand handle */
-button.nm {
+/* the header arm is the primary handle: it must look pressable */
+.tool[data-toggle="1"] > .th { cursor: pointer; }
+.tool[data-toggle="1"]:hover > .th { filter: brightness(1.14); }
+.tool > .th:focus-visible { outline: none; box-shadow: inset 0 0 0 2px #000; }
+.tool[data-expanded="1"] > .th { filter: brightness(1.08); }
+button.th {
   border: 0;
   font-family: inherit;
   cursor: pointer;
-  padding: 0;
 }
-button.nm:hover { filter: brightness(1.12); }
 button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 
 
@@ -1146,7 +1462,9 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
   display: flex;
   flex-direction: column;
   gap: 8px;
-  font: 400 16px/2 var(--text);
+  /* 16px中文正文配 1.6（=25.6px），AGENTS §4.2 的 24–26px 区间；之前是 2.0，
+     行距比字号多出一倍，一段话读起来像行间插了空行 */
+  font: 400 16px/1.6 var(--text);
   color: var(--w);
   overflow-wrap: anywhere;
 }
@@ -1171,8 +1489,13 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 .md strong { font-weight: 700; color: var(--w); }
 .md em { font-style: normal; color: var(--amber); }
 .md del { color: var(--g3); }
-.md code {
-  font: 400 15px/2 var(--mono);
+/* inline code sits IN a sentence: its line box must not outgrow the paragraph,
+   otherwise every `code` word pushes the line down (the old 15px/2 did).
+   `:not(pre) >` keeps this off the fenced block, which used to inherit the
+   inline padding on top of its own — that is where the "code block has too
+   much spacing" came from as much as the line-height. */
+.md :not(pre) > code {
+  font: 400 15px/1.4 var(--mono);
   background: var(--g0);
   color: var(--ice);
   padding: 1px 5px;
@@ -1189,21 +1512,36 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 .md hr { height: 4px; margin: 4px 0; background: var(--g1); border: 0; border-radius: var(--r-pill); }
 .md img { max-width: 100%; border-radius: var(--r-1); }
 
-/* tables: header is a block, rows are separated by the seam, no borders */
-.md table { border-collapse: separate; border-spacing: 0 4px; width: 100%; font-size: 15px; }
+/* tables: header is a block, rows are separated by the seam, no borders.
+   The wrapper is a scroll port, not a card: a 9-column table must not widen
+   the message column (it did, because .md is a flex column and the table's
+   min-content forced the whole panel). */
+.md-tbl {
+  overflow-x: auto;
+  max-width: 100%;
+  scrollbar-width: thin;
+  scrollbar-color: var(--g1) transparent;
+}
+.md table { border-collapse: separate; border-spacing: 0 4px; width: 100%; font-size: 15px; line-height: 1.5; }
 .md thead th {
   background: var(--amber);
   color: #000;
-  font: 700 11.5px/1 var(--din);
+  font: 700 11px/1.5 var(--din);
   letter-spacing: 0.1em;
+  text-transform: uppercase;
   text-align: left;
-  padding: 5px 10px;
+  padding: 4px 10px;
+  white-space: nowrap;
 }
 .md thead th:first-child { border-radius: var(--r-1) 0 0 var(--r-1); }
 .md thead th:last-child { border-radius: 0 var(--r-1) var(--r-1) 0; }
-.md tbody td { padding: 5px 10px; background: var(--g0); vertical-align: top; }
+.md tbody td { padding: 5px 10px; background: var(--g0); vertical-align: top; line-height: 1.55; }
 .md tbody td:first-child { border-radius: var(--r-1) 0 0 var(--r-1); }
 .md tbody td:last-child { border-radius: 0 var(--r-1) var(--r-1) 0; }
+/* `:--` / `:-:` / `--:` are the author's alignment, not ours to guess */
+.md th[align="center"], .md td[align="center"] { text-align: center; }
+.md th[align="right"], .md td[align="right"] { text-align: right; font-variant-numeric: tabular-nums; }
+.md td :not(pre) > code { font-size: 13.5px; }
 
 /* fenced code block */
 .codeblk { display: flex; flex-direction: column; margin: 2px 0; }
@@ -1227,15 +1565,25 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 .codeblk .cb-copy:hover { color: var(--w); }
 .codeblk .cb-bd {
   margin: 0;
-  padding: 10px 12px;
+  padding: 10px 14px;
   background: var(--g0);
-  font: 400 13.5px/2 var(--mono);
+  /* 13.5px 代码行配 1.55（=21px）：终端里行距要的是可扫，不是可喘气 */
+  font: 400 13.5px/1.55 var(--mono);
   color: var(--w);
   white-space: pre;
   overflow: auto;
   max-height: 52vh;
   scrollbar-width: thin;
   scrollbar-color: var(--g1) transparent;
+}
+/* the block's own <code> must stay a bare box: no inline padding, no extra
+   line-height, no second background */
+.codeblk .cb-bd code {
+  padding: 0;
+  background: none;
+  border-radius: 0;
+  font: inherit;
+  color: inherit;
 }
 
 /* ============================================================
@@ -1607,8 +1955,9 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
   .ctl { padding: 0 7px; gap: 4px; }
   .ctl .v { max-width: 150px; }
   .shelf { padding-left: 62px; padding-right: 8px; }
-  .cmdbar .btn { min-width: 76px; }
-  .cmdbar .btns .btn:last-child { display: none; } /* FORK needs a session anyway */
+  .cmdbar .cmd-aux { flex-basis: 272px; width: 272px; }
+  .cmdbar .cmd-aux .btn { min-width: 0; }
+  .cmdbar .aux-primary > .btn:last-child { flex-basis: 92px; }
   .center-head h1 { font-size: 16px; }
 }
 @media (max-width: 900px) {
@@ -1616,6 +1965,10 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
   .cmdbar { min-height: 84px; }
   .cmdbar .entry-block { width: 64px; flex-basis: 64px; height: 84px; }
   .cmdbar .btn { height: 84px; }
+  .cmdbar .cmd-aux { height: 84px; flex-basis: 244px; width: 244px; }
+  .cmdbar .aux-primary { flex-basis: 38px; }
+  .cmdbar .cmd-aux .btn { height: 38px; }
+  .qp { letter-spacing: 0.06em; }
 }
 
 /* ============================================================
@@ -1872,39 +2225,203 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 [data-motion="reduced"] [data-tip]:hover::after { animation: none; }
 
 /* ============================================================
-   standby — the empty transcript still speaks LCARS
+   standby — an idle instrument panel, not a paragraph
    ============================================================ */
-.standby { display: flex; flex-direction: column; gap: 2px; padding: 10px 0 0; }
-.sb-head {
-  display: grid;
-  grid-template-columns: 4px auto minmax(0, 1fr);
+/* the session pane stretches to the viewport so the status strip can sit at
+   the bottom edge of the screen; the log inside just keeps its own height */
+.sess-body { display: flex; flex-direction: column; min-height: 100%; }
+.standby { flex: 1 1 auto; display: flex; flex-direction: column; gap: 4px; padding: 4px 8px 0; }
+
+/* the elbow: a 22px arm runs the full width, a 14px stem drops beside the
+   title and stops above the bar stack. Concave corner filleted with a
+   quadratic through the exact corner (r = 22 → (36,22) → (14,44)). */
+.sb-arm {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
   gap: 12px;
-  align-items: center;
-  min-height: 44px;
+  /* fixed, not min-height: the elbow svg is 100 tall and must land exactly on
+     the first readout bar (96 + the 4px seam = the board's top edge) */
+  height: 96px;
+  flex: 0 0 96px;
+  padding: 32px 0 0 48px;
 }
-.sb-head .st { align-self: stretch; margin: 4px 0; background: var(--orange); border-radius: var(--r-pill); }
-.sb-head .ttl {
-  font: 700 21px/1.2 var(--din);
-  letter-spacing: 0.1em;
+.sb-arm::before {
+  content: "";
+  position: absolute;
+  /* starts where the svg arm ends, so the rounded outer corner is not
+     squared off again by the css bar · ends in a half-round like every
+     other bar terminal in this console */
+  left: 48px;
+  right: 0;
+  top: 0;
+  height: 22px;
+  background: var(--orange);
+  border-radius: 0 var(--r-pill) var(--r-pill) 0;
+}
+.sb-corner { position: absolute; left: 0; top: 0; color: var(--orange); }
+.sb-corner path { fill: currentColor; }
+.sb-ttl { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.sb-ttl b {
+  font: 700 21px/1.1 var(--din);
+  letter-spacing: 0.14em;
+  color: var(--w);
+  white-space: nowrap;
+}
+.sb-ttl span {
+  font: 700 11px/1.3 var(--din);
+  letter-spacing: 0.18em;
+  color: var(--g3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* link state is the one element allowed to go solid: it is the console's
+   own condition, and it must be readable without opening anything */
+.sb-link {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 13px;
+  border-radius: 0 var(--r-pill) var(--r-pill) 0;
+  background: var(--cyan);
+  color: #000;
+  font: 700 11px/1 var(--din);
+  letter-spacing: 0.14em;
+  white-space: nowrap;
+}
+.sb-link[data-link="down"] { background: var(--tomato); }
+.sb-link[data-link="connecting"] { background: var(--moon); }
+
+/* ---- the bar stack: spine + a solid label block + value strip per row ---- */
+.sb-board { display: flex; flex-direction: column; gap: 4px; }
+.sb-row { display: flex; align-items: stretch; gap: 4px; min-height: 36px; }
+.sb-row[data-tone="orange"] { --tone: var(--orange); }
+.sb-row[data-tone="amber"] { --tone: var(--amber); }
+.sb-row[data-tone="lilac"] { --tone: var(--lilac); }
+.sb-row[data-tone="cyan"] { --tone: var(--cyan); }
+.sb-row[data-tone="moon"] { --tone: var(--moon); }
+.sb-row .stem { flex: 0 0 14px; background: var(--tone); }
+/* the label is a solid block with black type: the same contract as a tool row
+   (icon inside the colour, §7.5), and it is what makes this read as a console
+   instead of a key/value list */
+.sb-row .cap {
+  flex: 0 0 118px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px;
+  background: var(--tone);
+  color: #000;
+  font: 700 11px/1 var(--din);
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+  overflow: hidden;
+  border-radius: 0 var(--r-1) var(--r-1) 0;
+}
+.sb-row .cap .icon { opacity: 0.8; }
+.sb-row .body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px 0 12px;
+  /* the tone continues as a band, exactly like a tool row's body */
+  background: color-mix(in srgb, var(--tone) 8%, transparent);
+  border-radius: 0 var(--r-pill) var(--r-pill) 0;
+}
+.sb-row .v {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 700 16px/1.2 var(--din);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
   color: var(--w);
 }
-.sb-head .sub {
-  font: 700 10.5px/1.4 var(--din);
-  letter-spacing: 0.16em;
+.sb-row .v.is-mono { font: 400 13.5px/1.4 var(--mono); letter-spacing: 0; }
+.sb-row .un {
+  flex: 0 0 auto;
+  font: 700 11px/1 var(--din);
+  letter-spacing: 0.14em;
+  color: var(--g3);
+  font-variant-numeric: tabular-nums;
+}
+.sb-row .mm { flex: 0 1 180px; display: flex; gap: 3px; height: 12px; min-width: 56px; }
+.sb-row .mm i { display: block; height: 12px; border-radius: 0 var(--r-1) var(--r-1) 0; }
+.sb-row .mm i:first-child { flex: 0 0 auto; background: var(--tone); }
+.sb-row .mm i:last-child { flex: 1 1 auto; background: var(--g1); }
+.sb-row .nt {
+  margin-left: auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 400 11px/1.3 var(--din);
+  letter-spacing: 0.06em;
   color: var(--g3);
 }
-.sb-rows { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; max-width: 900px; }
-.sb-row {
-  display: grid;
-  grid-template-columns: 96px minmax(0, 1fr);
-  gap: 12px;
-  align-items: baseline;
-  min-height: 26px;
-  padding-left: 16px;
-  box-shadow: inset 2px 0 0 var(--g1);
+
+/* ---- keycaps: the only prose left, and it is a legend, not a sentence ---- */
+.sb-bottom { margin-top: auto; display: flex; flex-direction: column; gap: 4px; padding-top: 12px; }
+.sb-keys { display: flex; flex-wrap: wrap; gap: 4px; padding-left: 14px; }
+.sb-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding-right: 13px;
+  background: var(--g0);
+  border-radius: 0 var(--r-pill) var(--r-pill) 0;
+  box-shadow: inset 3px 0 0 var(--g1);
 }
-.sb-row .k { font: 700 10.5px/1.3 var(--din); letter-spacing: 0.16em; color: var(--amber); }
-.sb-row .v { font: 400 11.5px/1.5 var(--mono); color: var(--g3); }
+.sb-key kbd {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 9px;
+  background: var(--g1);
+  color: var(--w);
+  font: 700 11px/1 var(--din);
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  border-radius: 0 var(--r-1) var(--r-1) 0;
+}
+.sb-key span {
+  font: 700 11px/1 var(--din);
+  letter-spacing: 0.14em;
+  color: var(--g3);
+  white-space: nowrap;
+}
+
+/* ---- readout strip: the console is waiting, and says so in one line ---- */
+.sb-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 26px;
+  padding: 0 13px 0 10px;
+  background: var(--g0);
+  box-shadow: inset 3px 0 0 var(--g2);
+  border-radius: 0 0 var(--r-1) 0;
+}
+.sb-foot .scan i { background: var(--g2); }
+.sb-foot .tx { font: 700 11px/1 var(--din); letter-spacing: 0.18em; color: var(--t3); }
+
+@media (max-width: 1180px) {
+  .sb-row .cap { flex-basis: 112px; }
+  .sb-row .mm { flex-basis: 96px; }
+  .sb-row .nt { display: none; }
+}
+@media (max-width: 980px) {
+  .sb-row .mm,
+  .sb-key:last-child { display: none; }
+}
 
 /* ============================================================
    status badges + inline error bar + on/off toggle
@@ -2449,19 +2966,6 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 
 /* composer extras: attach button, image chips, drag/flash states
    State lives in the spine colour (§4.3) — no rings, no shadows. */
-.cmd-help .ch-right { display: flex; align-items: center; gap: 8px; }
-.cmd-attach {
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 16px;
-  padding: 0;
-  background: var(--g1);
-  color: var(--g3);
-  border-radius: var(--r-1) var(--r-1) 0 0;
-}
-.cmd-attach:hover:not(:disabled) { background: var(--ice); color: #000; }
-.cmd-attach:disabled { opacity: 0.4; }
 .cmdwrap[data-flash="1"] .cmd-field::before { background: var(--ice); }
 .cmdwrap[data-drop="1"] .cmd-field::before { background: var(--tang); }
 .cmdwrap[data-drop="1"] .inputline { border-bottom-color: var(--tang); }
@@ -2474,6 +2978,12 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
   scrollbar-width: none;
   padding-bottom: 1px;
 }
+.attach-strip::-webkit-scrollbar { display: none; }
+/* inside the help row the chips are compact: one line, 22px, never a second row */
+.cmd-help .achip { height: 22px; gap: 5px; }
+.cmd-help .achip img { width: 16px; height: 16px; }
+.cmd-help .achip .an { max-width: 120px; font-size: 11px; }
+.cmd-help .achip .ax { width: 14px; height: 14px; }
 .attach-strip .as-lb {
   flex: 0 0 auto;
   padding: 4px 6px;
@@ -2826,10 +3336,18 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
   font: 400 11.5px/1.4 var(--mono);
   color: var(--ice);
   text-decoration: none;
+  text-align: left;
+  appearance: none;
+  padding: 0;
+  background: none;
+  border: 0;
   border-bottom: 1px solid color-mix(in srgb, var(--ice) 35%, transparent);
+  cursor: pointer;
 }
-.about-author .mail.quiet { color: var(--g2); border-bottom-color: transparent; }
+.about-author .mail.quiet { color: var(--g2); border-bottom-color: transparent; cursor: default; }
 .about-author .mail:hover { color: var(--w); }
+/* a copy is a system acknowledgement, not a decoration — cyan, then back */
+.about-author .mail[data-copied="1"] { color: var(--cyan); border-bottom-color: transparent; }
 
 .about-credit {
   display: grid;
@@ -2852,6 +3370,8 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
   white-space: nowrap;
 }
 .about-credit .use { font: 400 11.5px/1.4 var(--text); color: var(--g3); }
+/* a bundled family row: the weights are a readout, so they are mono and dim */
+.about-credit .nm .wt { font: 400 10.5px/1.4 var(--mono); color: var(--g2); letter-spacing: 0.04em; }
 .about-credit .ver { font: 400 11.5px/1.4 var(--mono); color: var(--g3); text-align: right; font-variant-numeric: tabular-nums; }
 .about-credit .lic {
   font: 700 11px/1.4 var(--din);
@@ -2927,8 +3447,11 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 
 /* ---- the strip: numeral | label + note + count | live state ---- */
 /* three blocks with black seams, not one grey bar: the numeral is the cycle
-   order, and the state block is the only thing allowed to go solid when busy */
+   order, and the state block is the only thing allowed to go solid when busy.
+   The numeral block is also the arm's shoulder: its outer corner is swept and
+   the piece below (.ws-arm) turns it down into the body's leg. */
 .ws-hd {
+  position: relative;
   flex: 0 0 28px;
   display: flex;
   gap: var(--gap);
@@ -2942,10 +3465,24 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
   justify-content: center;
   background: var(--tone);
   color: #000;
-  border-radius: 0 var(--r-1) var(--r-1) 0;
-  font: 700 12.5px/1 var(--din);
+  border-radius: 14px 0 var(--r-1) 0;
+  font: 400 12.5px/1 var(--deco);
   letter-spacing: 0.04em;
 }
+/* the curved arm: concave fillet from the header's underside into the body's
+   leg, painted over the seam and above the (scrolling) body */
+.ws-arm {
+  position: absolute;
+  left: 0;
+  top: 28px;
+  z-index: 2;
+  width: 28px;
+  height: 18px;
+  color: var(--tone);
+  pointer-events: none;
+}
+.ws-arm svg { display: block; }
+.ws-arm path { fill: currentColor; }
 .ws-hd .lb {
   flex: 1 1 auto;
   min-width: 0;
@@ -2995,13 +3532,15 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 .ws-hd .st[data-live="1"] { background: var(--tone); color: #000; }
 
 /* ---- the body: the only scrolling surface in each instrument ---- */
+/* the leg of the bent arm: a 14px solid rail the whole instrument hangs from */
 .ws-body {
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
   gap: var(--gap);
-  padding: 8px;
+  padding: 8px 8px 8px 10px;
+  border-left: 14px solid var(--tone);
   overflow-y: auto;
   overflow-x: hidden;
   background: var(--g0);
@@ -3028,7 +3567,8 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 .exc,
 .ws-body [data-dim] { transition: opacity var(--t-2) var(--ease); }
 
-/* empty instruments still speak LCARS: a small elbow, then the sentence */
+/* empty instruments still speak LCARS — but the frame above already IS an
+   elbow, so the marker here is a short tone tick, not a second one */
 .ws-empty {
   display: flex;
   align-items: flex-start;
@@ -3036,8 +3576,54 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
   padding: 8px 4px;
   color: var(--tone);
 }
-.ws-empty .elbow { flex: 0 0 auto; opacity: 0.6; }
-.ws-empty span { padding-top: 2px; font: 400 11px/1.7 var(--mono); color: var(--g2); }
+.ws-empty::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 28px;
+  height: 4px;
+  margin-top: 8px;
+  background: var(--tone);
+  border-radius: 0 var(--r-pill) var(--r-pill) 0;
+}
+.ws-empty span { font: 400 11px/1.7 var(--mono); color: var(--g2); }
+
+/* reasoning is an instrument strip, not a card: a solid moon cap (the number)
+   and a moon band, the same anatomy as a terminal command row below it. */
+.ws-t {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  column-gap: 4px;
+  align-items: start;
+  padding: 0;
+  text-align: left;
+  border: 0;
+  border-radius: 0 var(--r-2) var(--r-2) 0;
+  background: color-mix(in srgb, var(--moon) 8%, transparent);
+}
+.ws-t:hover { background: color-mix(in srgb, var(--moon) 14%, transparent); }
+.ws-t[data-open="1"] { background: color-mix(in srgb, var(--moon) 13%, transparent); }
+.ws-t .ix {
+  grid-column: 1;
+  grid-row: 1 / 3;
+  align-self: stretch;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 6px;
+  background: var(--moon);
+  color: #000;
+  border-radius: 0 var(--r-1) var(--r-1) 0;
+  font: 700 11px/1 var(--din);
+  font-variant-numeric: tabular-nums;
+}
+.ws-t .hd {
+  grid-column: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 5px 8px 0 2px;
+}
 
 /* ---- the readout strip under an instrument ---- */
 .ws-foot {
@@ -3046,10 +3632,11 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
   align-items: center;
   gap: 8px;
   height: 22px;
-  padding: 0 10px;
+  padding: 0 10px 0 14px;
   background: var(--g1);
   border-radius: 0 var(--r-1) var(--r-1) 0;
-  box-shadow: inset 4px 0 0 var(--tone);
+  /* the leg keeps running through the strip, so the frame closes at the foot */
+  box-shadow: inset 14px 0 0 var(--tone);
 }
 .ws-read { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
 .ws-read b {
@@ -3088,38 +3675,6 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 .ws-body .row .txt { font-size: 14.5px; }
 .ws-body .row.turn { margin-top: 0; }
 
-/* ---- THINKING: an aside that says whether it is still reading ---- */
-.ws-t {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 6px 8px 7px;
-  text-align: left;
-  background: transparent;
-  border: 0;
-  border-radius: 0 var(--r-2) var(--r-2) 0;
-  box-shadow: inset 2px 0 0 var(--g1);
-}
-.ws-t:hover { background: var(--g1); }
-.ws-t[data-open="1"] {
-  background: color-mix(in srgb, var(--g0) 55%, #000);
-  box-shadow: inset 2px 0 0 var(--moon);
-}
-.ws-t .hd {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-.ws-t .ix {
-  flex: 0 0 auto;
-  padding: 1px 5px;
-  background: var(--moon);
-  color: #000;
-  border-radius: 0 var(--r-1) var(--r-1) 0;
-  font: 700 10.5px/1.4 var(--din);
-  font-variant-numeric: tabular-nums;
-}
 .ws-t .lb {
   flex: 0 0 auto;
   font: 700 10.5px/1 var(--din);
@@ -3154,10 +3709,12 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
   animation: scan var(--t-4) steps(3) infinite;
 }
 .ws-t .bd {
+  grid-column: 2;
   display: -webkit-box;
   -webkit-line-clamp: 6;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  padding: 4px 8px 7px 2px;
   font: 400 12.5px/1.68 var(--text);
   color: var(--t2);
   overflow-wrap: anywhere;
@@ -3265,22 +3822,36 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
   gap: 6px;
   background: color-mix(in srgb, var(--g0) 55%, #000);
 }
-.term { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.term { --tone: var(--cyan); display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.term[data-state="run"] { --tone: var(--tang); }
+.term[data-state="error"] { --tone: var(--tomato); }
+.term[data-state="warn"] { --tone: var(--amber); }
+/* a command is a readout strip: solid prompt cap (black glyph on the state
+   colour), then the same-colour band, then the return-code lamp. */
 .term-cmd {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: 8px;
   min-width: 0;
-  padding: 3px 6px 3px 8px;
-  background: var(--g0);
+  padding: 0 6px 0 0;
+  background: color-mix(in srgb, var(--tone) 9%, transparent);
   border-radius: 0 var(--r-2) var(--r-2) 0;
-  box-shadow: inset 2px 0 0 var(--g1);
 }
-.term-cmd .ps { flex: 0 0 auto; font: 700 12px/1.5 var(--mono); color: var(--orange); }
+.term-cmd .ps {
+  flex: 0 0 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--tone);
+  color: #000;
+  border-radius: 0 var(--r-1) var(--r-1) 0;
+  font: 700 12px/1.5 var(--mono);
+}
 .term-cmd .cmd {
   flex: 1 1 auto;
   margin: 0;
   min-width: 0;
+  padding: 3px 0;
   font: 400 12.5px/1.55 var(--mono);
   color: var(--w);
   white-space: pre-wrap;
@@ -3288,21 +3859,24 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 }
 .term-cmd .meta {
   flex: 0 0 auto;
+  align-self: center;
   display: flex;
   align-items: center;
   gap: 6px;
-  font: 400 10.5px/1.5 var(--mono);
+  font: 400 11px/1.5 var(--mono);
   color: var(--g3);
   white-space: nowrap;
   text-transform: uppercase;
 }
 .term-cmd .lamp {
   flex: 0 0 auto;
+  align-self: center;
+  margin-left: 2px;
   padding: 2px 7px;
   border-radius: var(--r-1);
   background: var(--g1);
   color: var(--t3);
-  font: 700 10.5px/1.3 var(--din);
+  font: 700 11px/1.3 var(--din);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -3327,8 +3901,7 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 .term-out .ln[data-tone="hunk"] { color: var(--moon); }
 .term-out .ln[data-tone="warn"] { color: var(--amber); }
 .term[data-state="error"] .term-out { color: var(--tomato); }
-.term[data-state="run"] .term-cmd .ps { color: var(--tang); }
-.term[data-state="error"] .term-cmd { box-shadow: inset 2px 0 0 var(--tomato); }
+.term[data-state="run"] .term-cmd .ps { color: #000; }
 
 /* one strip per exchange, so a long terminal still says which instruction
    the command belonged to */
@@ -3616,9 +4189,9 @@ html[data-backdrop="1"] body::after {
     opacity: 0.8;
   }
 }
-[data-theme="borg"] .tool[data-state="run"] > .st {
+[data-theme="borg"] .tool[data-state="run"] > .th {
   animation: alcove var(--t-4) steps(1, end) infinite;
 }
-[data-theme="borg"] .tool[data-state="run"] > .mt {
+[data-theme="borg"] .tool[data-state="run"] > .th .mt {
   animation: alcove var(--t-4) steps(1, end) 450ms infinite reverse;
 }

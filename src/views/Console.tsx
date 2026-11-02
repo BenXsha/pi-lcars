@@ -1,6 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import type { BackdropDir, BackdropImage, DiffData, DirEntry, HistoryResult, TreeRow, Item, ImageAttachment, McpConfig, ModelInfo, ProviderRow, ProvidersResult, SkillsResult, SystemInfo } from "../api";
+import type { BackdropDir, BackdropImage, DiffData, DirEntry, HistoryResult, TreeRow, Item, ImageAttachment, McpConfig, Meta, ModelInfo, ProviderRow, ProvidersResult, SkillsResult, SystemInfo } from "../api";
 import { api } from "../api";
 import { actions, connect, getState, subscribe } from "../store";
 import { THEMES, appliedTheme, applyTheme, type ThemeId } from "../theme";
@@ -14,12 +14,12 @@ import { AboutPanel } from "./About";
 import { Markdown } from "../components/Markdown";
 import { askComposer, askDeck, onComposerRequest, onDeckRequest } from "../composer";
 import { clearDraft, loadDraft, loadHistory, pushHistory, saveDraft } from "../drafts";
+import { QUICK_SLOTS, loadQuick, newQuick, onQuickChange, resetQuick, saveQuick, type QuickPrompt } from "../quick";
 import {
   ApprovalDeck,
   BarButton,
   ControlChip,
   Deck,
-  Elbow,
   FieldArea,
   FieldRow,
   MessageRow,
@@ -145,7 +145,7 @@ function useStore() {
 export function Console() {
   const s = useStore();
   const [view, setView] = useState<View>(viewFromHash);
-  const [deck, setDeck] = useState<null | "new" | "model" | "think">(null);
+  const [deck, setDeck] = useState<null | "new" | "model" | "think" | "quick">(null);
   const [sideMode, setSideMode] = useState<"sessions" | "files">("sessions");
   const [previewCwd, setPreviewCwd] = useState<string | null>(null);
   const [viewer, setViewer] = useState<{ path: string; diff?: DiffData } | null>(null);
@@ -417,17 +417,24 @@ export function Console() {
         ) : null}
         {deck === "model" ? <ModelDeck current={meta?.modelId} onClose={() => setDeck(null)} /> : null}
         {deck === "think" ? <ThinkDeck current={meta?.thinking} onClose={() => setDeck(null)} /> : null}
+        {deck === "quick" ? <QuickDeck onClose={() => setDeck(null)} /> : null}
 
 
         <div class="body">
           <main class="center">
             <div class="center-head">
-              <div>
+              {/* keyed on the view so the head drops in (90ms wipe-down) each time
+                  the station changes; the body below keeps its 2-frame swap */}
+              <div class="ttl" key={view}>
                 <h1>{view === "session" ? titleOf(active, meta) : view.toUpperCase()}</h1>
                 <p>{view === "session" ? subtitleOf(meta, s.items, s.queue.waiting.length) : subtitleFor(view)}</p>
               </div>
               <div class="chips">
-                {s.link !== "open" ? <span class="badge tomato">{s.link === "down" ? "LINK DOWN" : "LINKING"}</span> : null}
+                {s.link !== "open" ? (
+                  <span class="badge tomato" data-scan={s.link === "down" ? undefined : "1"}>
+                    {s.link === "down" ? "LINK DOWN" : "LINKING"}
+                  </span>
+                ) : null}
                 {meta?.pending ? <span class="badge tomato">{meta.pending} HELD</span> : null}
                 {s.queue.waiting.length ? (
                   <span class="badge moon">{s.queue.waiting.length} QUEUED</span>
@@ -436,18 +443,52 @@ export function Console() {
                 )}
                 <span class="badge ice">{countTools(s.items)} CALLS</span>
                 {view === "session" ? (
+                  /* A mode, not an action: both positions stay on screen and the
+                     current one is filled. A single badge whose label flips reads
+                     as "go to log" — the wrong promise for a two-state view. */
+                  <div class="vsw" role="group" aria-label={t("ws.mode")}>
+                    <span class="k">{t("ws.mode")}</span>
+                    <button
+                      type="button"
+                      class="vsw-b"
+                      aria-pressed={wsOpen ? "false" : "true"}
+                      onClick={() => {
+                        setWsOpen(false);
+                        setTreeOpen(false);
+                      }}
+                      title={t("ws.close")}
+                    >
+                      LOG
+                    </button>
+                    <button
+                      type="button"
+                      class="vsw-b"
+                      aria-pressed={wsOpen ? "true" : "false"}
+                      onClick={() => {
+                        setWsOpen(true);
+                        setTreeOpen(false);
+                      }}
+                      title={t("ws.open")}
+                    >
+                      STREAM
+                    </button>
+                  </div>
+                ) : null}
+                {view === "session" ? (
+                  /* A toggle, not an opener: the button carries the state and the
+                     second click closes. The panel's own CLOSE stays as a
+                     secondary way out, never the only one. */
                   <button
                     type="button"
                     class="badge dim"
-                    data-on={wsOpen ? "1" : "0"}
-                    onClick={() => setWsOpen((open) => !open)}
-                    title={wsOpen ? t("ws.close") : t("ws.open")}
+                    data-on={treeOpen ? "1" : "0"}
+                    aria-pressed={treeOpen ? "true" : "false"}
+                    onClick={() => {
+                      setTreeOpen((open) => !open);
+                      setWsOpen(false);
+                    }}
+                    title={treeOpen ? t("tree.close") : t("tree.open")}
                   >
-                    {wsOpen ? "LOG" : "STREAM"}
-                  </button>
-                ) : null}
-                {view === "session" ? (
-                  <button type="button" class="badge dim" onClick={() => setTreeOpen(true)} title="Branch tree (⌘T)">
                     TREE
                   </button>
                 ) : null}
@@ -475,10 +516,12 @@ export function Console() {
               <Workspace items={s.items} onOpenDiff={(p, d) => setViewer({ path: p, diff: d })} />
             ) : (
             <div class="scroll" id="scroll" ref={scrollRef}>
-              <div key={view} class={view === "session" ? undefined : "anim-swap"}>
+              <div key={view} class={view === "session" ? "sess-body" : "anim-swap"}>
               {view === "session" ? (
                 <Transcript
                   items={s.items}
+                  meta={meta}
+                  link={s.link}
                   onOpenDiff={(p, d) => setViewer({ path: p, diff: d })}
                   onRecall={async (turn, text, _itemId) => {
                     if (!turn) return;
@@ -662,8 +705,8 @@ function Sidenav({
         </span>
         {collapsed ? null : (
           <span class="cap-text">
-            <b>Enterprise Agent Console</b>
-            <em>base on pi.agent</em>
+            <b>Agent Console</b>
+            <em>based on pi.agent</em>
           </span>
         )}
       </TopCap>
@@ -946,13 +989,171 @@ function AskBlock({ item }: { item: Extract<Item, { kind: "ask" }> }) {
   );
 }
 
+/* -------------------------------------------------------------- standby */
+/**
+ * The empty transcript is an instrument panel, not a paragraph (§7.6g).
+ *
+ * Grammar: one elbow opens the section (the only elbow here — §3 R6), then a
+ * left bar stack whose segments carry each subsystem's tone, then a bar-end
+ * capsule per row. Every readout is a real field on the active session meta:
+ * no decorative numbers, no "invented telemetry" (§7.6).
+ */
+type SbRow = {
+  tone: "orange" | "amber" | "lilac" | "cyan" | "moon";
+  icon: IconName;
+  label: string;
+  value: string;
+  /** bar height — the segment that matters most is the tallest (§7.5) */
+  h: 52 | 44 | 36;
+  unit?: string;
+  note?: string;
+  mono?: boolean;
+  /** 0-100; renders the two-segment context bar */
+  meter?: number;
+};
+
+const APPROVAL_NOTE: Record<string, Parameters<typeof t>[0]> = {
+  off: "sb.polOff",
+  risky: "sb.polRisky",
+  all: "sb.polAll",
+};
+
+function Standby({ meta, link }: { meta: Meta | null; link: "connecting" | "open" | "down" }) {
+  const win = meta?.contextWindow ?? 0;
+  const pct = meta?.contextPct ?? 0;
+  const used = meta?.usage.total ?? 0;
+  const policy = (meta?.policy ?? "").toLowerCase();
+  const rows: SbRow[] = [
+    {
+      tone: "cyan",
+      icon: "station-session",
+      label: t("sb.workspace"),
+      value: meta ? shortPath(meta.cwd) : "—",
+      mono: true,
+      h: 52,
+      note: meta ? t("sb.workspaceNote") : undefined,
+    },
+    {
+      tone: "orange",
+      icon: "fld-model",
+      label: t("sb.model"),
+      value: meta?.model ?? "—",
+      mono: true,
+      h: 44,
+      note: meta ? `${meta.thinking.toUpperCase()} · ${t("sb.thinking")}` : undefined,
+    },
+    {
+      tone: "amber",
+      icon: "station-tools",
+      label: t("sb.loadout"),
+      value: meta ? String(meta.tools.length) : "—",
+      unit: t("sb.tools"),
+      h: 36,
+      note: meta ? `${meta.skills ?? 0} ${t("sb.skills")}` : undefined,
+    },
+    {
+      tone: "lilac",
+      icon: "station-context",
+      label: t("sb.context"),
+      value: `${pct}%`,
+      unit: meta ? `${fmtTok(used)} / ${fmtTok(win)}` : "—",
+      h: 44,
+      meter: meta ? pct : undefined,
+    },
+    {
+      tone: "moon",
+      icon: "fld-lock",
+      label: t("sb.approval"),
+      value: policy ? policy.toUpperCase() : "—",
+      h: 36,
+      note: policy && APPROVAL_NOTE[policy] ? t(APPROVAL_NOTE[policy]) : undefined,
+    },
+  ];
+
+  return (
+    <div class="standby">
+      {/* the elbow: thin stem + 22px arm, filleted on the concave corner */}
+      <div class="sb-arm">
+        <svg class="sb-corner" width={48} height={100} viewBox="0 0 48 100" aria-hidden="true">
+          {/* one continuous spine: soft outer corner (16), concave fillet (22),
+              then a root fillet (14) where it grows into the first readout bar
+              — the header does not stop in mid-air, it feeds the stack */}
+          <path d="M16,0 H48 V22 H36 Q14,22 14,44 V86 Q14,100 28,100 H0 V16 Q0,0 16,0 Z" />
+        </svg>
+        <div class="sb-ttl">
+          <b>{t("sb.standing")}</b>
+          <span>{t("sb.idle")}</span>
+        </div>
+        <div class="sb-link" data-link={link}>
+          <Icon name={link === "open" ? "status-ok" : link === "down" ? "status-fail" : "status-idle"} size={12} />
+          {link === "open" ? t("sb.linkOpen") : link === "down" ? t("sb.linkDown") : t("sb.linking")}
+        </div>
+      </div>
+
+      <div class="sb-board">
+        {rows.map((r) => (
+          <div class="sb-row" data-tone={r.tone} style={{ height: `${r.h}px` }} key={r.label}>
+            <span class="stem" />
+            <div class="cap" title={r.label}>
+              <Icon name={r.icon} size={12} />
+              <span>{r.label}</span>
+            </div>
+            <div class="body">
+              <span class={r.mono ? "v is-mono" : "v"} title={r.value}>
+                {r.value}
+              </span>
+              {r.meter != null ? (
+                <span class="mm" aria-hidden="true">
+                  <i style={{ width: `${Math.max(1.5, r.meter)}%` }} />
+                  <i />
+                </span>
+              ) : null}
+              {r.unit ? <span class="un">{r.unit}</span> : null}
+              {r.note ? <span class="nt">{r.note}</span> : null}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div class="sb-bottom">
+        <div class="sb-keys">
+          {([
+            ["ENTER", "sb.kSend"],
+            ["SHIFT + ENTER", "sb.kNewline"],
+            ["@", "sb.kRef"],
+            ["ESC", "sb.kStop"],
+          ] as [string, Parameters<typeof t>[0]][]).map(([key, label]) => (
+            <div class="sb-key" key={key}>
+              <kbd>{key}</kbd>
+              <span>{t(label)}</span>
+            </div>
+          ))}
+        </div>
+
+        <div class="sb-foot">
+          <span class="scan">
+            <i />
+            <i />
+            <i />
+          </span>
+          <span class="tx">{t("sb.await")}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ----------------------------------------------------------- transcript */
 function Transcript({
   items,
+  meta,
+  link,
   onOpenDiff,
   onRecall,
 }: {
   items: Item[];
+  meta: Meta | null;
+  link: "connecting" | "open" | "down";
   onOpenDiff?: (path: string, diff: DiffData) => void;
   onRecall?: (turn: number, text: string, itemId: string) => void;
 }) {
@@ -985,30 +1186,7 @@ function Transcript({
       return next;
     });
 
-  if (!items.length) {
-    return (
-      <div class="standby">
-        <div class="sb-head">
-          <span class="st" />
-          <span class="ttl">STANDING BY</span>
-          <span class="sub">NO TRANSMISSION IN THIS SESSION</span>
-        </div>
-        <div class="sb-rows">
-          {[
-            ["LINK", "live pi session — nothing here is scripted"],
-            ["INPUT", "ENTER transmits · SHIFT+ENTER breaks the line"],
-            ["STREAM", "text deltas · tool calls · retries · truncation · approvals"],
-            ["SCOPE", "this session only; the workspace tree lives in the sidebar"],
-          ].map(([k, v]) => (
-            <div class="sb-row" key={k}>
-              <span class="k">{k}</span>
-              <span class="v">{v}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
+  if (!items.length) return <Standby meta={meta} link={link} />;
 
   return (
     <div class="log">
@@ -1306,6 +1484,15 @@ function Zone(props: {
         <span class="st" data-live={props.live ? "1" : "0"}>
           {props.status}
         </span>
+        {/* The bent arm: the header is the horizontal leg, the body's left edge
+            is the vertical one, and this piece carries the concave fillet
+            across the 4px seam so the two read as one piece. It lives on the
+            header (not in the body) because the body scrolls and would clip it. */}
+        <span class="ws-arm" aria-hidden="true">
+          <svg width="28" height="18" viewBox="0 0 28 18">
+            <path d="M0,0 H28 Q14,0 14,18 H0 Z" />
+          </svg>
+        </span>
       </header>
       <div
         class="ws-body"
@@ -1319,7 +1506,6 @@ function Zone(props: {
           props.children
         ) : (
           <div class="ws-empty">
-            <Elbow vw={10} vh={24} hw={84} hh={5} r={7} />
             <span>{props.empty}</span>
           </div>
         )}
@@ -1851,6 +2037,9 @@ function Composer({
 }) {
   const plainRef = useRef<HTMLTextAreaElement>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
+  const mirrorRef = useRef<HTMLDivElement>(null);
+  /** last height written to the field — writes are skipped when it is unchanged */
+  const grownRef = useRef(0);
   const fileRef = useRef<HTMLInputElement>(null);
   const histDraft = useRef("");
   /** true between compositionstart and compositionend — the IME owns `value` */
@@ -1865,6 +2054,9 @@ function Composer({
   const [files, setFiles] = useState<{ rel: string; base: string; dir: string }[]>([]);
   const [filesBusy, setFilesBusy] = useState(false);
   const [histPick, setHistPick] = useState<number | null>(null);
+  // operator macro pad: rebuilt whenever the editor saves
+  const [quick, setQuick] = useState<QuickPrompt[]>(loadQuick);
+  useEffect(() => onQuickChange(() => setQuick(loadQuick())), []);
 
   useEffect(() => {
     api
@@ -1941,18 +2133,47 @@ function Composer({
   }, [session, text]);
 
   /* Auto-grow: the field rises with the draft, then scrolls inside its cap.
-     Measured, not guessed — `height:auto` first so scrollHeight is real. Also
-     called from `input`/`compositionupdate`, because an IME grows the field
+     Measured on an off-screen mirror, never by collapsing the real box —
+     `height:auto` on the textarea made the composer jump 44 → 64 → 44 on every
+     keystroke and re-laid out the whole transcript (see .grow-mirror).
+     Also called from `input`/`compositionupdate`, because an IME grows the field
      before it commits anything to `text`. */
   const grow = () => {
     const el = ref.current;
-    if (!el) return;
-    el.style.height = "auto";
+    const m = mirrorRef.current;
+    if (!el || !m) return;
+    const w = el.clientWidth;
+    if (!w) return;
+    const width = `${w}px`;
+    if (m.style.width !== width) m.style.width = width;
+    // the trailing newline keeps a final empty line in the count
+    m.textContent = `${el.value}\n`;
     const cap = Math.min(240, Math.max(96, Math.round(window.innerHeight * 0.26)));
-    el.style.height = `${Math.min(Math.max(el.scrollHeight, 44), cap)}px`;
+    const want = Math.min(Math.max(m.scrollHeight, 44), cap);
+    if (want === grownRef.current) return;
+    grownRef.current = want;
+    el.style.height = `${want}px`;
   };
 
   useEffect(grow, [text]);
+
+  /** A pad appends to the draft (never sends): the operator keeps the last word. */
+  const useQuick = (q: QuickPrompt) => {
+    setText((prev) => {
+      const base = prev.replace(/\s+$/, "");
+      return base ? `${base}\n${q.text}` : q.text;
+    });
+    setHistPick(null);
+    requestAnimationFrame(() => {
+      const el = ref.current;
+      el?.focus();
+      if (el) {
+        el.setSelectionRange(el.value.length, el.value.length);
+        setCaret(el.value.length);
+      }
+      grow();
+    });
+  };
 
   /* File palette: debounced, because a walk per keystroke is wasteful. */
   useEffect(() => {
@@ -2014,6 +2235,7 @@ function Composer({
   const submit = () => {
     const trimmed = text.trim();
     if (!trimmed && !images.length) return;
+    stopVoice();
     if (trimmed && runUi(trimmed)) {
       setText("");
       clearDraft(session);
@@ -2049,6 +2271,68 @@ function Composer({
 
   const [focused, setFocused] = useState(false);
   const chars = text.length;
+
+  /* ---------------------------------------------------------- dictation
+     The browser's own recogniser, feature-detected. Nothing goes through this
+     app: the recognition (and its network hop, if the browser has one) belongs
+     to the browser, and the transcript lands in the same draft the keys write
+     to. Unsupported browsers get a disabled button, never a silent no-op. */
+  const [listening, setListening] = useState(false);
+  const recRef = useRef<{ stop: () => void } | null>(null);
+  const speechSupported =
+    typeof window !== "undefined" &&
+    !!((window as unknown as Record<string, unknown>).SpeechRecognition ||
+      (window as unknown as Record<string, unknown>).webkitSpeechRecognition);
+
+  const stopVoice = () => {
+    recRef.current?.stop?.();
+    recRef.current = null;
+    setListening(false);
+  };
+
+  const toggleVoice = () => {
+    if (!speechSupported) return;
+    if (listening) return stopVoice();
+    const w = window as unknown as Record<string, any>;
+    const SR = w.SpeechRecognition ?? w.webkitSpeechRecognition;
+    const rec = new SR();
+    const base = textRef.current.trim() ? `${textRef.current.trim()} ` : "";
+    let final = "";
+    rec.lang = getSettings().locale === "zh" ? "zh-CN" : "en-US";
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.onresult = (e: any) => {
+      let interim = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const r = e.results[i];
+        if (r.isFinal) final += r[0].transcript;
+        else interim += r[0].transcript;
+      }
+      setText(base + final + interim);
+      requestAnimationFrame(() => {
+        grow();
+        const el = ref.current;
+        if (el) {
+          el.setSelectionRange(el.value.length, el.value.length);
+          setCaret(el.value.length);
+        }
+      });
+    };
+    rec.onerror = () => stopVoice();
+    rec.onend = () => {
+      recRef.current = null;
+      setListening(false);
+    };
+    recRef.current = rec;
+    try {
+      rec.start();
+      setListening(true);
+    } catch {
+      stopVoice();
+    }
+  };
+
+  useEffect(() => () => recRef.current?.stop?.(), []);
 
   const queued = [...textList(queue?.steering), ...textList(queue?.followUp)];
 
@@ -2179,30 +2463,74 @@ function Composer({
       </div>
     ) : null}
 
-    <div class="cmdbar">
+    <div class="cmdbar" data-run={running ? "1" : "0"}>
+      {/* ENTRY is the input console's control block: label, the two input modes
+          (image attach, dictation) and the live mode line. Keeping the buttons
+          here means the field needs only one auxiliary row — the chips. */}
       <div class="entry-block">
         <span class="el">{t("cmd.entry")}</span>
-        <span class="eh">{running ? t("cmd.steer") : "CTRL K"}</span>
+        <div class="entry-acts">
+          <button
+            type="button"
+            class="iact"
+            title={t("cmd.attach")}
+            aria-label={t("cmd.attach")}
+            disabled={disabled || images.length >= MAX_IMAGES}
+            onClick={() => fileRef.current?.click()}
+          >
+            <Icon name="fld-image" size={12} />
+          </button>
+          <button
+            type="button"
+            class="iact"
+            data-on={listening ? "1" : "0"}
+            title={!speechSupported ? t("cmd.voiceNA") : listening ? t("cmd.voiceStop") : t("cmd.voice")}
+            aria-label={listening ? t("cmd.voiceStop") : t("cmd.voice")}
+            aria-pressed={listening ? "true" : "false"}
+            disabled={disabled || !speechSupported}
+            onClick={toggleVoice}
+          >
+            <Icon name={listening ? "act-mic-off" : "act-mic"} size={12} />
+          </button>
+        </div>
+        <span class="eh" data-live={listening ? "1" : "0"}>
+          {images.length
+            ? `${images.length}/${MAX_IMAGES} IMG`
+            : listening
+              ? t("cmd.listening")
+              : running
+                ? t("cmd.steer")
+                : "CTRL K"}
+        </span>
       </div>
 
       <div class="cmd-field" data-state={disabled ? "off" : running ? "live" : "idle"}>
         <div class="cmd-help">
-          <span class={running ? "live" : ""}>
-            {running ? t("cmd.live") : t("cmd.send")}
-          </span>
-          <span class="ch-right">
-            <button
-              type="button"
-              class="cmd-attach"
-              title={t("cmd.attach")}
-              aria-label={t("cmd.attach")}
-              disabled={disabled || images.length >= MAX_IMAGES}
-              onClick={() => fileRef.current?.click()}
-            >
-              <Icon name="fld-image" size={12} />
-            </button>
-            <span class="cnt">{chars ? `${chars} CHARS` : "INPUT"}</span>
-          </span>
+          {/* one row, two tenants: the chips take it over while something is
+              attached, so an attachment never costs a second line */}
+          {images.length ? (
+            <div class="attach-strip">
+              {images.map((a) => (
+                <span class="achip" key={a.id} title={`${a.name} · ${a.mimeType} · ${fmtSize(a.bytes)}`}>
+                  <img src={`data:${a.mimeType};base64,${a.data}`} alt="" />
+                  <span class="an">{a.name}</span>
+                  <span class="asz">{fmtSize(a.bytes)}</span>
+                  <button
+                    type="button"
+                    class="ax"
+                    title={t("cmd.drop")}
+                    aria-label={t("cmd.drop")}
+                    onClick={() => setImages((prev) => prev.filter((x) => x.id !== a.id))}
+                  >
+                    <Icon name="act-close" size={10} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          ) : (
+            <span class={`hint${running ? " live" : ""}`}>{running ? t("cmd.live") : t("cmd.send")}</span>
+          )}
+          <span class="cnt">{chars ? `${chars} CHARS` : "INPUT"}</span>
         </div>
         <input
           ref={fileRef}
@@ -2216,31 +2544,10 @@ function Composer({
             input.value = "";
           }}
         />
-        {images.length ? (
-          <div class="attach-strip">
-            <span class="as-lb">
-              IMAGE {images.length}/{MAX_IMAGES}
-            </span>
-            {images.map((a) => (
-              <span class="achip" key={a.id} title={`${a.name} · ${a.mimeType} · ${fmtSize(a.bytes)}`}>
-                <img src={`data:${a.mimeType};base64,${a.data}`} alt="" />
-                <span class="an">{a.name}</span>
-                <span class="asz">{fmtSize(a.bytes)}</span>
-                <button
-                  type="button"
-                  class="ax"
-                  title={t("cmd.drop")}
-                  aria-label={t("cmd.drop")}
-                  onClick={() => setImages((prev) => prev.filter((x) => x.id !== a.id))}
-                >
-                  <Icon name="act-close" size={10} />
-                </button>
-              </span>
-            ))}
-          </div>
-        ) : null}
         <label class="inputline" data-focused={focused ? "1" : "0"}>
           <span class="caret" />
+          {/* autosize probe — see .grow-mirror in the stylesheet */}
+          <div class="grow-mirror" ref={mirrorRef} aria-hidden="true" />
           <textarea
             ref={ref}
             rows={2}
@@ -2385,10 +2692,30 @@ function Composer({
         </label>
       </div>
 
-      <div class="btns">
-        <BarButton label={running ? t("cmd.steer") : t("cmd.run")} hint="ENTER" tone="ok" disabled={disabled} onClick={submit} icon="act-send" />
-        <BarButton label={t("cmd.stop")} hint="ESC" tone="stop" disabled={!running} onClick={() => actions.abort()} icon="act-stop" />
-        <BarButton label={t("cmd.fork")} hint="COPY" tone="quiet" onClick={() => actions.fork()} icon="act-copy" />
+      <div class="cmd-aux">
+        <div class="aux-primary">
+          <BarButton label={running ? t("cmd.steer") : t("cmd.run")} hint="ENTER" tone="ok" disabled={disabled} onClick={submit} icon="act-send" />
+          <BarButton label={t("cmd.stop")} hint="ESC" tone="stop" disabled={!running} onClick={() => actions.abort()} icon="act-stop" />
+        </div>
+        {/* quick prompts: a 3x2 pad matrix, corner key last. A pad appends its
+            text to the draft instead of sending — the operator still owns RUN. */}
+        <div class="aux-matrix" role="group" aria-label={t("qp.title")}>
+          {quick.map((q) => (
+            <button type="button" class="qp" key={q.id} title={q.text} onClick={() => useQuick(q)}>
+              <span class="lb">{q.label}</span>
+            </button>
+          ))}
+          <button
+            type="button"
+            class="qp is-edit"
+            title={t("qp.edit")}
+            aria-label={t("qp.edit")}
+            onClick={() => askDeck("quick")}
+          >
+            <Icon name="act-new" size={11} />
+            <span class="lb">{t("qp.editKey")}</span>
+          </button>
+        </div>
       </div>
     </div>
     </div>
@@ -2727,6 +3054,77 @@ function ThinkDeck({ current, onClose }: { current?: string; onClose: () => void
       <div style={{ font: "400 11px/1.6 var(--mono)", color: note ? "var(--amber)" : "var(--g2)", padding: "4px 2px 0" }}>
         {note ?? "off → THINKING rows disappear from the stream. switching mid-run applies to the next turn."}
       </div>
+    </Deck>
+  );
+}
+
+/**
+ * The quick-prompt editor. Same language as every other console form: a numbered
+ * strip per row, label on the left, the sentence in mono, delete at the end.
+ * Rows are edited in place and only written when SAVE runs — a half-typed row
+ * never lands on the pad.
+ */
+function QuickDeck({ onClose }: { onClose: () => void }) {
+  const [rows, setRows] = useState<QuickPrompt[]>(loadQuick);
+  const patch = (id: string, next: Partial<QuickPrompt>) =>
+    setRows((r) => r.map((q) => (q.id === id ? { ...q, ...next } : q)));
+
+  return (
+    <Deck
+      label={t("qp.title")}
+      sub={`${rows.length}/${QUICK_SLOTS} · ${t("qp.sub")}`}
+      actions={
+        <>
+          <BarButton tone="quiet" label={t("qp.reset")} icon="act-reload" onClick={() => setRows(resetQuick())} />
+          <BarButton
+            tone="ok"
+            label={t("qp.save")}
+            icon="status-ok"
+            onClick={() => {
+              saveQuick(rows);
+              onClose();
+            }}
+          />
+        </>
+      }
+    >
+      <div class="qp-rows">
+        {rows.map((q, i) => (
+          <div class="qp-row" key={q.id} data-bad={q.text.trim() ? "0" : "1"}>
+            <span class="n">{String(i + 1).padStart(2, "0")}</span>
+            <input
+              class="kl"
+              value={q.label}
+              maxLength={12}
+              placeholder={t("qp.label")}
+              aria-label={t("qp.label")}
+              onInput={(e) => patch(q.id, { label: (e.target as HTMLInputElement).value })}
+            />
+            <input
+              class="tx"
+              value={q.text}
+              placeholder={t("qp.text")}
+              aria-label={t("qp.text")}
+              onInput={(e) => patch(q.id, { text: (e.target as HTMLInputElement).value })}
+            />
+            <button
+              type="button"
+              class="del"
+              title={t("qp.del")}
+              aria-label={t("qp.del")}
+              onClick={() => setRows((r) => r.filter((x) => x.id !== q.id))}
+            >
+              <Icon name="act-delete" size={11} />
+            </button>
+          </div>
+        ))}
+        {rows.length < QUICK_SLOTS ? (
+          <button type="button" class="qp-add" onClick={() => setRows((r) => [...r, newQuick()])}>
+            <Icon name="act-new" size={11} /> {t("qp.add")}
+          </button>
+        ) : null}
+      </div>
+      <div class="qp-note">{t("qp.note")}</div>
     </Deck>
   );
 }

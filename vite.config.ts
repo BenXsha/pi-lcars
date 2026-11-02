@@ -27,19 +27,34 @@ type PackageJson = {
   devDependencies?: Record<string, string>;
 };
 
-/** npm allows `Name <mail> (url)` or an object; ABOUT wants the three parts split. */
-function parseAuthor(raw: AuthorField | undefined): { name: string; email: string | null; url: string | null } | null {
+/**
+ * npm allows `Name <mail> (url)` or an object; ABOUT wants the parts split.
+ *
+ * The address is shipped as two halves (`local` + `domain`) rather than one
+ * string, so the bundle never contains a token a harvester's regex can match.
+ * The UI joins them only at the moment the operator asks for the address.
+ */
+type EmailParts = { local: string; domain: string };
+function splitEmail(email: string | null): EmailParts | null {
+  if (!email) return null;
+  const at = email.lastIndexOf("@");
+  return at > 0 ? { local: email.slice(0, at), domain: email.slice(at + 1) } : null;
+}
+
+function parseAuthor(
+  raw: AuthorField | undefined,
+): { name: string; email: EmailParts | null; url: string | null } | null {
   if (!raw) return null;
   if (typeof raw === "string") {
     const email = /<([^>]*)>/.exec(raw)?.[1]?.trim() || null;
     const url = /\(([^)]*)\)/.exec(raw)?.[1]?.trim() || null;
     const name = raw.replace(/<[^>]*>/g, "").replace(/\([^)]*\)/g, "").trim();
     if (!name && !email && !url) return null;
-    return { name: name || email || "unknown", email, url };
+    return { name: name || email || "unknown", email: splitEmail(email), url };
   }
   const name = raw.name?.trim() || raw.email?.trim() || raw.url?.trim() || "";
   if (!name) return null;
-  return { name, email: raw.email?.trim() || null, url: raw.url?.trim() || null };
+  return { name, email: splitEmail(raw.email?.trim() ?? null), url: raw.url?.trim() || null };
 }
 
 /** Best-effort: a tarball install or a non-git checkout simply has no commit. */

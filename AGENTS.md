@@ -105,6 +105,10 @@
 - **R7 无描边**：不用 border 表达边界。需要分隔就用黑缝或 2px 内缩块。
 - **R8 无卡片**：不允许"圆角卡片 + 内边距 + 标题"的三段式。信息靠**条带（bar）** 承载，条带左端接在一条"脊（spine）"上。
 - **R9 左轨即导航**：左轨条堆 = 站点列表，条高随重要性变化（当前站点最高）。条内编号是**真实快捷键**（`01`–`06`）。
+  **条长随标签内容**（`width: fit-content`，`min-width: 88px`，`max-width: 100%`）—— 右手边齐得像表格就不是 LCARS 了；
+  只有窄轨（64px）图标态才回到满宽。
+  **标签两侧留白不对称**：`--st-gap: 24px`（编号↔文字）+ `--st-gap-r: 40px`（文字↔图标），
+  条末端 `--st-pad: 16px`。文字贴住图标比贴住编号显拥挤，所以尾巴多给一档；`MCP` 这种三字母不会被夹死。
 
 ### 3.5 曲线（浏览器里的真形状）
 
@@ -137,21 +141,38 @@ LCARS 的形状语言本质是**曲线**：肘的凹角、胶囊端、读数条�
   若 cap 与列同宽，凹口会缩进 r 像素，下面一排块就会突兀地探出约 55px。
   凹口区（x ∈ [列宽, 列宽+r]，y ≤ bar）被 cap 盖住，所以细条要留 `padding-left: 列宽+r` 再把内容放出来。
 
-### 3.5b Markdown（助手输出）
+### 3.5b Markdown（助手输出 / 文档预览）
 
-助手消息按 Markdown 渲染（`marked`，构建期依赖，运行时无新增）。规则：
+Markdown 渲染（`marked`，构建期依赖，运行时无新增）。**两种方言**，因为同一个解析器在回答两个问题：
+
+| 方言 | 用在哪 | `breaks` | 理由 |
+|---|---|---|---|
+| `CHAT` | 助手流式输出（mission log / STREAM） | `true` | 模型写的是短行，单换行就是换行 |
+| `DOC` | 查看器里的 `.md` 文件（PREVIEW） | `false` | 文档的软换行必须折成一段；带 `breaks` 时每个源码行变成 `<br>`，**这就是“纯文本间距过大”的真因** |
+
+规则：
 
 - **原始 HTML 一律丢弃**（`renderer.html = () => ""`）：模型输出不得注入标记。
-- **代码块复用工具条的语言**：`[LANG]` 头 26px + 可滚动正文（`52vh` 上限、等宽、`--g0`），右上 `COPY`。
+- **行高只允许 1.5–1.7 这一档**（§4.2 的 16px→24–26px）：
+  正文 `16/1.6`（25.6px）· 行内代码 `15/1.4` · 代码块 `13.5/1.55`（21px）。
+  早期写的是 `/2`（正文 32px、代码 27px），一段话读起来像行间插了空行；
+  **行内代码的 line-height 必须小于正文**，否则每个 `code` 词都把行盒子顶高一截。
+- **代码块复用工具条的语言**：`[LANG]` 头 26px + 可滚动正文（`52vh` 上限、等宽、`--g0`、内距 `10/14`），右上 `COPY`。
+  块内的 `<code>` 必须归零（`padding:0`、`background:none`、`font:inherit`）——
+  行内代码那套内距叠在 `<pre>` 自己的内距上，是“代码块看着很空”的另一半原因。
   **有语言标识就上高亮**（highlight.js，只注册 12 种语言）；`read` 工具的输出按文件扩展名高亮。
   配色按语义映射，不搬现成主题：keyword=lav、string=cyan、number=amber、function=orange、comment=g2。
-  行内代码用 `--g0` 底 + `--ice` 字，不加边框。
-- **表格不用线**：表头是一块 `--amber` 实色（黑字、10px 全大写），表体每行一块 `--g0`，
-  行距 4px 黑缝，首尾单元格各收一侧圆角。
+- **表格不用线**：表头是一块 `--amber` 实色（黑字、11px 全大写 `--din`、`nowrap`），表体每行一块 `--g0`，
+  行距 4px 黑缝（`border-spacing: 0 4px`），首尾单元格各收一侧圆角。
+  - **对齐是作者的语法**：`:--` / `:-:` / `--:` 渲染成 `align` 属性后再由 CSS 取用（`th[align]` / `td[align]`），
+    `right` 列加 `tabular-nums`。曾经整张表左对齐，数字列读不起来。
+  - **表包在 `.md-tbl` 里横向滚动**：`.md` 是 flex 列，表格的 min-content 会把整列撑宽。
 - 标题靠 `inset 4px --orange` 竖条（h1/h2）建立层级，不用字号爆炸；h4 走全大写 + `--amber`。
 - 列表 marker 用 `--orange`（有序用 `--amber` + 等宽数字）。
 - 链接一律 `target=_blank rel=noreferrer noopener`，下划线只用 1px `--ice` 透明化，不做整块高亮。
 - **用户消息不解析 Markdown**：操作者输入按字面呈现，避免误判。
+- 工艺页（`?craft#markdown`）常驻一份样例（段落 + 行内代码 + 对齐表格 + 代码块 + 列表 + 引用），
+  `test/ui.mjs` 在它上面断言行高比、行内代码不撑行、表格对齐与滚动容器——**这几个数不能靠肉眼守**。
 
 ### 3.5c Diff（差异块）
 
@@ -207,9 +228,40 @@ LCARS 原版用 `Swiss 911 Ultra Compressed`（压缩粗体）。**本项目不�
 
 | 令牌 | 首选 | 回退栈 | 用途 |
 |---|---|---|---|
-| `font-ui` | **MiSans**（小米，免费商用） | `Source Han Sans SC` → `Noto Sans SC` → `PingFang SC` → `HarmonyOS Sans SC` | 中文正文、中英混排 |
-| `font-instrument` | **D-DIN**（SIL OFL） | `Inter` → `Helvetica Neue` | 英文标签、编号、读数、大数字 |
-| `font-code` | **IBM Plex Mono**（SIL OFL） | `SF Mono` → `Menlo` | 命令、路径、工具参数 |
+| `--text`（`font-ui`） | **MiSans**（小米，免费商用）**不内置** | `PingFang SC` → `Source Han Sans SC` → `Noto Sans SC` → `Helvetica Neue` → `Arial` | 中文正文、中英混排 |
+| `--din`（`font-instrument`） | **D-DIN 400/700**（SIL OFL，**内置**） | `DIN Alternate` → `Bahnschrift` → `DIN Condensed` → `Helvetica Neue` → `Arial` | 英文标签、编号、读数、大数字 |
+| `--mono`（`font-code`） | **IBM Plex Mono 400/600**（SIL OFL，**内置**） | `ui-monospace` → `SF Mono` → `Menlo` | 命令、路径、工具参数 |
+| `--deco`（`font-deco`） | **Michroma 400**（SIL OFL，**内置**） | `Orbitron` → `Chakra Petch` → `Rajdhani` → `--din` | **只用于装饰**：顶栏字标、周期编号（`I / II / III`）。不承担正文 |
+
+**内置的三个字族共 5 个 woff2 / 74,588 B**（`public/fonts/`，Vite 原样拷进 `dist/fonts/`，随 npm 包分发）：
+
+| 文件 | 字重 | 体积 | 上游（同时发布字形与许可证） |
+|---|---|---|---|
+| `d-din-400.woff2` / `d-din-700.woff2` | 400 / 700 | 41 KB | `github.com/amcchord/datto-d-din`（Datto OFL 发布的镜像） |
+| `michroma-400.woff2` | 400 | 11 KB | `github.com/google/fonts/ofl/michroma` |
+| `ibm-plex-mono-400.woff2` / `-600.woff2` | 400 / 600 | 20 KB | `github.com/google/fonts/ofl/ibmplexmono` |
+
+硬规则：
+
+- **OFL §1 要求许可证随字体走**：`public/fonts/OFL-*.txt` 三份许可证与 woff2 同放，`README.txt` 写明来源与总字节数。
+  删字体必须连许可证一起删，加字体必须一起加。
+- **文件永不改动、永不改名**：D-DIN 与 Plex 带 Reserved Font Name（`D-DIN` / `Plex`），改名或二次子集化即违约。
+  Latin 子集是**下载时就选用官方 Latin 分包**（Google Fonts 的 `/* latin */` 块），不是我们自己裁的。
+- **从上游取，不从字体站取**：`fontspace.io` 之类的聚合站会把 Helvetica Neue / Microgramma / Eurostile /
+  Lucida Grande 当「免费」发，页面上的「License: OFL」不是授权书，下载包里也没有 `OFL.txt`。
+  合规做法是走 `scripts/fetch-fonts.mjs`：按上游 URL 下载 → 校验 `wOF2` 魔数 → 记录 sha256 → 生成 `src/fontPack.ts`。
+  **发现字体的地方可以是任何站点，取证的地方只能是上游。**
+- **内置的意义是「网格确定」**：内置前同一张 1600px 版面在 macOS 是 DIN Alternate、在 Windows 是 Bahnschrift、
+  在 Linux 什么都没有 —— 实测 D-DIN 比 macOS DIN Alternate 窄 2–3%（`SUBAGENTWORKFLOW` 129 vs 133px），
+  于是「臂长随名字」这类尺寸在不同机器上给出不同结果。
+- **CJK 不内置**：可用的 MiSans 子集是 MB 级，而这块界面以拉丁读数为主；浏览器逐字符回退，
+  所以 `中文 READY` 这种混排仍然中文走系统字体、拉丁走 D-DIN。
+- `document.fonts.check()` 只认 @font-face，所以 ABOUT 的 `DECORATIVE FACE` 仍是**实测读数**：
+  用「同串同尺寸比宽」判定，并先 `document.fonts.load()` 等内置 woff2 落地（最多等 1s），避免首帧读出回退答案。
+
+> **为什么装饰层不是「星际迷航字体」**：LCARS 原版是 Helvetica Ultra Compressed（商业授权，约 €59），而传播最广的
+> 爱好字体（Okuda / PCap Terminal / Star Trek Future）都是「个人使用」或原版字形的衍生 —— 两者都进不了 MIT 包。
+> 内置的 Michroma 是 Microgramma 系的方角门牌字：形近 TNG 门牌，许可干净。身份仍然由几何/色彩/网格承担（见首段）。
 
 > 为什么 MiSans 而不是思源黑体：**宿主里没有安装 Source Han / Noto Sans SC**（实测 `setFont` 静默回退到 Inter）。
 > MiSans / PingFang SC / HarmonyOS Sans SC 实测可用。思源系仍是回退栈第一位 —— 只要目标机器装了就会命中。
@@ -248,12 +300,15 @@ LCARS 原版用 `Swiss 911 Ultra Compressed`（压缩粗体）。**本项目不�
 |---|---|---|
 | **草稿** | 按**会话**存 `localStorage[lcars.draft.<id>]`，输入停止 400ms 落盘；发送 / 执行 `/命令` 后清空；切换会话先 flush 旧会话再读新会话 | 刷新、切站、切会话都不丢字；**不跨会话串字** |
 | **历史召回** | `↑` 从**光标在文首**时开始走 `lcars.hist.<id>`（最近 40 条，去连续重复），`↓` 走回去，到底恢复原草稿；随手输入即退出历史模式 | 不在任意位置劫持 `↑`，否则多行草稿没法用方向键 |
-| **附件** | 粘贴 / 拖入 / 点 attach 得到图片 chip（缩略图 + 名字 + 体积 + ×，上限 6 张） | 服务端只收 `png/jpeg/webp/gif`，`/api/prompt` 独立 32MB 缓冲；转录区**只显示数量与体积**，不回传字节 |
+| **附件** | 粘贴 / 拖入 / 点 **ENTRY 块**里的图片键得到图片 chip（缩略图 + 名字 + 体积 + ×，上限 6 张） | 服务端只收 `png/jpeg/webp/gif`，`/api/prompt` 独立 32MB 缓冲；转录区**只显示数量与体积**，不回传字节。**chip 与「键盘提示」共用同一行**（左提示、右计数），附件永不占第二行；已附张数写在 ENTRY 块底部（`2/6 IMG`） |
+| **语音输入** | **ENTRY 块**里的麦克风键，用浏览器自带识别（`SpeechRecognition` / `webkitSpeechRecognition`），边识别边把文字并进同一份草稿；再点一次停止，发送时自动停 | 能力探测决定可用性：不支持的浏览器按钮 `disabled` + `title` 说明，**不做静默无操作**。识别过程完全在浏览器侧（含它自己的网络跳转），本应用不上传音频；语言跟 `settings.locale` 走（`zh-CN` / `en-US`） |
 | **@ 引用** | `@` + 若干字符 → 文件面板（同一套 `.cp` 条），`↑↓` 选、`Tab/Enter` 插入成 `` `rel/path` `` | 扁平索引 + 服务端排序（文件名前缀 > 文件名包含 > 路径包含），跳过 `node_modules/.git/dist` 与隐藏项，20s 缓存 |
-| **自增高** | `height:auto` 量 `scrollHeight`，夹在 `44px` 与 `min(240px, 26vh)` 之间，超限内部滚动 | 测量在 effect 里做，不用字符数估算；`ENTRY` 块与右侧按钮**固定 96px 贴底**，只有字段长高 |
+| **自增高** | 用一块**离屏镜像**（`.grow-mirror`，`position:absolute; left:-9999px`，同字体/行高/宽度/`pre-wrap`）量 `scrollHeight`，夹在 `44px` 与 `min(240px, 26vh)` 之间，超限内部滚动；**算出来的高度没变就不写 DOM** | **绝不用 `height:auto` 去量真实输入框**：它在 `rows={2}` 下等于 64px，而静态高度是 44px —— 每敲一个字都让 composer 长 20px 再缩回去（handler + effect 各一次），每次都会重排并重绘整条转录。实测 2.5k 节点的会话里：`auto` 方案 **37.9ms/键（≈26fps）**，镜像方案 **16.6ms/键（60fps，与空会话相同）**。`ENTRY` 块与右侧按钮**固定 96px 贴底**，只有字段长高 |
+| **快捷指令（macro pad）** | 运行键下面一块 **3×2 按键矩阵**：5 个按键 + 右下角 `EDIT`。点键只把正文**追加进草稿**（不发送），`title` 给完整正文 | 内置五条就是这台控制台每天做的事：提交推送 / 结构优化 / 启动项目 / 需求分析 / 开发计划（按 `locale` 各一份）。存在 `localStorage.lcars.quick`，**不进会话**；`EDIT` 开 deck（行内改名 / 改正文 / 删除 / 加键 / 恢复内置），**保存才落盘**，半成品行不会上键盘 |
 | **输入法（IME）** | 组字期间 `value` 与 DOM **逐键同步**（`onInput` 直接 `setText(el.value)`），`Enter` / `↑↓` / `Tab` / `Esc` 全部让给候选窗；字段随组字即时长高 | Preact 在 `value` 与 `dom.value` 不一致时会**回写**（`diff/index.js`），滞后一帧就把半个词吞掉；故不能用“组字期间不改 state”的做法，只能让两者恒等。`composing` ref 兜住“提交候选的 Enter 报 `isComposing:false`”的浏览器 |
 
 - 状态只用**脊色**表达（聚焦 `--orange`、拖入 `--tang`、引用闪回 `--ice`），不加 ring、不加投影（§2 R4 / §4.3）。
+- **`ENTRY` 块 = 输入模式控制块**，不是一块纯标签：`ENTRY` 标签 / 两个黑底图标键（图片、语音）/ 底部一行模式（`CTRL K` · `STEER` · `LISTENING` · `N/6 IMG`）。图标键是橙色块里的**黑色挖槽**，和 shelf 上的控制 chip 同一套语言；语音激活时键变 `--tang` 并做亮度脉冲（§5 允许的唯一脉冲）。
 - 附件 chip 的左脊是 `--lavender`（并行/外部输入位），转录里的静态 chip 降为 `--g2`。
 - `@` 面板的文件名用 `--ice`：路径是**只读引用**，不是可执行命令。
 
@@ -286,6 +341,20 @@ LCARS 原版用 `Swiss 911 Ultra Compressed`（压缩粗体）。**本项目不�
 | 宽度变化（meter） | `width` 过渡 | 240ms linear |
 | hover | **无过渡**，直接 +8~40% 亮度 | 0ms |
 | 声音 | 默认静音，设置里可开 | — |
+
+**页面级微动效（v3）**：整套动效收敛成**三种动作**，每个构件必须能说出自己属于哪一种，
+说不出来的不许动。三者都只用上面四个时长与 linear / steps，不新增缓动。
+
+| 动作 | 语义 | 落在哪些构件 |
+|---|---|---|
+| **ENTER**（`wipe` / `wipe-down`） | 「这块是新的」 | 左轨选中条与选中会话、面板头 `.phead`、列表行（`.hrow` / `.mcp-card` / `.sk` / `.pv-model` / 右栏 `.mrow`，延迟 60ms）、工具结果落地（state 变 `ok`/`error` 时 `.out`/`.err`）、子代理嵌套行、整列覆盖层（查看器 `.fv` / 分支树 `.tv` / 分区工作区 `.ws`，140ms）、`LATEST` 条（90ms）、站位切换时的标题块（90ms） |
+| **CHANGE**（`swap`，steps(1)） | 「同一个位置上，读数变了」 | 站位外壳切换（`.anim-swap`，90ms）、`SESSIONS/FILES` 二段开关、shelf 的 `MODEL`/`THINK` 读数（值变化才重挂）、复制成功的 `COPIED` |
+| **BUSY**（`scan` / `sweep`，900ms steps(3)） | 「它在跑，还没回来」 | 工具臂与嵌套行、思考区 `SCANNING`、重连中的 `LINKING` 徽标、**命令条顶部 2px 梯度扫描条**（`data-run="1"`，`sweep` 走 `left:0→67%` 保证扫描块不越出父容器，不用 translate 以免画出边界） |
+
+- 扫描条为什么是 `left` 而不是 `translateX`：`busy` 那套 translate 会超出父容器右沿，命令条贴着屏幕底、右边就是右栏，画出去不可接受。
+- 行进场**同时**出现（不 stagger），只有「次级块」允许固定的 60ms 延迟；这是节奏，不是逐项滑入。
+- 所有动作在 `[data-motion="reduced"]`（设置项）与 `prefers-reduced-motion` 下都被拍平（`animation: none` / `0.001ms`），
+  扫描条因此退化成一条静止的 `--tang` 细线 —— 仍然说明「在跑」，只是不闪。
 
 - **R11 只用 linear**：唯一例外是 `ease-out`，仅用于 240ms 以上的宽度补间。禁止 spring / bounce / 模糊过渡。
 - **R12 尊重减弱动效**：`prefers-reduced-motion: reduce` 时全部 `0.001ms` 且不循环。
@@ -496,6 +565,9 @@ TUI 的 `/tree` 对应物。服务端 `POST /api/session {op:"tree"}` 把 `manag
   从 `session.messages` 重建 items → 推 `{e:"items"}`。运行中拒绝（`409 E_BUSY`）。
 - 切换前必须二次确认（行内 `SWITCH HERE / CANCEL`）——它会把后续对话从当前视图移走。
 - 入口是 center header 的 `TREE` 徽标，视图与文件查看器同级（替换 transcript 列，composer 不动）。
+- **它是开关，不是打开器**：点一下开、再点一下关，开着时徽标冰蓝实心（`aria-pressed`），面板里的 `CLOSE`
+  只是第二条出路、绝不是唯一出路。打开 TREE 会关掉 STREAM，点 `LOG` / `STREAM` 也会关掉 TREE ——
+  三个视图互斥，`VIEW` 开关永远说真话。
 
 ### 7.6r 三分区域工作区（STREAM，实验视图）
 
@@ -512,7 +584,10 @@ TUI 的 `/tree` 对应物。服务端 `POST /api/session {op:"tree"}` 把 `manag
 `I` 是操作员立的因，`II/III` 是它引出的两半，最后仍落回 `I` 等一句确认。罗马数字刻意与左轨
 `01`–`06` 的快捷键编号区分开，避免"编号即快捷键"（§3 R9）被误读。
 
-- **入口**：center header 的 `STREAM` 徽标（开着时变 `LOG`，`data-on="1"` 用 ice 实心），`Esc` 退回日志，
+- **入口**：center header 上的 **`VIEW` 双位开关** `[LOG | STREAM]`：两位永远同时在屏上，选中位 `--ice` 实心 + 黑字，
+  另一位 `--g1` + `--g3`（hover 只提亮，不换底）。**不做"点一下换个字"的单键** —— 单键读作「去日志」这个动作，
+  而这里是两个共存状态的切换；旁边的 `TREE` 仍是单键徽标，两者放在一排时“开关 vs 动作”的差别肉眼可辨。
+  `Esc` 退回日志，
   `#stream` 可深链（与 `TREE` 同级：替换 transcript 区，composer 不动）。
 - **切分是纯函数**（`zonesOf()`），每条 item 只落一个区，不复制、不编造：
 
@@ -534,11 +609,19 @@ TUI 的 `/tree` 对应物。服务端 `POST /api/session {op:"tree"}` 把 `manag
   这台仪器忙不忙、要不要求你。
 - 编号块、状态块都只做**单侧圆角**（右端）；正文体用 `--r-2`（14px），对话区同样是 `--r-2`——
   圆角尺寸随块的大小走，不做四角同半径（§3 R5）。
+- **每台仪器都是一把曲臂（折线臂）**，和 standby / 工具行同一套语法：编号块的**左上外角 r=14** →
+  `.ws-arm`（28×18 的 SVG，凹圆角 r=14，跨过 4px 黑缝，`z-index:2` 盖在滚动体之上）→ 躯体左边的
+  **14px 实色竖腿**（`border-left`）→ 读数条（`.ws-foot`）里用 `inset 14px` 让腿一直跑到脚。
+  曲臂画在**头部**而不是躯体里：躯体是 `overflow-y:auto`，放里面会被裁掉。
+- **三区共用同一条读数条语法**：`[实心 cap][同色 9% 色带][读数]`。终端命令行是 `$`/`▸` 实心 cap +
+  状态色带；思考块是编号实心 cap（moon）+ 文本带。这一层统一之后，两个上分区的"仪器感"来自同一个句子，
+  不是各画各的。
 - **两条接缝里的接头**（`.ws-joint`，96×8px，`--g1`）：左列与右列各一条，正好落在
   两列与对话区之间的 8px 黑缝里，让两根柱子"接入"底栏——这就是本视图的**肘**预算（§3 R6：
   一个手势镜像使用，左主结构 + 右状态区），不再加第三个 L 形装饰。
-- **空区必须自证**：三区各自的空态文案（`ws.empty*`）走 i18n，前面配一个小 `Elbow`（真曲线，`currentColor`
-  取该区色调），不留纯黑板。
+- **空区必须自证**：三区各自的空态文案（`ws.empty*`）走 i18n，前面配一根 **28×4 的色调短棒**
+  （`border-radius: 0 pill pill 0`），不留纯黑板。这里**不再放第二把肘**——曲臂已经是区框本身，
+  再画一把只是重复。
 - **每个区独立滚动且独立跟随**：只有贴底时才自动滚（滚上去就不再被拽回去）。**跟随的触发是内容增长，不是 `count`**：
   流式正文、流式 thinking、正在跑的命令输出都是“item 数不变、高度在长”，只按条数跟随等于看着答案长到屏幕外。
   实现是 `Zone` 里每次渲染后的 effect（`pinned` 为真才写 `scrollTop`），不需要 `ResizeObserver`。
@@ -683,11 +766,22 @@ composer 上方出现 `QUEUED n` 条带，逐条显示待投递文本 + `deliver
 
 ### 7.6g 空态（standby）
 
-空会话不能只剩一段说明文字：
+空会话不能只剩一段说明文字 —— 它必须是**一台待命仪器**（§7.6 的反面：不写散文、不写装饰编号）：
 
-`solid 4px --orange 竖条 + 21px 标题 STANDING BY + 10.5px 全大写副标`，下面用 `[96px 键 | 值]` 的
-双列读数说清楚 LINK / INPUT / STREAM / SCOPE，键用 `--amber` 等宽，值用 `--g3` 等宽。
-文案保持"仪表陈述句"，不用营销口吻，也不描述不存在的能力。
+- **头部是一个肘 + 一根脊柱**：22px 橙臂横贯整宽（右端半圆收口），14px 竖向脊柱贴着标题左侧下探；
+  凹角用二次贝塞尔倒圆（r=22），**外侧角也倒圆（r=16）**，脊柱末端再以一个 r=14 的根部圆角**长进第一根读数条**——
+  头部不在半空里断掉，它把视线交给下面的条目。
+- **正文是 5 根读数条**（高 `52 / 44 / 36 / 44 / 36`，条高即权重，不是等高栅格）：
+  `[14px 脊柱][118px 实色标签块（图标 + 全大写标签，黑字）][值带]`，条间 4px 黑缝。
+  值带是 `--tone` 8% 的连续色带（同工具行），右端半圆收口；右侧可挂一条 11px 说明或一根两段 meter。
+- **五个读数全部来自活会话的 meta**：`WORKSPACE`（cyan，cwd）· `MODEL`（orange，模型 + 思考档）·
+  `LOADOUT`（amber，工具数 + 技能数）· `CONTEXT`（lilac，`contextPct` + `used / window`，带 meter）·
+  `APPROVAL`（moon，策略 + 一句“什么会停下来”）。**没有 meta 就写 `—`**，不编数字。
+- **键位图例**（`ENTER` / `SHIFT + ENTER` / `@` / `ESC`）是四个 `[kbd | 动作]` 小块，不是句子；
+  底部一条 26px 状态条（三段扫描 + `AWAITING INSTRUCTION`），`margin-top:auto` 贴在面板底边。
+- 面板撑满 `#scroll`（`.sess-body`），所以状态条落在屏幕底沿，中间留黑 —— 黑是背景，不是空缺。
+
+文案保持“仪表陈述句”，不用营销口吻，也不描述不存在的能力。
 
 ### 7.6q ABOUT 站（归属与致谢）
 
@@ -702,8 +796,11 @@ composer 上方出现 `QUEUED n` 条带，逐条显示待投递文本 + `deliver
 - **归属文案**必须写死三件事：LCARS 出自 TNG(1987)、Michael Okuda 与 Rick Sternbach；三处刻意偏离
   （一色一义 / 放弃压缩字体 / 编号只放真实数据）；Star Trek 与 LCARS 是 Paramount/CBS 商标、
   本项目为非官方爱好者作品、不复用原版素材。
-- **字体段**说明字体栈偏好的 MiSans（小米，免费商用）/ D-DIN / IBM Plex Mono（后两者 SIL OFL），
-  并明确"不随包分发字体文件"。
+- **字体段**说明三款**内置**字族（D-DIN 400/700 · Michroma 400 · IBM Plex Mono 400/600，全 SIL OFL 1.1），
+  每一行给「字族 + 字重 + 角色 + 真实体积 + 许可证」，体积来自 `src/fontPack.ts`（由 `scripts/fetch-fonts.mjs` 生成），
+  不手写；再一行 `FONT PAYLOAD`（`5 woff2 · 73 KB`）与一行 `DECORATIVE FACE` 实测读数（先等内置 woff2 落地，
+  再比宽判定，多半是 `Michroma`；加载失败才会是 `not loading — D-DIN takes over`）。
+  **CJK 也要说清楚不内置**：中文走系统字体是决定，不是缺省。
 - **网络段**必须与实现一致：无遥测、默认只绑 `127.0.0.1`、对外流量仅来自 pi 本身。
 - 正文走 `i18n`（中英），包名/许可证/商标声明保持原文，不翻译专有名词。
 
@@ -749,12 +846,17 @@ composer 上方出现 `QUEUED n` 条带，逐条显示待投递文本 + `deliver
    **不允许出现“消息在流、输入框还在等 RUN”的矛盾态**。
 8. **图标必须在色块内部**：工具行的图标放在名字块（实色）里，与标签同行，颜色为 **黑**（跟块内文字同色）。
    早期版本给图标单独开了一列 26px，靠黑底衬托，结果在状态条和名字块之间切出一段黑，行被割裂。
-   现在的列宽只有 `4px(状态) | 104px(名字+图标) | body | 88px(耗时)`，色块连续。
+   
+8b. **名字在第一行，臂长随名字**（v3）：工具行不是「左边一个 104px 名字格 + 右边内容」，而是
+   **折线臂**：顶部一条 `26px` 实色横臂（`[图标][名字 ×N][右端耗时/返回码]`，半圆收口），
+   下面是 `8px` 同色竖脊 + `9%` 色带的躯体，两者在内角用 `r=10` 的凹圆角相接。
+   横臂 `width: fit-content; min-width: 148px`，**长名字自己把臂拉长**（`SUBAGENTWORKFLOW` → 209px），
+   只有超过整行宽才省略 —— 固定列宽时代 `GET_SUBAGENT_RESULT` 根本读不出全名。
 9. **折叠必须真的解开**：展开靠 `data-expanded="1"` 解除 `max-height`，不能只改渲染行数 ——
    只切数据而 CSS 仍钳着 `max-height: 2.8em` 时，按钮会"点了没反应"。展开后给 `52vh` 上限 + 内部滚动，
    否则 45 行输出会把整条 transcript 顶下去 700px。
-   **展开手柄 = 工具名字块本身**（它已经是一个实色块，天然是最好的点击目标）：`<button class="nm">`
-   带 `aria-expanded`，键盘 Enter/Space 可用；行尾的 `+ N MORE LINES` 只是同一动作的副入口。
+   **展开手柄 = 工具名字臂本身**（它已经是一个实色块，天然是最好的点击目标，而且现在是满宽的）：
+   `<button class="th">` 带 `aria-expanded`，键盘 Enter/Space 可用；行尾的 `+ N MORE LINES` 只是同一动作的副入口。
 10. **滚动窗从中间开始**：顶部放 `↑ 18 EARLIER MESSAGES` 灰条。
    会话永远不会刚好从第一句开始，也不会刚好排满。
 
@@ -853,7 +955,8 @@ composer 上方出现 `QUEUED n` 条带，逐条显示待投递文本 + `deliver
 | 2026-xx-xx | 交付形态定为**一条命令**：`pi-lcars`（bin）= pi 后台 + UI + 浏览器；`dist` 随包发布，构建只在源码检出发生 | `opencode web` 式启动是产品级预期；全局安装不带 vite，不能要求用户先 build | PLAN.md §8（M9）、`bin/pi-lcars.mjs`、`package.json` 的 `bin`/`files`/`prepack` |
 | 2026-xx-xx | 启动前做 **pi 环境检查**：候选按“能 import + 具备所需 API”逐个探测，新版缺 API 就自动退到旧版；没装 pi 就打印平台对应安装命令（不打栈） | 用户机器上 pi 的版本/路径不可预测；“报错但不说怎么办”是启动器的最大摩擦 | `server/pi/sdk.mjs`、`bin/pi-lcars.mjs` 的 `doctor`、`test/pi-env.mjs`；PLAN §8.8 |
 | 2026-xx-xx | 路径一律 `node:os.homedir()` + `node:path`，支持 `PI_CODING_AGENT_DIR` / `PI_PACKAGE_DIR` | 旧代码读 `process.env.HOME`，在 Windows 上为空；pi 官方也提供这两个 env 覆盖 | `server/pi/sdk.mjs`、`server/index.mjs` |
-| 2026-xx-xx | 新增 `07 ABOUT` 站：版本 / 运行时 / 依赖许可 / LCARS 归属 / 字体 / 网络姿态；依赖清单由构建期注入而非手写 | 归因与许可证是可分发项目的基本义务；手写清单必然与 `package.json` 漂移 | `src/views/About.tsx`、`src/appInfo.ts`、`vite.config.ts`、AGENTS §7.6q |
+| 2026-xx-xx | 新增 `07 ABOUT` 站：版本 / 运行时 / 依赖许可 / LCARS 归属 / 字体 / 网络姿态；依赖清单由构建期注入而非手写 | 归因与许可证是可分发项目的基本义务；手写清单必然与 `package.json` 漂移 | `src/views/About.tsx`、`src/appInfo.ts`、`vite.config.ts`、AGENTS §7.6q || 2026-xx-xx | 顶栏字标去掉 `Enterprise`（→ `Agent Console` / `based on pi.agent`）；新增装饰字体令牌 `--deco`（Michroma → Orbitron → Chakra Petch → Rajdhani → D-DIN），只用在字标与周期编号；ABOUT 增加 `DECORATIVE FACE` 实测行 | 用户要"找一款开源的星际迷航字体做局部装饰"。调研结论：**没有可开源的 ST 字体**——原版 Helvetica Ultra Compressed 商业授权，Okuda / PCap Terminal / Star Trek Future 全是个人使用或衍生字形。所以改用 SIL OFL 的科幻字面做装饰层，并且仍然不随包分发；实测 Michroma 14px 会撑破 186px 字标槽（被裁 2px），降到 13px 后 174px 正好放下，`III` 在 34px 编号块里也不裁 | `src/styles/tokens.css`（`--deco`）、`src/styles/lcars.css`（`.cap-text b` / `.ws-hd .idx`）、`src/fonts.ts`、`src/views/About.tsx`、`src/i18n.ts`、AGENTS §4.1 / §7.6q |
+
 | 2026-xx-xx | 站点**组合键直连**：`⌥1`–`⌥6`（Alt+数字）切站、`⌥0` 回日志，左轨显示 `01`–`06` | §3 R9「编号即快捷键」此前只写了没接线。不用裸数字（会抢输入），不用 `⌘1–⌘9`（浏览器标签页）与 `⌘⇧3`（macOS 截图）；`⌥` 组合在两端都空闲，靠 `e.code` 取值以避开 macOS `⌥3=£` 的字符化 | `src/views/Console.tsx`、`src/styles/lcars.css` |
 | 2026-xx-xx | 动作条统一为一条语言：40px 中性底 + 4px 橙脊 + 34px 图标格 + 11px 标签，图标格与编号列同轴、标签与标题同轴（50px） | `.lnew` 被两条同名规则叠成竖排（新规则没重置 `flex-direction`），且与 `.sess` 网格对不齐 | `src/styles/lcars.css`（`.lnew`、`.add-row`、`.form-actions`、`.form-note`、`.pv-h`） |
 | 2026-xx-xx | `meta.queue` 只允许文本数组，客户端 `textList()` 兜底 | 服务端一处发数字、一处发数组，`...(... ?? [])` 抛异常后整页停止重渲染（表现为"点什么都没反应"） | `server/pi/registry.mjs`、`src/views/Console.tsx` |
@@ -874,16 +977,28 @@ composer 上方出现 `QUEUED n` 条带，逐条显示待投递文本 + `deliver
 | 2026-xx-xx | 输入区高度从"固定 96px"改为 **96px 下限 + 240px 上限的自增高**，`ENTRY` 块与按钮**固定 96 贴底** | 多行草稿（粘贴一段日志/报错）在两行高的字段里根本没法改；但整条 bar 一起长高会把按钮拉成色块板。只让字段长高、控件贴底，两个问题都解 | `src/styles/lcars.css`（`.cmdbar` / `.cmd-entry` / `.btn`）、`Composer` 的测量 effect、AGENTS §4.3 |
 | 2026-xx-xx | 附件在**转录区只留数量与体积**（`{mimeType, bytes}`），不回传 base64 | 一张截图 base64 就几百 KB，塞进 SSE 会让每次重渲染都搬运一遍；模型已经拿到字节，界面只需要回答"这轮带了什么" | `server/index.mjs`（`attachmentMeta`）、`server/pi/registry.mjs`（重开后从 session 里 `imagesOf` 还原）、`src/components/ui.tsx`（`.msg-attach`） |
 | 2026-xx-xx | 新增实验视图 **四分区域工作区**（`STREAM` 徽标切换 / `#stream` 深链）：同一份 items 按种类切成 thinking / base / output / action 四区，各自滚动、各自跟随；**不替换 mission log**，`Esc` 或徽标退回 | 长跑里「在读什么、产出什么、机器在干什么」混在一条时间线里，扫不动；分区是 LCARS 多仪表盘的原始用法，而按时间顺序读仍然只有 log 一种正确方式，所以做成并列视图而不是改造 log | `src/views/Console.tsx`（`zonesOf`/`Zone`/`Workspace`、`wsOpen`、hash、Esc）、`src/styles/lcars.css`（`.ws*`）、`src/i18n.ts`（`ws.*`）、`test/ui.mjs`、AGENTS §7.6r |
+| 2026-xx-xx | `TREE` 改为**自持状态的开关**：点一下开、再点一下关，开着时冰蓝实心 + `aria-pressed`；打开 TREE 关掉 STREAM，点 `LOG`/`STREAM` 也关掉 TREE（三个视图互斥，`VIEW` 开关永远说真话）；删掉标题里的假 `⌘T` 提示（浏览器保留该组合键，页面劫持不到） | 原来只能从面板头部的 `CLOSE` 关，位置在右上角一堆按钮之间，等于「进来了出不去」；而 `⌘T` 写在那里从来没接上，属于承诺不存在的快捷键 | `src/views/Console.tsx`（center-head 的 TREE / `.vsw`、`TreePanel` 保留 CLOSE）、`src/i18n.ts`（`tree.open` / `tree.close`）、`test/ui.mjs`、AGENTS §7.6o |
+| 2026-xx-xx | 输入框自增高改成**离屏镜像测量**（`.grow-mirror` + `grownRef` 去重写入），不再对真实 `textarea` 做 `height:auto` | 中文输入卡顿的根因不是 Preact、也不是 IME，而是量高方式：`height:auto` 在 `rows={2}` 下算 64px、静态高 44px，于是**每个按键都让 composer 长 20px 再缩回**（`onInput` 与 effect 各一次），每次都重排+重绘整条转录。CDP profile 实测（2.5k 节点转录）：修复前 37.9ms/键 ≈ 26fps，修复后 16.6ms/键 = 60fps 地板；空会话两者都是 16.6ms，这也是「会话越长越卡」的原因。镜像量与真实 `scrollHeight` 逐值对齐（4 行 = 160px，长段落封顶 = 26vh） | `src/views/Console.tsx`（`grow` / `grownRef` / `.grow-mirror`）、`src/styles/lcars.css`（`.grow-mirror` 与 textarea 共用字体度量）、`test/ui.mjs`、AGENTS §4.3b |
+| 2026-xx-xx | STREAM 三区补上**曲臂**：编号块左上外角 r=14 → `.ws-arm`（28×18 凹圆角，跨 4px 缝，z-index 盖在滚动体上）→ 躯体 14px 实色竖腿 → 读数条 `inset 14px` 让腿跑到底；思考块与终端命令行统一成 `[实心 cap][9% 色带][读数]` 的读数条；空态的小 `Elbow` 换成 28×4 色调短棒 | 用户判断「不像 TNG 控制台、缺曲臂」——原来三个区只是单侧圆角的矩形，头与体之间只有 4px 黑缝，没有任何结构把它们连起来；TNG 的分区感来自**构件相接处的肘**，不是给矩形加圆角。终端与思考原本各用各的样式（2px 脊 / 透明块），也没有仪器感，统一成读数条后两个上分区共享同一句话 | `src/views/Console.tsx`（`Zone` 的 `.ws-arm`、空态去掉 `Elbow`）、`src/styles/lcars.css`（`.ws-arm` / `.ws-body` / `.ws-foot` / `.ws-t` / `.term-cmd`）、`test/ui.mjs`、AGENTS §7.6r |
 | 2026-xx-xx | STREAM 视图对齐真实会话响应（三处）：① 客户端 store 的 `item` / `patch` / `delta` 不再原地改数组与对象，改发布**新数组 + 新 item**；② `Zone` 的跟随从“按 `count`”改为“每次渲染按内容高度”（贴底才跟）；③ `OUTPUT` 区只收真正有 `text` 的 assistant 消息，`生成中` 改由会话的 `streaming` 推导。服务端 `#load()` 也调用 `#hydrate()`（原先只有 rewind/goto 的 `#rebuild()` 才从 `session.messages` 重建） | 三条都是“真实响应到来时视图不真实”：memo 用的 `items` 身份在整场运行里不变，四区的**成员**被冻结在开跑那一刻（只有 log 在长）；流式正文/thinking/命令输出“条数不变、高度在长”，按条数跟随等于让答案长到屏幕外；只有 toolCall 的 assistant 消息会先占一条空 caret 再消失。而历史/恢复的会话 `items` 恒为 0——真实的 `session.messages` 从来没有被读回界面 | `src/store.ts`、`src/views/Console.tsx`（`zonesOf` / `Zone` / `Workspace`）、`server/pi/registry.mjs`（`#hydrate`）、`server/pi/stream.mjs`（导出 `agentMeta` / `nestedChildren`）、`test/smoke.mjs`、AGENTS §7.6r |
 | 2026-xx-xx | `BASE` 与 `OUTPUT` **合并为 `CONVERSATION`（`thread`）**：user / summary / assistant-text 按时间顺序落同一个区，脊色取 `--orange`；栅格从四区变三区（`thinking` 占满左列、`action` 占满右列、`thread` 满宽底栏） | 问答被拆到屏幕左下与底栏两处，读一条回答得先记住上面的问题——它不是四分区的信息密问题，而是切分轴选错了：“谁在说”不该跟“说的是什么”分开。合并后的区天然是一段对话，同时三区各自都能拿满一维（不再有碎块） | `src/views/Console.tsx`（`zonesOf` / `Workspace`）、`src/styles/lcars.css`（`.ws` 栅格）、`src/i18n.ts`（`ws.zoneThread` / `ws.emptyThread`）、`test/ui.mjs`、`README.md`、AGENTS §7.6r |
 | 2026-xx-xx | TERMINAL 与 OUTPUT **换位**：终端占右列（两行高），输出改满宽底栏（行高比不变：`0.78/0.58/1.55`） | 操作员要的是“命令在上、结果在下”的阅读顺序：终端是看“现在在干什么”的，贴右上就不用跨整屏回到左下；正文（markdown、宽段落）在满宽底栏读起来更顺，而终端在 360px 以上宽度下 `pre-wrap` 本来就够用。代价：终端不再是四区最大一块（输出 376px > 终端 ≈ 334px），`test/ui.mjs` 的断言同步改成“终端占右列 / 输出占满宽底栏” | `src/styles/lcars.css`（`.ws` 各 `grid-area`）、`test/ui.mjs`、AGENTS §7.6r |
 | 2026-xx-xx | 输入区适配输入法（IME）：组字期间 `value` 与 DOM 逐键同步（不再“组字期间不改 state”）；`onKeyDown` 顶部统一 `imeBusy()` 短路（`composing` ref / `isComposing` / `keyCode 229`），`Enter` `↑↓` `Tab` `Esc` 让给候选窗；`growth` 改为公共 `grow()` 并在 `input` / `compositionupdate` 里量；所有全局 Esc（中断运行、关覆盖层、壁纸选择器）与其它 Enter 提交框同样短路 | 两个真实病灶：① Preact 在 `value !== dom.value` 时**每次渲染回写** `value`，而渲染由 `setCaret` 触发——于是每敲一个拼音就把半个词吐回去，字段也停在 2 行高；② 组字时的 Enter/Esc 是“选词/关候选”，被当成“发送/中断”，半成品直接发出、跑着的回合被意外停掉 | `src/views/Console.tsx`（`imeBusy` / `Composer` 的 `grow` / 各 keydown）、`test/ui.mjs`（组字四检）、AGENTS §4.3b |
+| 2026-xx-xx | `LOG / STREAM` 从「单键翻字（开着时变 LOG）」改成 **`VIEW` 双位开关**：`[LOG][STREAM]` 两位常在，选中位 ice 实心、另一位 `--g1`+`--g3`，hover 只提亮；`aria-pressed` 表达状态 | 单键翻字的语义是错的：文字一变，它就读成「去日志」这个动作，而用户要看的是「我现在在哪个视图」。双位开关把两个状态同时摆出来，也让旁边仍是单键的 `TREE` 自然读成动作而不是模式（同一排里“开关 vs 动作”一眼可分） | `src/views/Console.tsx`（center-head 的 `.vsw`）、`src/styles/lcars.css`（`.vsw` / `.vsw-b`）、`src/i18n.ts`（`ws.mode`）、`test/ui.mjs`、AGENTS §7.6r |
+| 2026-xx-xx | 工具行改成**折线臂**：26px 实色横臂放 `[图标][名字 ×N][耗时/返回码]`（`width: fit-content; min-width: 148px`，臂长随名字），下面 `8px` 竖脊 + `9%` 色带的躯体，内角 `r=10` 凹圆角相接；展开/收起的手柄从名字块变成整条横臂 | 旧版是 `[4px][104px 名字块][body][88px 耗时]` 的四列网格：`SUBAGENTWORKFLOW` / `GET_SUBAGENT_RESULT` 在 104px 里永远被裁，而「这把到底跑了什么」正是工具行要回答的第一件事。把名字抬到第一行、臂长随名字，既解决截断，也让重复出现的工具行共享 standby 那套「横臂 + 脊柱」的肘语言（§3.5 / §7.6g），顺手把点击目标从 104px 扩到整条臂 | `src/components/ui.tsx`（`ToolStrip`）、`src/styles/lcars.css`（`.tool > .th` / `.tool > .bd` / `.join`、`.nm` 选择器、borg `alcove`）、`src/views/Craft.tsx`（长名字样例）、AGENTS §7.5 8b |
+| 2026-xx-xx | 左轨导航条改成**条长随内容**（`.station.is-full { width: fit-content; min-width: 88px; max-width: 100% }`，窄轨图标态仍满宽） | 之前六个站点都是 320 满宽等长条，右边缘齐成表格——那不是 LCARS 的左栏，原版是一堆长度不等的横条。实测宽度 `MCP 107 / SKILLS 128 / PROVIDERS 157 / HISTORY 137 / SETTINGS 146 / ABOUT 124`，差异来自标签本身，不是编的 | `src/styles/lcars.css`（`.lnav` 下的 `.station.is-full`）、AGENTS §3 R9 |
+| 2026-xx-xx | 输入区右侧改成 **44px 主操作条（RUN / STOP）+ 3×2 快捷键矩阵**（5 个 pad + 右下角 `EDIT`）；删掉 `FORK` 按钮（`/fork` 斜杠命令仍在）；pad 点击**只追加到草稿**，不直接发送；新增 `quick` deck 做行内编辑（改名 / 改正文 / 删除 / 加键 / 恢复内置），存 `localStorage.lcars.quick` | 原来右侧是三块 96px 高的等宽按钮，其中 `FORK` 基本不点却和 `RUN` 一样大；而「这台机器每天被要求做的那几件事」要手打五遍。pad 不直接发送是故意的：一个误点就把 prompt 发进真实会话，代价不可逆；追加进草稿后操作员仍握着 `RUN` | `src/views/Console.tsx`（`Composer` 的 `cmd-aux` / `QuickDeck`）、`src/quick.ts`、`src/styles/lcars.css`（`.cmd-aux` / `.qp*`）、`src/i18n.ts`（`qp.*`）、`src/composer.ts`（`quick` deck）、`test/ui.mjs`、AGENTS §4.3b |
 | 2026-xx-xx | ACTION 区**重画成终端**并拿到最大高度（行高比 `0.78 / 0.58 / 1.55`，标签改 `TERMINAL`）：bash 显示真实命令行 + 原样输出 + `exit N`，diff 显示 `+N −M` 与着色行，跑着的条目末尾追加闪烁 `$ ▊` | 168px 的底栏只够看两条命令，而“这把到底跑了什么、回来什么”正是分区视图存在的理由；终端是唯一既能提密度又能保留原文的形态，也不与 log 里的 LCARS 读数条重复 | `src/views/Console.tsx`（`TerminalEntry` / `termCommand` / `termBody`）、`src/styles/lcars.css`（`.term*` + 行高比）、`src/views/Craft.tsx`（`?craft#workspace` 样例流）、AGENTS §7.6r |
 | 2026-xx-xx | STREAM 三区改为**按角色定位 + 用编号写清先后**：`I CONVERSATION`（指令/问询/结果确认）、`II THINKING`（检索与思考状态）、`III TERMINAL`（实时执行反馈）；头部从一条 26px 灰条换成**三段带黑缝的仪器条**（实心色调编号块 + 标签/定位/条数 + 实时状态块，状态块是唯一允许整块变实色的元素：`SCANNING` / `STREAMING` / `N RUNNING` / `AWAITING YOU`） | 三区原本只有色调区分，读者得自己推断"谁先谁后、谁在等谁"。编号把一次交换的循环（指令 → 推理 → 执行 → 结果回到指令）直接写在头上；状态块让人不用点开就知道哪台仪器忙、哪台在等操作员——这是"亲和力"的可实现形式，而不是加圆角或加淡入。罗马数字刻意避开左轨 `01`–`06` 的快捷键编号 | `src/views/Console.tsx`（`Zone`）、`src/styles/lcars.css`（`.ws-hd`）、`src/i18n.ts`（`ws.note*` / `ws.st*`）、`test/ui.mjs`、AGENTS §7.6r |
 | 2026-xx-xx | 新增**交换（exchange）模型**把三区连起来：`cyclesOf()` 给每条 item 打"第几次交换"，`tallyOf()` 数出每轮产生几块推理/几条命令；对话区按交换分组，每组末尾一条 24px footer `[序号][◇N REASONING][▸N COMMANDS][T+…][ACKNOWLEDGE]`。点 tap → 另两区**降到 26% 并滚到同一次交换**、三区头部同时显示 `▸ EXCH 0n`；`ACKNOWLEDGE` 写本地 `lcars.ack`（item id → 时间戳，上限 200），不发给模型 | 原来三区只是"同一份流的三种切片"，彼此没有任何可见联系，读起来像三台没接线的仪表。交换是数据里本来就存在的边界，用它做联系物既不用编造，又让"结果确认"有了落点：确认是操作员的动作，不该塞进 transcript。dim 用 `opacity` 240ms linear 表达"焦点被移来了"（§5 R11 允许的唯一时间性过渡） | `src/views/Console.tsx`（`cyclesOf` / `tallyOf` / `exchangesOf` / `Exchange` / `Zone` 的 focus effect）、`src/styles/lcars.css`（`.exc*`）、`src/i18n.ts`（`ws.ack` / `ws.acked` / `ws.reasoning` / `ws.commands`）、`test/ui.mjs`、AGENTS §7.6r |
 | 2026-xx-xx | TERMINAL 补齐三件事：**实心返回码灯**（`exit 0` cyan / `exit 1`·`FAILED` tomato / `RUN` tang / `+N −M` / `OK`）、**交换分隔条** `EXCH 0n · N REASONING`（只在多于一次交换时插）、命令行整条给 `--g0` 底 + `--r-2` 右端。THINKING 补齐状态：每块 `SCANNING`（tang 实色 + `scan` 三步循环）/ `SETTLED`，区底读数带在检索类工具运行时写 `READING · read <file>` | 返回码是终端唯一不能省略的读数，藏在灰字尾串里等于没有；命令挂不回发起它的指令，长跑里就分不清哪几条是"这次让我跑的"。读数带是"思考正依赖着执行"的唯一可见证据，所以读的是**真的在跑的那条工具**，不是最近一条 | `src/views/Console.tsx`（`TerminalEntry` 的 `lamp`、`term-turn`、`.ws-foot`）、`src/styles/lcars.css`（`.lamp` / `.term-turn` / `.ws-foot` / `.ws-t .stt`）、AGENTS §7.6r |
 | 2026-xx-xx | 曲线语言收敛到三处：**接头**（`96×8px` `--g1`，落在两列与底栏之间的 8px 黑缝里，镜像使用 = §3 R6 的两个肘）、**空态小肘**（`Elbow` SVG，取该区色调）、**单侧圆角升一档**（仪器体与终端行 `/ 对话体` 取 `--r-2` 14px，状态块取 `--r-pill` 做条带末端）。不引入第四处装饰弧 | 用户要求"更像 LCARS 的分区曲线"。原版的分区感来自**构件相接处的肘**与**条带末端半圆**，不是给矩形加四角圆角；把这两件事做对，比再画一圈装饰线更接近原版。§3 R6 的肘预算仍是 2：一个手势镜像使用，不再加第三个 L 形 | `src/styles/lcars.css`（`.ws-joint` / `.ws-empty` / `.ws-hd .st` / `.ws-body` / `.ws-t` / `.term-cmd`）、`src/views/Console.tsx`（`Elbow` import） |
 | 2026-xx-xx | `?craft#workspace` 的样例流补到**两次交换**（第二段含 read / edit / 运行中的 bash + 流式 thinking） | 只有一次交换时"交换"这个结构看不出来：没有分隔条、没有第二个 footer、dim 也没东西可暗。工艺页是视觉契约的验收页，样例流必须覆盖它要表达的结构 | `src/views/Craft.tsx`（`WS_ITEMS`） |
+| 2026-xx-xx | STANDBY 从“4 行说明文字”重画成**待命仪器面板**：一个肘（22px 橙臂 + 14px 脊柱）+ 5 根读数条（`[脊柱][实色标签块][色带值]`，条高 52/44/36/44/36）+ 键位图例 + 贴底的 26px 状态条；五个读数全部取活会话 meta（cwd / 模型+思考档 / 工具+技能数 / contextPct+meter / 审批策略），无 meta 写 `—` | 旧空态是键值文档：`[96px 键 \| 值]` 两列 + 四句英文解释，去色以后和后台表单没区别，也读不出这是「一台待命的仪器」（§1「像仪器，不像海报」/§7.6「数字必须自洽」）。改成色块条后，空屏也能用 LCARS 的原始语法（左边条堆 + 色块 + 黑缝）表达「这台机器现在什么状态」 | `src/views/Console.tsx`（`Standby`）、`src/styles/lcars.css`（`.standby` / `.sb-*`）、`src/i18n.ts`（`sb.*`）、AGENTS §7.6g |
+| 2026-xx-xx | 肘的**外侧角也倒圆（r=16）**，臂端与脊柱端改半圆收口，脊柱以一个 r=14 的根部圆角**长进第一根读数条**（SVG 高度写死 100，正好落在 96 + 4px 黑缝处） | 用户要「柔和一点、更好地过渡到下面条目」。原 §3.5 的「外角保持直角」是原版电视图形的做法，但在黑屏+细条上，直角外角和半空断掉的脊柱端读起来像被裁切；把外角倒圆、脊柱接进条目，视线才能顺着右臂→脊柱→读数条一路读下去。**这是对 §3.5 的显式偏离**，肘预算仍是 1 | `src/views/Console.tsx`（`.sb-corner` 的 path）、`src/styles/lcars.css`（`.sb-arm` 固定 96 高、`.sb-arm::before` 从 48px 起） |
+| 2026-xx-xx | 输入区改版：图片 / 语音两个输入模式并入**左侧 `ENTRY` 控制块**（黑色挖槽图标键 + 底部一行 `CTRL K`/`STEER`/`LISTENING`/`N/6 IMG`），附件 chip 与键盘提示**共用同一行**，不再单独占一行；新增**浏览器原生语音输入**（`SpeechRecognition`，能力探测） | 原来 attach 键挂在提示行右端、附件 chip 又自占一行：一附件就把输入区顶高一层，而 ENTRY 块只放两个单词，等于把「输入模式」和「输入框」拆成了两块界面。并进 ENTRY 块后，一块负责「怎么输入」，一块负责「输入什么」，chip 只借用提示那一行 | `src/views/Console.tsx`（`Composer` 的 `entry-acts` / `attach-strip` / `toggleVoice`）、`src/styles/lcars.css`（`.entry-acts` / `.iact` / `.cmd-help .achip`）、`src/i18n.ts`（`cmd.voice*` / `cmd.listening`）、`scripts/build-icons.mjs`（`act-mic` / `act-mic-off`）、AGENTS §4.3b |
+
+| 2026-xx-xx | **页面级微动效收敛成三种动作**：ENTER（`wipe`/`wipe-down`）、CHANGE（`swap` steps(1)）、BUSY（`scan`/`sweep` steps(3)）。新增落点：站位标题块 90ms、左轨选中条与选中会话、面板头与列表行（次级 60ms 延迟）、工具结果落地（state 转 `ok`/`error` 时 `.out`/`.err`）、子代理嵌套行、查看器/分支树/分区工作区 140ms、`LATEST` 条、shelf 读数 swap、`LINKING` 徽标 scan、命令条顶部 2px 扫描条（`data-run` + `sweep`，`left:0→67%` 而非 translate，避免画出边界）；`COPIED` 用 swap | 用户要「更多页面级组件的微动效」。LCARS 的生动来自**构件在状态之间整块切换**，不是淡入/位移/弹簧，所以先把可用动作限定成三种，再让每个新落点都能说出自己属于哪一种；`busy` 的 translate 会越出命令条右沿（右边就是右栏），故改用 `left` 步进。所有落点在 `[data-motion="reduced"]` 与 `prefers-reduced-motion` 下拍平，扫描条退化为静止细线 | `src/styles/lcars.css`（motion 段 + `.cmdbar{position:relative}`）、`src/views/Console.tsx`（`.ttl` keyed wipe、`data-run`、`LINKING` `data-scan`）、`src/components/ui.tsx`（`ControlChip` 值 keyed swap）、AGENTS §5、`test/ui.mjs`（160 检查仍全绿） |
 
 ---
 
@@ -957,3 +1072,5 @@ browser ──EventSource(/api/stream)──► server.mjs ──session.subscri
 - [x] 右栏是否常驻 → **可折叠**：`⌘⇧B` 收成 24px 拉手条（§7.6f）
 - [ ] 目标形态：桌面宽屏 1600×1000 为主？是否需要 1440×900 / 1280×800 适配稿？
   （当前实现只做宽度断点：1600 / 1280 / 1100 起，见 §4.2b）
+| 2026-xx-xx | **字体改为内置**：D-DIN 400/700（仪表）、Michroma 400（装饰）、IBM Plex Mono 400/600（代码），共 5 个 woff2 / 74,588 B，SIL OFL 1.1，从上游原样下载，`public/fonts/OFL-*.txt` 与文件同放，`scripts/fetch-fonts.mjs` 可复现（校验 `wOF2` 魔数、记录 sha256、生成 `src/fontPack.ts`）。CJK 仍不内置 | 用户要求「找合适的字体内置，并符合开源规范」。调研 `fontspace.io`（WordPress 聚合站，非 fontspace.com）：它把 Helvetica Neue / Microgramma / Eurostile / Lucida Grande 等商业字体也当免费发，页面上的 `License:` 一行不是授权书，下载包里没有 `OFL.txt` —— **发现可以在这里，取证只能在上游**；抽查 556 条 techno/sci-fi 相关条目只有 15 条写着「开放/可商用」，其中真正 OFL 的仍是 Orbitron / Rajdhani / Fredoka 这类 Google Fonts 老面孔。内置真正的原因是网格确定：实测 D-DIN 比 macOS DIN Alternate 窄 2–3%（`SUBAGENTWORKFLOW` 129 vs 133px，`GET_SUBAGENT_RESULT` 150 vs 154px），而 §7.5 8b 的「臂长随名字」正是靠这些宽度立的；同一张 1600px 版面不该在 Windows（Bahnschrift）与 Linux（无 DIN）上换一副骨架 | `scripts/fetch-fonts.mjs`、`src/styles/fonts.css`（新增，`main.tsx` 首先导入）、`src/styles/tokens.css`（`--din`/`--mono`）、`src/fontPack.ts`（生成）、`src/fonts.ts`（`decoFace()` 改 async，先 `document.fonts.load` 再比宽）、`src/views/About.tsx`（字族行 + `FONT PAYLOAD`）、`src/i18n.ts`（`about.fontsBody` / `about.role*`）、`public/fonts/`（3 份 OFL + README.txt）、`package.json`（`fonts` 脚本）、AGENTS §4.1 / §7.6q |
+| 2026-xx-xx | Markdown 渲染修三处：① `.md` 正文行高 `2.0 → 1.6`、行内代码 `15/2 → 15/1.4`、代码块 `13.5/2 → 13.5/1.55`，并让块内 `<code>` 归零（`padding:0`/`background:none`/`font:inherit`）；② 查看器的 `.md` 预览改走 `breaks:false` 方言（`CHAT` 保留 `breaks:true`）；③ 表格补 `align` 支持（`:--`/`:-:`/`--:` → `th[align]`/`td[align]`，右列 `tabular-nums`）+ 表头 11px 全大写 + `.md-tbl` 横向滚动容器 | 用户报「纯文本和代码区块行高拉开了过多间距，表格渲染不够完美」。实测三个独立病灶：正文 16px 配 32px 行高（§4.2 规定 24–26px）；行内代码 15/2 的 30px 行盒把所在段落顶高；代码块 13.5/2 的 27px 行距 + 行内内距叠在 `<pre>` 内距上。表格那边则是 `marked` 的 `align` 属性没有任何样式接住（数字列全左对齐），且 `.md` 是 flex 列、表格 min-content 会把整列撑宽。`breaks:true` 用在文档预览上是第四个病灶：README 的软换行每行变一个 `<br>`，这才是「纯文字看着间距大」的直接原因 | `src/components/Markdown.tsx`（`build(breaks)` 双实例 + `table` renderer + `breaks` prop）、`src/components/FileViewer.tsx`（`breaks={false}`）、`src/styles/lcars.css`（`.md` / `.md :not(pre) > code` / `.codeblk .cb-bd code` / `.md-tbl` / `th[align]`）、`src/views/Craft.tsx`（`?craft#markdown` 样例）、`test/ui.mjs`（8 条 markdown 断言）、AGENTS §3.5b |

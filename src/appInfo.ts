@@ -4,7 +4,16 @@
  */
 export type Credit = { name: string; version: string; license: string; note: string };
 
-export type Author = { name: string; email: string | null; url: string | null };
+/**
+ * The address travels as two halves so the shipped bundle holds no token a
+ * scraper's regex can match; the UI joins them only when asked.
+ */
+export type Author = { name: string; email: { local: string; domain: string } | null; url: string | null };
+
+/** `local@domain`, or null when package.json carries no address. */
+export function authorEmail(author: Author): string | null {
+  return author.email ? `${author.email.local}@${author.email.domain}` : null;
+}
 
 export type AppInfo = {
   name: string;

@@ -80,7 +80,9 @@ export function FileViewer({ path, diff, onClose }: { path: string; diff?: DiffD
           <div class="pv-note">loading…</div>
         ) : data.kind === "text" && isMd && md === "preview" ? (
           <div class="fv-md">
-            <Markdown text={data.text} />
+            {/* a .md file is a document, not a chat: soft-wrapped lines fold
+                instead of turning into one <br> per source line */}
+            <Markdown text={data.text} breaks={false} />
           </div>
         ) : data.kind === "text" ? (
           <div class={`fv-code ${wrap ? "is-wrap" : ""}`}>

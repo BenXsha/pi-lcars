@@ -98,7 +98,11 @@ export function ControlChip(props: {
     >
       <Icon name={props.icon} size={11} />
       <span class="k">{props.label}</span>
-      <span class="v">{props.value}</span>
+      {/* keyed on the value: when the instrument changes reading, the number
+          swaps in two frames instead of silently turning into a new string */}
+      <span class="v" key={props.value}>
+        {props.value}
+      </span>
       <Icon name={props.open ? "act-collapse" : "act-expand"} size={11} />
     </button>
   );
@@ -221,7 +225,7 @@ export function ToolStrip(props: {
   expanded?: boolean;
   onToggle?: () => void;
 }) {
-  const state = props.state;
+const state = props.state;
   const raw = (state === "error" ? props.errorText ?? props.output ?? "" : props.output ?? "").trim();
   const lines = raw ? raw.split("\n") : [];
   const visible = state === "error" ? 3 : 2;
@@ -239,33 +243,58 @@ export function ToolStrip(props: {
   // alive — otherwise the row can only ever open (it used to be one-way).
   const canToggle = !!props.onToggle && (!!props.expanded || hidden > 0 || hiddenDiff > 0 || hiddenKids > 0 || argsLong);
 
+  /* The header arm carries the tool name at full width, so a long name
+     (SUBAGENTWORKFLOW, GET_SUBAGENT_RESULT…) is never clipped by a fixed
+     column. The arm + the body's left spine form the LCARS bent arm. */
+  const head = (
+    <>
+      <Icon name={props.icon} size={13} />
+      <span class="nm">
+        {props.name.toUpperCase()}
+        {props.count && props.count > 1 ? <small>x{props.count}</small> : null}
+      </span>
+      <span class="mt">
+        {props.agent ? (
+          <span>{props.agent.tools} CALLS</span>
+        ) : kids.length ? (
+          <span>{kids.length} CALLS</span>
+        ) : state === "run" ? (
+          <span class="scan">
+            <i />
+            <i />
+            <i />
+          </span>
+        ) : state === "error" ? (
+          props.exitCode != null ? `EXIT ${props.exitCode}` : "ERROR"
+        ) : (
+          <span>{props.ms != null ? (props.ms < 1000 ? `${Math.round(props.ms)}ms` : `${(props.ms / 1000).toFixed(2)}s`) : "—"}</span>
+        )}
+      </span>
+    </>
+  );
+
   return (
     <div class="tool" data-state={state} data-expanded={props.expanded ? "1" : "0"} data-toggle={canToggle ? "1" : "0"}>
-      <div class="st" />
       {canToggle ? (
         <button
           type="button"
-          class="nm"
+          class="th"
           aria-expanded={props.expanded ? "true" : "false"}
           title={props.expanded ? "Collapse output" : "Expand output"}
           onClick={props.onToggle}
         >
-          <Icon name={props.icon} size={13} />
-          <span class="lb">
-            {props.name.toUpperCase()}
-            {props.count && props.count > 1 ? <small>x{props.count}</small> : null}
-          </span>
+          {head}
         </button>
       ) : (
-        <div class="nm">
-          <Icon name={props.icon} size={13} />
-          <span class="lb">
-            {props.name.toUpperCase()}
-            {props.count && props.count > 1 ? <small>x{props.count}</small> : null}
-          </span>
-        </div>
+        <div class="th">{head}</div>
       )}
       <div class="bd">
+        {/* the concave fillet where the arm turns into the spine */}
+        <span class="join" aria-hidden="true">
+          <svg width="18" height="10" viewBox="0 0 18 10">
+            <path d="M0,0 H18 Q8,0 8,10 H0 Z" />
+          </svg>
+        </span>
         <div class="args">{props.args}</div>
         {props.diff ? (
           <>
@@ -302,23 +331,6 @@ export function ToolStrip(props: {
         {props.truncated ? <div class="warn">warning: output truncated</div> : null}
         {kids.length ? <SubCalls rows={visibleKids} total={kids.length} /> : null}
         {props.agent ? <AgentBay a={props.agent} /> : null}
-      </div>
-      <div class="mt">
-        {props.agent ? (
-          <span>{props.agent.tools} CALLS</span>
-        ) : kids.length ? (
-          <span>{kids.length} CALLS</span>
-        ) : state === "run" ? (
-          <span class="scan">
-            <i />
-            <i />
-            <i />
-          </span>
-        ) : state === "error" ? (
-          props.exitCode != null ? `EXIT ${props.exitCode}` : "ERROR"
-        ) : (
-          <span>{props.ms != null ? (props.ms < 1000 ? `${Math.round(props.ms)}ms` : `${(props.ms / 1000).toFixed(2)}s`) : "—"}</span>
-        )}
       </div>
     </div>
   );
