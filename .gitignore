@@ -7,3 +7,4 @@ dist/
 tmp/
 *.tgz
 .pi/
+release/

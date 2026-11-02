@@ -48,7 +48,8 @@
     "check:themes": "node scripts/check-themes.mjs",
     "test:ui": "node test/ui.mjs",
     "test:mcp": "node test/mcp-config.mjs",
-    "test:fonts": "node test/fonts.mjs"
+    "test:fonts": "node test/fonts.mjs",
+    "release": "node scripts/build-release.mjs"
   },
   "devDependencies": {
     "@preact/preset-vite": "^2.10.6",
