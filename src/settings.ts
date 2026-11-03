@@ -54,7 +54,7 @@ const backdropUrl = (path: string) =>
   `/api/backdrop/file?path=${encodeURIComponent(path)}${stamp ? `&v=${stamp}` : ""}`;
 
 /** UI zoom is a real layout scale (zoom, not font-size) so px values stay intact. */
-export function applySettings() {
+function applySettings() {
   const root = document.documentElement;
   root.style.setProperty("--ui-scale", String(state.scale));
   root.dataset.motion = state.motion;

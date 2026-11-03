@@ -33,7 +33,7 @@ export const MIN_PI = "1.4.0";
 /** Exports we call directly. A release missing any of these is not usable. */
 export const REQUIRED_API = ["createAgentSession", "DefaultResourceLoader", "SessionManager", "parseSkillBlock"];
 /** Nice to have: without these the session still runs, with fewer features. */
-export const OPTIONAL_API = ["VERSION", "createMcpExtension", "createToolSearchExtension"];
+const OPTIONAL_API = ["VERSION", "createMcpExtension", "createToolSearchExtension"];
 
 /* --------------------------------------------------------------- versions */
 const parts = (v) => String(v).replace(/^v/, "").split(/[.-]/).map((n) => Number.parseInt(n, 10) || 0);
@@ -56,12 +56,12 @@ export function agentDir(env = process.env) {
 }
 
 /** Where the installer puts releases. */
-export function releasesDir(env = process.env) {
+function releasesDir(env = process.env) {
   return join(agentDir(env), "install", "releases");
 }
 
 /** Absolute entries of every installed release, newest first. */
-export function releasePaths(env = process.env) {
+function releasePaths(env = process.env) {
   const dir = releasesDir(env);
   let names = [];
   try {
@@ -136,7 +136,7 @@ function candidateVersion(candidate, mod) {
 }
 
 /** Import a candidate and check the API surface this console actually uses. */
-export async function probeCandidate(candidate) {
+async function probeCandidate(candidate) {
   const row = { ...candidate, found: false, version: null, missing: [], optionalMissing: [], error: null };
   let mod;
   try {
@@ -256,7 +256,6 @@ export function installGuidance(env = process.env) {
 let cached;
 let loadedFrom = null;
 let loadedInfo = null;
-let tried = [];
 
 /** Which specifier actually resolved — the SYSTEM station shows it. */
 export const sdkSpec = () => loadedFrom;
@@ -264,14 +263,10 @@ export const sdkSpec = () => loadedFrom;
 /** Full report of the resolution that succeeded (or the last attempt). */
 export const sdkInfo = () => loadedInfo;
 
-/** Everything resolution looked at, for error reporting. */
-export const sdkTried = () => tried.slice();
-
 export async function loadSdk() {
   if (cached) return cached;
   const report = await inspect();
   loadedInfo = report;
-  tried = report.candidates.map((c) => `${c.origin} (${c.spec}): ${c.found ? c.error ?? "ok" : c.error}`);
 
   if (!report.selected) {
     const error = new Error(

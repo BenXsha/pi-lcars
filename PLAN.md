@@ -145,7 +145,6 @@ pi-lcars/
                  DiffBlock · SubagentBay · ApprovalDeck · FieldRow · BarButton
     styles/      tokens.css · lcars.css
   test/  smoke.mjs  ui.mjs
-  demo/                  v0 参考实现，保留不删
   PLAN.md  AGENTS.md
 ```
 

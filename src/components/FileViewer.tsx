@@ -1,12 +1,10 @@
 import { useEffect, useState } from "preact/hooks";
 import { api, type DiffData, type FileResult } from "../api";
 import { Icon } from "./Icon";
+import { fmtSizeShort } from "../format";
 import { DiffView, flattenDiff } from "./ui";
 import { highlight, langFromPath } from "../highlight";
 import { Markdown } from "./Markdown";
-
-const fmtSize = (n: number) =>
-  n < 1024 ? `${n}B` : n < 1024 * 1024 ? `${Math.round(n / 1024)}K` : `${(n / 1048576).toFixed(1)}M`;
 
 const raw = (path: string) => `/api/raw?path=${encodeURIComponent(path)}`;
 
@@ -44,7 +42,7 @@ export function FileViewer({ path, diff, onClose }: { path: string; diff?: DiffD
         <span class="st" />
         <span class="nm">{data?.rel || path}</span>
         <span class="mt">
-          {data ? `${data.kind.toUpperCase()} · ${fmtSize(data.size)}${data.lines ? ` · ${data.lines} LINES` : ""}` : "…"}
+          {data ? `${data.kind.toUpperCase()} · ${fmtSizeShort(data.size)}${data.lines ? ` · ${data.lines} LINES` : ""}` : "…"}
         </span>
         {isMd && data?.kind === "text" ? (
           <button type="button" class="pv-btn" data-on={md === "preview" ? "1" : "0"} onClick={() => setMd(md === "preview" ? "source" : "preview")}>
@@ -116,7 +114,7 @@ export function FileViewer({ path, diff, onClose }: { path: string; diff?: DiffD
           <div class="fv-none">
             <p class="ttl">NO INLINE PREVIEW</p>
             <p class="sub">
-              {data.mime} · {fmtSize(data.size)} — this format is not something the browser renders. Use OPEN to hand it to
+              {data.mime} · {fmtSizeShort(data.size)} — this format is not something the browser renders. Use OPEN to hand it to
               the OS.
             </p>
           </div>

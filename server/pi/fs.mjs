@@ -6,7 +6,7 @@ import { homedir } from "node:os";
 const SKIP = new Set(["node_modules", ".git", "dist", ".turbo", ".next"]);
 
 /** Resolve a client path and refuse anything outside the workspace. */
-export async function guardPath(cwd, target = "") {
+async function guardPath(cwd, target = "") {
   const abs = resolve(cwd, target || ".");
   const root = await realpath(cwd).catch(() => cwd);
   const real = await realpath(abs).catch(() => abs);
@@ -212,7 +212,7 @@ const MIME = {
 };
 
 /** What the viewer can do with this path. */
-export function classify(absPath) {
+function classify(absPath) {
   const ext = (absPath.match(/\.[^./]+$/)?.[0] || "").toLowerCase();
   const kind = IMAGE.has(ext) ? "image" : AUDIO.has(ext) ? "audio" : VIDEO.has(ext) ? "video" : TEXT.has(ext) ? "text" : "other";
   return { ext, kind, mime: MIME[ext] ?? (kind === "text" ? "text/plain; charset=utf-8" : "application/octet-stream") };
@@ -246,11 +246,6 @@ export async function readTextFile({ cwd, target, maxBytes = 512 * 1024, maxLine
   const shown = clipped ? all.slice(0, maxLines).join("\n") : text;
   return { ...base, lines: all.length, truncated: clipped, reason: clipped ? "lines" : null, text: shown };
 }
-
-export const isInside = (root, p) => {
-  const abs = isAbsolute(p) ? p : resolve(root, p);
-  return abs === root || abs.startsWith(root + sep);
-};
 
 /* ------------------------------------------------------------- backdrop */
 /*

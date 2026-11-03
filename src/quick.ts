@@ -41,7 +41,7 @@ const BUILTIN: Record<"en" | "zh", QuickPrompt[]> = {
   ],
 };
 
-export const builtinQuick = (): QuickPrompt[] =>
+const builtinQuick = (): QuickPrompt[] =>
   (BUILTIN[getSettings().locale as "en" | "zh"] ?? BUILTIN.en).map((q) => ({ ...q }));
 
 const clean = (list: QuickPrompt[]): QuickPrompt[] =>

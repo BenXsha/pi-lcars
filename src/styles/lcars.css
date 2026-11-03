@@ -517,7 +517,6 @@ button { cursor: pointer; }
 .anim-in { animation: wipe var(--t-1) var(--ease) backwards; }
 .anim-swap { animation: swap var(--t-1) steps(1, end); }
 .anim-pulse { animation: pulse 300ms var(--ease) 2; }
-.anim-blink { animation: blink 1s steps(1) infinite; }
 
 /* ============================================================
    page-level micro-motion — one grammar, three moves, all linear
@@ -665,17 +664,6 @@ button { cursor: pointer; }
 .tab[aria-selected="true"] { background: var(--orange); color: #000; }
 .tab[aria-selected="true"] i { background: #000; }
 .tab .ct { font-weight: 400; opacity: 0.65; font-variant-numeric: tabular-nums; }
-.tab-new {
-  width: 32px;
-  flex: 0 0 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--g1);
-  color: var(--w);
-  border-radius: var(--r-1) var(--r-1) 0 0;
-}
-.tab-new:hover { background: var(--orange); color: #000; }
 
 .center-head {
   display: flex;
@@ -1211,7 +1199,6 @@ button { cursor: pointer; }
 .station.is-full .lbl { min-width: 0; }
 /* icon-only narrow rail: the bar fills the 64px rail again, icon centred */
 .app[data-left="0"] .lnav .station.is-full { width: 100%; min-width: 0; }
-.station .bdg { font: 700 11px/1 var(--din); padding: 2px 5px; background: #000; color: var(--amber); border-radius: var(--r-1); }
 
 /* ============================================================
    top cap + session blocks (per the canvas: 容器 412)
@@ -1974,20 +1961,6 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 /* ============================================================
    collapsible panes — explicit control, not only breakpoints
    ============================================================ */
-.pane-tgl {
-  width: 26px;
-  height: 26px;
-  flex: 0 0 26px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #000;
-  color: var(--amber);
-  border-radius: var(--r-1);
-}
-.pane-tgl:hover { background: var(--w); color: #000; }
-.pane-tgl[aria-pressed="true"] { color: #000; background: color-mix(in srgb, #000 22%, var(--orange)); }
-.pane-tgl[aria-pressed="true"]:hover { background: var(--w); }
 
 /* with the sidebar gone the shelf no longer has to clear the cap overhang */
 .app[data-left="0"] .shelf { padding-left: 12px; }
@@ -2984,16 +2957,6 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 .cmd-help .achip img { width: 16px; height: 16px; }
 .cmd-help .achip .an { max-width: 120px; font-size: 11px; }
 .cmd-help .achip .ax { width: 14px; height: 14px; }
-.attach-strip .as-lb {
-  flex: 0 0 auto;
-  padding: 4px 6px;
-  background: var(--g1);
-  border-radius: var(--r-1) var(--r-1) 0 0;
-  font: 700 10.5px/1 var(--din);
-  letter-spacing: 0.12em;
-  color: var(--amber);
-  white-space: nowrap;
-}
 .achip {
   display: flex;
   flex: 0 0 auto;

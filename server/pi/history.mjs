@@ -65,49 +65,6 @@ export function queryHistory({ query = "", limit = 80 } = {}) {
   };
 }
 
-/** Blocking variant, kept for scripts/tests. */
-export async function listHistory({ sdk, sessionDir, query = "", limit = 80 }) {
-  const t0 = Date.now();
-  let rows = [];
-  try {
-    rows = await (sessionDir
-      ? sdk.SessionManager.listAll(sessionDir)
-      : sdk.SessionManager.listAll());
-  } catch (e) {
-    const err = new Error(`cannot scan sessions: ${e.message}`);
-    err.status = 500;
-    err.code = "E_HISTORY";
-    throw err;
-  }
-
-  const q = String(query || "").trim().toLowerCase();
-  const matched = (q
-    ? rows.filter((r) =>
-        [r.name, r.firstMessage, r.allMessagesText, r.cwd, r.id].some((v) => v && String(v).toLowerCase().includes(q)),
-      )
-    : rows
-  )
-    .sort((a, b) => new Date(b.modified) - new Date(a.modified))
-    .slice(0, Math.max(1, Math.min(400, Number(limit) || 80)));
-
-  return {
-    scanned: rows.length,
-    matched: matched.length,
-    ms: Date.now() - t0,
-    sessions: matched.map((r) => ({
-      path: r.path,
-      id: r.id,
-      cwd: r.cwd,
-      name: r.name ?? null,
-      title: r.firstMessage || r.name || r.id.slice(0, 10),
-      messages: r.messageCount,
-      created: r.created,
-      modified: r.modified,
-      parent: r.parentSessionPath ?? null,
-    })),
-  };
-}
-
 /** Delete a transcript file. Open sessions must be closed by the registry first. */
 export async function deleteHistoryFile(path) {
   try {

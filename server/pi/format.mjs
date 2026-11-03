@@ -37,12 +37,6 @@ export function truncationOf(result, text) {
   return /warning: truncated|truncated output|\[truncated/i.test(text || "");
 }
 
-/** "0.42s" / "12ms" / "—" */
-export function fmtMs(ms) {
-  if (ms == null) return "—";
-  return ms < 1000 ? `${Math.round(ms)}ms` : `${(ms / 1000).toFixed(2)}s`;
-}
-
 export const now = () => Date.now();
 
 /** First-sentence summary of an operator prompt, used as the session title. */

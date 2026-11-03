@@ -4,7 +4,7 @@ import { t } from "../i18n";
 import { appInfo, authorEmail, npmUrl, repoUrl, uiBuildStamp, type Author, type Credit } from "../appInfo";
 import { DECO_CANDIDATES, decoFace } from "../fonts";
 import { FONT_PACK, FONT_PACK_BYTES, type FontPackEntry } from "../fontPack";
-import { fmtSize } from "../components/ui";
+import { fmtSize } from "../format";
 
 /** `[4px 条][标签][读数]` — the same row language as the config panels. */
 function Fact(props: { k: string; v: string; title?: string; tone?: string }) {

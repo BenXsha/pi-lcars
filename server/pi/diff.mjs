@@ -7,7 +7,7 @@
  */
 
 /** Parse a unified patch into hunks with old/new line numbers. */
-export function parseUnifiedPatch(patch) {
+function parseUnifiedPatch(patch) {
   if (!patch || typeof patch !== "string") return null;
   const hunks = [];
   let cur = null;

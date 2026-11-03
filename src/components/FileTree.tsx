@@ -1,9 +1,7 @@
 import { useEffect, useState } from "preact/hooks";
 import { api, type TreeEntry } from "../api";
 import { Icon } from "./Icon";
-
-const fmtSize = (n: number | null) =>
-  n == null ? "" : n < 1024 ? `${n}B` : n < 1024 * 1024 ? `${Math.round(n / 1024)}K` : `${(n / 1048576).toFixed(1)}M`;
+import { fmtSizeShort } from "../format";
 
 /** Lazy workspace tree: folders load on first expand, files hand off to the OS. */
 export function FileTree({
@@ -98,7 +96,7 @@ export function FileTree({
               )}
             </span>
             <span class="nm">{e.name}</span>
-            <span class="sz">{isDir ? "" : fmtSize(e.size)}</span>
+            <span class="sz">{isDir ? "" : fmtSizeShort(e.size)}</span>
             <span class="acts">
               <button
                 type="button"

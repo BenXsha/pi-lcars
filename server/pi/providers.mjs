@@ -137,7 +137,7 @@ export async function listProviderModels({ session, providerId }) {
 }
 
 /** APIs pi can speak to; anything else needs a provider extension. */
-export const APIS = ["openai-completions", "openai-responses", "anthropic-messages", "google-generative-ai"];
+const APIS = ["openai-completions", "openai-responses", "anthropic-messages", "google-generative-ai"];
 
 const SLUG = /^[a-z0-9][a-z0-9._-]{0,40}$/i;
 
@@ -217,8 +217,3 @@ export async function reloadProviders({ session }) {
   }
 }
 
-/** Which ids are user-defined (can be deleted) — for the panel's affordances. */
-export async function customProviderIds({ agentDir }) {
-  const doc = await readJson(join(agentDir, "models.json"), { providers: {} });
-  return Object.keys(doc.providers ?? {});
-}

@@ -8,3 +8,4 @@ tmp/
 *.tgz
 .pi/
 release/
+release.zip

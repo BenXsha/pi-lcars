@@ -27,10 +27,7 @@
   /* grid — 4px base */
   --gap: 4px;
   --seam: 8px;
-  --row: 40px;
   --chip: 84px;
-  --name: 104px; /* tool name + icon */
-  --meta: 88px;
 
   /* radius: half-height on the OUTER side only. never four-corner. */
   --r-1: 6px;

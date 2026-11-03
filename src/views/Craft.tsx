@@ -1,6 +1,6 @@
 import { useState } from "preact/hooks";
 import type { Item } from "../api";
-import { Workspace } from "./Console";
+import { Workspace } from "./console/Workspace";
 import { ICONS, type IconName } from "../icons";
 import { THEMES, appliedTheme, applyTheme, type ThemeId } from "../theme";
 import { Icon } from "../components/Icon";
@@ -245,7 +245,7 @@ function Section(props: { id: string; title: string; note?: string; children: an
 }
 
 const DIRS = [
-  { name: "/Users/liuyunkai/Projects/design", meta: "AGENTS.md · demo/ · src/" },
+  { name: "/Users/liuyunkai/Projects/design", meta: "AGENTS.md · src/ · server/" },
   { name: "/Users/liuyunkai/Projects/design/demo", meta: "server.mjs · public/" },
   { name: "/Users/liuyunkai/Projects/design/src", meta: "components/ · views/" },
   { name: "/Users/liuyunkai/Projects/master-local-mcp", meta: "mgpilot-mcp/" },

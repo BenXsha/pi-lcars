@@ -44,8 +44,6 @@ const MANIFEST = {
   // state
   "status-ok": "checkbox-circle-fill",
   "status-fail": "close-circle-fill",
-  "status-run": "loader-4-fill",
-  "status-warn": "error-warning-fill",
   "status-idle": "circle-fill",
   // actions
   "act-copy": "file-copy-fill",
@@ -61,7 +59,6 @@ const MANIFEST = {
   "act-test": "flashlight-fill",
   "act-open": "external-link-fill",
   "act-close": "close-fill",
-  "act-theme": "palette-fill",
   "act-mic": "mic-fill",
   "act-mic-off": "mic-off-fill",
   "pane-collapse-left": "arrow-left-double-fill",
@@ -71,8 +68,6 @@ const MANIFEST = {
   "fld-url": "links-fill",
   "fld-host": "server-fill",
   "fld-lock": "lock-fill",
-  "fld-show": "eye-fill",
-  "fld-hide": "eye-off-fill",
   "fld-model": "brain-fill",
   "fld-args": "list-unordered",
   "fld-path": "folder-fill",
@@ -85,11 +80,7 @@ const MANIFEST = {
   "role-user": "user-3-fill",
   "role-agent": "sparkling-fill",
   "role-system": "cpu-fill",
-  "role-compact": "contract-fill",
   // diff
-  "diff-add": "add-fill",
-  "diff-del": "subtract-fill",
-  "diff-file": "file-text-fill",
 };
 
 const index = new Map();

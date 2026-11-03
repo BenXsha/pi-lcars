@@ -2,6 +2,7 @@ import type { ComponentChildren } from "preact";
 import { Icon, type IconName } from "./Icon";
 import { Markdown } from "./Markdown";
 import { askComposer } from "../composer";
+import { fmtSize } from "../format";
 import type { AgentMeta, DiffData, SubCall } from "../api";
 import { highlight, langFromPath } from "../highlight";
 
@@ -354,15 +355,6 @@ export function Readout(props: { value: string; unit?: string }) {
       {props.unit ? <span>{props.unit}</span> : null}
     </div>
   );
-}
-
-/* ---------------------------------------------------------------- sizes */
-/** 1.2 MB / 48 KB / 512 B — attachment chips and the composer both read this. */
-export function fmtSize(n: number): string {
-  if (!Number.isFinite(n) || n <= 0) return "0 B";
-  if (n >= 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MB`;
-  if (n >= 1024) return `${Math.round(n / 1024)} KB`;
-  return `${n} B`;
 }
 
 /* ============================================================

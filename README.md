@@ -75,7 +75,9 @@ SMOKE_MODEL=1 npm test   # also does one real turn + fork (costs a model call)
 ```
 bin/pi-lcars.mjs   launcher: args, build-if-stale, port walk, status/stop/doctor
 server/            Node, no runtime deps beyond the pi SDK
-  index.mjs        start(opts): http + SSE + routes
+  index.mjs        the shell: config, shared objects, http + SSE lifecycle
+  http.mjs         JSON envelope, error shape, body reader, query (one place)
+  routes/          one module per station: core · session · files · providers · mcp · skills · history
   pi/sdk.mjs       pi backend discovery: PI_SDK → node_modules → releases → npm -g
   pi/registry.mjs  session lifecycle, transcript items, meta
   pi/queue.mjs     one global run at a time
@@ -84,13 +86,16 @@ server/            Node, no runtime deps beyond the pi SDK
 src/               Vite + Preact + TS client
   styles/          tokens (structure) + themes (colour) + fonts (@font-face) + lcars (components)
   components/      Elbow · ToolStrip · ApprovalDeck · FieldRow · Icon …
+  format.ts        pure readouts: sizes, tokens, mm:ss, ages, paths (no DOM)
+  ime.ts           the one IME gate every keydown consults
   drafts.ts        per-session composer drafts + sent-history (localStorage)
-  views/Console.tsx console shell, mission log, and the three-zone workspace
-  views/Craft.tsx  craft layer, the visual contract in one page
-  icons.ts         generated: remixicon -fill paths (64 icons, no font)
+  views/Console.tsx      the shell: top rail, three columns, deck stack
+  views/console/         conversation pieces: Sidenav · Transcript · Workspace · Composer · Rail
+  views/stations/        one file per station: Mcp · Providers · Tree · History · Skills · Settings
+  views/Craft.tsx        craft layer, the visual contract in one page
+  icons.ts         generated: remixicon -fill paths (57 icons, no font)
   fontPack.ts      generated: bundled families, weights, byte counts, licences
 public/fonts/      5 woff2 (74.6 KB) + 3 OFL texts — SIL Open Font License 1.1
-demo/              v0 vanilla implementation, kept for reference
 boards/            MasterGo frames (v1 skeleton, v2 real stream)
 AGENTS.md          the design contract — read before touching UI (repo only, not published)
 PLAN.md            milestone plan (M0..M9) (repo only, not published)
