@@ -5,6 +5,8 @@ import { actions } from "../../store";
 import { t } from "../../i18n";
 import { firstLine, fmtTok, mmss, pad2, wordsOf } from "../../format";
 import { Icon } from "../../components/Icon";
+import { BrailleBand } from "../../components/Braille";
+import { phaseOf } from "../../braille";
 import { ApprovalDeck, MessageRow } from "../../components/ui";
 import { AskBlock, SkillBlock, SummaryBlock } from "./blocks";
 import { TerminalEntry } from "./Terminal";
@@ -146,6 +148,8 @@ function Zone(props: {
   live?: boolean;
   empty: string;
   focus: number | null;
+  /** ambient motion filling the seam between the header strip and the body */
+  band?: ComponentChildren;
   footer?: ComponentChildren;
   children: ComponentChildren;
 }) {
@@ -195,6 +199,7 @@ function Zone(props: {
           </svg>
         </span>
       </header>
+      {props.band}
       <div
         class="ws-body"
         ref={bodyRef}
@@ -350,12 +355,30 @@ export function Workspace({ items, onOpenDiff }: { items: Item[]; onOpenDiff?: (
   const turns = zones.thread.filter((it) => it.kind === "user").length;
   // the session is producing something, whether or not this zone has text yet
   const streaming = items.some((it) => it.kind === "assistant" && it.streaming);
-  const scanning = items.some((it) => it.kind === "assistant" && it.streaming && (it.thinking ?? "").trim());
   const reading = zones.action.find(
     (it): it is Extract<Item, { kind: "tool" }> => it.kind === "tool" && it.status === "run" && RETRIEVAL.has(it.name),
   );
   const tail = zones.thread[zones.thread.length - 1];
   const awaiting = !streaming && running === 0 && tail?.kind === "assistant";
+  // The band answers "what is the model doing" for the whole session, so it
+  // reads every item — not just this zone's.
+  const phase = phaseOf({
+    items,
+    running: streaming,
+    since: Date.now() - (items[items.length - 1]?.ts ?? 0),
+  });
+  // the reading and the motion come from one source, so they cannot disagree
+  const phaseWord =
+    phase === "thinking"
+      ? t("ws.stScan")
+      : phase === "streaming"
+        ? t("ws.streaming")
+        : phase === "running"
+          ? t("ws.running")
+          : phase === "done"
+            ? t("ws.stSettled")
+            : t("ws.stIdle");
+  const phaseBusy = phase === "thinking" || phase === "streaming" || phase === "running";
 
   const ack = (id: string) =>
     setAcks((prev) => {
@@ -381,10 +404,11 @@ export function Workspace({ items, onOpenDiff }: { items: Item[]; onOpenDiff?: (
         label={t("ws.zoneThinking")}
         count={zones.thinking.length}
         note={focus != null ? `▸ EXCH ${pad2(focus)}` : t("ws.noteThinking")}
-        status={scanning ? t("ws.stScan") : zones.thinking.length ? t("ws.stSettled") : t("ws.stIdle")}
-        live={scanning}
+        status={phaseWord}
+        live={phaseBusy}
         empty={t("ws.emptyThinking")}
         focus={focus}
+        band={<BrailleBand phase={phase} />}
         footer={
           reading ? (
             <span class="ws-read">

@@ -3494,6 +3494,33 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 }
 .ws-hd .st[data-live="1"] { background: var(--tone); color: #000; }
 
+/* ---- the ambient band: two braille cell rows in the seam between the
+   header strip and the body. It reads as part of the header's underside
+   (same tone, same left offset as the body's leg) rather than a new panel.
+   Colour is the zone tone; the glyph carries the meaning, not the hue. ---- */
+.ws-band {
+  display: block;
+  flex: 0 0 auto;
+  height: 30px;
+  margin-left: 14px;
+  padding: 0;
+  overflow: hidden;
+  font-family: "Apple Braille", "Noto Sans Symbols 2", "Segoe UI Symbol", "DejaVu Sans Mono", var(--mono);
+  font-size: 13px;
+  line-height: 15px;
+  letter-spacing: 0;
+  white-space: pre;
+  color: var(--tone);
+  opacity: 0.6;
+  user-select: none;
+  pointer-events: none;
+  -webkit-font-smoothing: antialiased;
+}
+/* idle is quieter than work, but it is still the thing that makes an empty
+   session feel alive — 0.26 read as "broken", not as "calm" */
+.ws-band[data-phase="idle"] { opacity: 0.34; }
+.ws-band[data-phase="done"] { opacity: 0.44; }
+
 /* ---- the body: the only scrolling surface in each instrument ---- */
 /* the leg of the bent arm: a 14px solid rail the whole instrument hangs from */
 .ws-body {
@@ -3524,8 +3551,7 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 }
 
 /* "show me exchange n": everything outside it steps back, nothing is hidden */
-.ws-body [data-dim="1"] { opacity: 0.26; }
-.ws-t,
+.ws-body [data-dim="1"] { opacity: 0.26; }.ws-t,
 .term,
 .exc,
 .ws-body [data-dim] { transition: opacity var(--t-2) var(--ease); }

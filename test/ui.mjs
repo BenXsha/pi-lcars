@@ -674,6 +674,74 @@ try {
   await evaluate(`${streamBadge}?.click()`);
   await sleep(300);
   check("the workspace reopens", await exists(".ws"));
+
+  /* the thinking band: ambient motion in the seam under the header */
+  const bandInfo = await evaluate(
+    `(() => {
+      const z = document.querySelector('.ws-zone[data-zone="thinking"]');
+      const band = z?.querySelector('.ws-band');
+      if (!band) return null;
+      const hd = z.querySelector('.ws-hd').getBoundingClientRect();
+      const b = band.getBoundingClientRect();
+      const body = z.querySelector('.ws-body').getBoundingClientRect();
+      const txt = band.textContent;
+      return {
+        phase: band.dataset.phase,
+        len: txt.length,
+        lines: txt.split('\\n').length,
+        braille: [...txt].every((c) => c === '\\n' || (c.codePointAt(0) >= 0x2800 && c.codePointAt(0) <= 0x28ff)),
+        seamTop: Math.round(b.y - (hd.y + hd.height)),
+        seamBottom: Math.round(body.y - (b.y + b.height)),
+        fill: band.scrollWidth <= band.clientWidth + 1 && b.width > 100,
+        indent: Math.round(b.x - z.getBoundingClientRect().x),
+        height: Math.round(b.height),
+      };
+    })()`,
+  );
+  check("the thinking zone carries a motion band", !!bandInfo, JSON.stringify(bandInfo));
+  check("it renders real braille glyphs", bandInfo?.braille === true && bandInfo.len > 8, `${bandInfo?.len} cells`);
+  check(
+    "the band carries two cell rows, not a single stray line",
+    bandInfo?.lines === 2 && bandInfo?.height === 30,
+    JSON.stringify(bandInfo && { lines: bandInfo.lines, height: bandInfo.height }),
+  );
+  check(
+    "it fills the slot without spilling",
+    bandInfo?.fill === true,
+    JSON.stringify(bandInfo && { fill: bandInfo.fill, len: bandInfo.len }),
+  );
+  check(
+    "it sits in the seam, indented to the body's leg",
+    bandInfo?.seamTop === 4 && bandInfo?.seamBottom === 4 && bandInfo?.indent === 14,
+    JSON.stringify(bandInfo && { top: bandInfo.seamTop, bottom: bandInfo.seamBottom, indent: bandInfo.indent }),
+  );
+
+  const bandFrames = await evaluate(
+    `(async () => {
+      const band = document.querySelector('.ws-band');
+      const seen = new Set([band.textContent]);
+      for (let i = 0; i < 7; i++) { await new Promise((r) => setTimeout(r, 220)); seen.add(band.textContent); }
+      const phase = band.dataset.phase;
+      document.documentElement.dataset.motion = 'reduced';
+      await new Promise((r) => setTimeout(r, 700));
+      const a = band.textContent;
+      await new Promise((r) => setTimeout(r, 800));
+      const frozen = a === band.textContent;
+      document.documentElement.dataset.motion = 'system';
+      return { distinct: seen.size, phase, frozen };
+    })()`,
+  );
+  check("the band actually animates", bandFrames?.distinct > 1, `${bandFrames?.distinct} frames in 1.5s`);
+  check("reduced motion freezes it", bandFrames?.frozen === true);
+  check(
+    "an idle session reads as idle",
+    bandFrames?.phase === "idle" &&
+      (await evaluate(
+        `document.querySelector('.ws-zone[data-zone="thinking"] .ws-hd .st').textContent`,
+      )) === "IDLE",
+    await evaluate(`document.querySelector('.ws-band').dataset.phase`),
+  );
+
   await evaluate(`${logBadge}?.click()`);
   await sleep(300);
   check("picking LOG switches the workspace off", !(await exists(".ws")));

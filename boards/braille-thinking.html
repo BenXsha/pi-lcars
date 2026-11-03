@@ -1,0 +1,1010 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BRAILLE THINKING — motion study</title>
+<style>
+  /* --- LCARS tokens (subset of src/styles/tokens.css + themes.css/tng) ------ */
+  :root {
+    --bg: #000;
+    --moon: #cccc99;     /* 计划 / 待办 / 推理 */
+    --amber: #ffce9c;    /* 次级信息 / 元数据 */
+    --orange: #ff9c00;   /* 主操作 / 当前焦点 */
+    --tang: #ff9966;     /* 运行态 */
+    --ice: #99ccff;
+    --g3: #999;
+    --g2: #666;
+    --g1: #333;
+    --r-1: 6px;
+    --r-2: 14px;
+    --r-pill: 999px;
+    --t-1: 90ms;
+    --din: "D-DIN", "DIN Alternate", Bahnschrift, "Helvetica Neue", Arial, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    /* braille must be monospaced: system faces carry the block, UI faces don't */
+    --braille: "Apple Braille", "Noto Sans Symbols 2", "Segoe UI Symbol", "DejaVu Sans Mono", var(--mono);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg);
+    color: #fff;
+    font: 400 13px/1.5 var(--din);
+    padding: 0 0 40px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* --- top cap: 4px seam, single-sided radius (AGENTS §3 R5) --------------- */
+  .top {
+    display: flex; align-items: stretch; gap: 4px;
+    height: 56px; margin-bottom: 4px;
+  }
+  .top .cap {
+    flex: 0 0 320px; background: var(--moon); color: #000;
+    border-radius: 0 0 var(--r-2) 0;
+    display: flex; flex-direction: column; justify-content: center;
+    padding: 0 16px;
+  }
+  .top .cap b { font: 700 15px/1.1 var(--din); letter-spacing: 1.2px; }
+  .top .cap span { font: 400 10px/1.2 var(--din); letter-spacing: 1.6px; opacity: .75; }
+  .top .facts {
+    flex: 1; display: flex; align-items: center; gap: 24px; padding: 0 20px;
+    background: var(--g1); border-radius: 0 var(--r-2) 0 0;
+    font: 400 11px/1 var(--din); letter-spacing: 1.4px; color: var(--amber);
+  }
+  .top .facts b { color: var(--moon); font-weight: 400; }
+
+  /* --- control bar --------------------------------------------------------- */
+  .bar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px;
+    padding: 10px 20px; margin-bottom: 4px;
+    border-left: 4px solid var(--orange);
+    background: var(--g1);
+  }
+  .bar label { font: 400 10px/1 var(--din); letter-spacing: 1.6px; color: var(--g3); }
+  .seg { display: inline-flex; gap: 2px; }
+  .seg button {
+    font: 700 11px/1 var(--din); letter-spacing: 1px; color: var(--moon);
+    background: #000; border: 0; padding: 7px 10px; cursor: pointer;
+    border-radius: 0 var(--r-1) var(--r-1) 0;
+  }
+  .seg button[aria-pressed="true"] { background: var(--moon); color: #000; }
+  .seg button:hover { background: #222; color: #fff; }
+  .seg button[aria-pressed="true"]:hover { background: var(--moon); color: #000; }
+
+  /* --- live mock: a real thinking row -------------------------------------- */
+  .mock { padding: 0 20px 4px; }
+  .ws-hd {
+    display: flex; align-items: stretch; gap: 4px; height: 26px; margin-bottom: 4px;
+  }
+  .ws-hd .idx {
+    flex: 0 0 34px; background: var(--moon); color: #000;
+    display: flex; align-items: center; justify-content: center;
+    font: 700 13px/1 var(--din); letter-spacing: .5px;
+    border-radius: 0 var(--r-1) var(--r-1) 0;
+  }
+  .ws-hd .lab {
+    display: flex; align-items: center; gap: 10px; padding: 0 12px;
+    background: color-mix(in srgb, var(--moon) 9%, #000);
+    border-radius: 0 var(--r-1) var(--r-1) 0;
+    font: 700 11px/1 var(--din); letter-spacing: 1.4px; color: var(--moon);
+    white-space: nowrap;
+  }
+  .ws-hd .lab .dim { color: var(--g3); font-weight: 400; letter-spacing: 1px; }
+  .ws-hd .st {
+    margin-left: auto; flex: 0 0 auto; padding: 0 12px;
+    display: flex; align-items: center;
+    background: var(--tang); color: #000;
+    border-radius: var(--r-pill) 0 0 var(--r-pill);
+    font: 700 10px/1 var(--din); letter-spacing: 1.4px;
+  }
+  .ws-hd .st[data-state="idle"] { background: var(--g1); color: var(--g3); }
+  .mock .hint { font: 400 10px/1.6 var(--din); letter-spacing: 1.2px; color: var(--g2); padding-left: 38px; }
+
+  /* --- cards --------------------------------------------------------------- */
+  .grid {
+    display: grid; gap: 4px; padding: 12px 20px 0;
+    grid-template-columns: repeat(auto-fill, minmax(460px, 1fr));
+  }
+  .card {
+    display: grid; grid-template-columns: 4px 1fr; gap: 0 12px;
+    background: var(--g1); padding: 0 0 10px;
+    border-radius: 0 var(--r-2) var(--r-2) 0;
+  }
+  .card > .spine { background: var(--moon); border-radius: 0 0 0 var(--r-1); }
+  .card.pick > .spine { background: var(--orange); }
+  .card .ch {
+    grid-column: 2; display: flex; align-items: baseline; gap: 10px;
+    padding: 9px 12px 7px 0; border-bottom: 2px solid #000;
+  }
+  .card .ch .n {
+    flex: 0 0 auto; font: 700 11px/1 var(--din); letter-spacing: 1px;
+    color: #000; background: var(--moon); padding: 3px 6px; border-radius: 0 var(--r-1) var(--r-1) 0;
+  }
+  .card.pick .ch .n { background: var(--orange); }
+  .card .ch b { font: 700 12px/1 var(--din); letter-spacing: 1.6px; color: #fff; }
+  .card .ch em { font: 400 11px/1.3 var(--din); font-style: normal; color: var(--g3); }
+  .card .ch .st { margin-left: auto; font: 400 10px/1 var(--mono); color: var(--moon); white-space: nowrap; }
+
+  .card .body {
+    grid-column: 2; display: grid; grid-template-columns: auto 1fr; gap: 4px 16px;
+    padding: 10px 12px 0 0; align-items: center;
+  }
+  .anim {
+    margin: 0; padding: 8px 12px; min-width: 190px;
+    background: #000; border-radius: 0 var(--r-2) var(--r-2) 0;
+    font-family: var(--braille); line-height: 1;
+    letter-spacing: 0; font-variant-ligatures: none;
+    color: var(--moon); white-space: pre; text-align: left;
+    font-size: var(--size, 22px);
+  }
+  [data-motion="reduced"] .anim { animation: none; }
+  .dots {
+    display: grid; gap: 2px; justify-content: start;
+    grid-auto-rows: 5px;
+  }
+  .dots i { display: block; width: 5px; height: 5px; background: var(--g1); }
+  .dots i[data-on="1"] { background: var(--moon); }
+  .dots i[data-on="2"] { background: var(--tang); }
+  .card .cd {
+    grid-column: 2; display: grid; grid-template-columns: 1fr auto; gap: 4px 16px;
+    padding: 8px 12px 0 0; font: 400 11px/1.6 var(--din); color: var(--g3);
+  }
+  .card .cd .why { max-width: 60ch; }
+  .card .cd .why kbd {
+    font: 700 10px/1 var(--din); letter-spacing: 1px; color: var(--moon);
+    background: #000; padding: 2px 5px; border-radius: var(--r-1);
+  }
+  .card .cd .verdict {
+    font: 700 10px/1.5 var(--din); letter-spacing: 1.2px; text-align: right; white-space: nowrap;
+  }
+  .card .cd .verdict[data-v="best"] { color: var(--orange); }
+  .card .cd .verdict[data-v="ok"] { color: var(--moon); }
+  .card .cd .verdict[data-v="no"] { color: var(--tang); }
+
+  /* --- size-fit strip: the same animation at the sizes it would ship at --- */
+  .fits {
+    grid-column: 2; display: flex; align-items: flex-end; gap: 20px;
+    padding: 12px 12px 0 0;
+  }
+  .fits .fx { display: flex; flex-direction: column; gap: 4px; }
+  .fits .fx b { font: 400 9px/1 var(--din); letter-spacing: 1.4px; color: var(--g2); }
+  .fits pre {
+    margin: 0; padding: 5px 8px; background: #000;
+    border-radius: 0 var(--r-1) var(--r-1) 0;
+    font-family: var(--braille); line-height: 1; color: var(--moon);
+    white-space: pre;
+  }
+  .fits .fx.hdr b { color: var(--orange); }
+  .fits .fx.hdr pre { color: var(--orange); }
+
+  /* --- "use in header" — picks the candidate for the live mock ------------ */
+  .card .use {
+    flex: 0 0 auto; margin-left: 10px; padding: 4px 8px; cursor: pointer;
+    font: 700 9px/1 var(--din); letter-spacing: 1.2px;
+    color: var(--g3); background: #000; border: 0;
+    border-radius: 0 var(--r-1) var(--r-1) 0;
+  }
+  .card .use:hover { color: #000; background: var(--g2); }
+  .card .use[data-on="1"] { color: #000; background: var(--moon); }
+  .card.pick .use:hover { background: var(--orange); }
+
+  /* --- inline header animation (real 18px) -------------------------------- */
+  .anim-inline {
+    font-family: var(--braille); font-size: 18px; line-height: 1;
+    letter-spacing: 0; color: var(--moon); display: inline-block;
+    vertical-align: -2px; white-space: pre;
+  }
+  .mock .lab .who { color: var(--g3); font-weight: 400; letter-spacing: 1px; }
+
+  /* --- idle-state legend --------------------------------------------------- */
+  .idle { margin: 12px 20px 0; }
+  .idle .ihd {
+    display: flex; align-items: baseline; gap: 10px; padding: 0 0 8px;
+  }
+  .idle .ihd .n {
+    font: 700 11px/1 var(--din); letter-spacing: 1px; color: #000;
+    background: var(--moon); padding: 3px 6px; border-radius: 0 var(--r-1) var(--r-1) 0;
+  }
+  .idle .ihd b { font: 700 12px/1 var(--din); letter-spacing: 1.6px; color: #fff; }
+  .idle .ihd em { font: 400 11px/1.3 var(--din); font-style: normal; color: var(--g3); }
+  .irow {
+    display: grid; grid-template-columns: 1fr 260px; gap: 4px 24px;
+    align-items: center; padding: 6px 0;
+    border-bottom: 1px solid var(--g1);
+  }
+  .irow:last-child { border-bottom: 0; }
+  .irow .ws-hd { margin-bottom: 0; min-height: 26px; height: auto; padding: 3px 0; }
+  /* two cell rows have to fit inside the 26px strip in this legend, so the
+     preview face drops a step — the shipped band itself runs at 13px */
+  .irow .anim-inline { font-size: 10px; line-height: 10px; white-space: pre; }
+  .irow .note { font: 400 11px/1.55 var(--din); color: var(--g3); }
+  .irow .note b { color: var(--moon); font-weight: 400; }
+  .irow .note code { font-family: var(--mono); font-size: 11px; color: var(--amber); }
+  .irow .cpu {
+    font: 700 9px/1 var(--din); letter-spacing: 1.2px; color: var(--g2);
+    white-space: nowrap;
+  }
+  .irow[data-cpu="0"] .cpu { color: var(--g2); }
+  .irow[data-cpu="1"] .cpu { color: var(--tang); }
+  /* the idle glyph is dimmer than the running one — presence without attention */
+  .irow .anim-inline[data-idle="1"] { color: var(--g2); }
+  .irow .ws-hd .st[data-state="idle"] { background: var(--g1); color: var(--g3); }
+  .irow .ws-hd .st[data-state="wait"] { background: var(--orange); color: #000; }
+
+  /* --- footer probes ------------------------------------------------------- */
+  .probe {
+    margin: 12px 20px 0; padding: 12px 16px;
+    border-left: 4px solid var(--ice); background: var(--g1);
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 4px 28px;
+    font: 400 11px/1.7 var(--din); color: var(--g3);
+  }
+  .probe h4 { margin: 0 0 2px; font: 700 10px/1 var(--din); letter-spacing: 1.6px; color: var(--ice); }
+  .probe .ok { color: var(--moon); }
+  .probe .bad { color: var(--tang); }
+  .probe code { font-family: var(--mono); font-size: 11px; color: var(--amber); }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="cap"><b>BRAILLE THINKING</b><span>MOTION STUDY · U+2800–U+28FF</span></div>
+  <div class="facts">
+    <span>FRAME <b id="f-ms">90ms</b></span>
+    <span>STEP <b id="f-step">~11 fps</b></span>
+    <span>GLYPH <b id="f-glyph">—</b></span>
+    <span>FRAME <b id="f-frame">000</b></span>
+    <span>REDUCED <b id="f-rm">OFF</b></span>
+  </div>
+</header>
+
+<div class="bar">
+  <label>SPEED</label>
+  <div class="seg" id="speed">
+    <button data-v="60">60ms</button>
+    <button data-v="90" aria-pressed="true">90ms</button>
+    <button data-v="140">140ms</button>
+    <button data-v="240">240ms</button>
+  </div>
+  <label>SIZE</label>
+  <div class="seg" id="size">
+    <button data-v="13">13</button>
+    <button data-v="18">18</button>
+    <button data-v="22" aria-pressed="true">22</button>
+  </div>
+  <label>MOTION</label>
+  <div class="seg" id="motion">
+    <button data-v="full" aria-pressed="true">FULL</button>
+    <button data-v="reduced">REDUCED</button>
+  </div>
+  <label>RUN</label>
+  <div class="seg" id="run">
+    <button data-v="1" aria-pressed="true">PAUSE ✕</button>
+  </div>
+  <label>FRAME</label>
+  <div class="seg" id="frame">
+    <button data-v="1">STEP ▸</button>
+    <button data-v="all">ALL ▸▸</button>
+  </div>
+</div>
+
+<section class="mock">
+  <div class="ws-hd">
+    <span class="idx">II</span>
+    <span class="lab">
+      <span id="mock-anim" class="anim-inline"></span>
+      <span id="mock-who" class="who">TRACE</span>
+      REASONING <span class="dim">128 W · T+01:12</span>
+    </span>
+    <span class="st" id="mock-state">SCANNING</span>
+  </div>
+  <div class="hint">真实字号（11px 标签 / 18px 动画）放进 thinking 头部时的样子 —— 动画必须不推开读数。</div>
+</section>
+
+<main class="grid" id="cards"></main>
+
+<section class="idle">
+  <div class="ihd">
+    <span class="n">IDLE</span>
+    <b>空闲态设计</b>
+    <em>没有推理在跑时，那块位置应该显示什么？—— 四种候选，已选 C</em>
+  </div>
+
+  <div class="irow" id="idle-none">
+    <div class="ws-hd">
+      <span class="idx">II</span>
+      <span class="lab">REASONING <span class="dim">— · T+00:00</span></span>
+      <span class="st" data-state="idle">IDLE</span>
+    </div>
+    <div class="note"><b>A · 什么都不放。</b>区块不存在，或只留一条灰字 <code>IDLE</code>。
+      最诚实的做法：没有推理就没有区块，注意力自然落在正文上。</div>
+    <div class="cpu" data-cpu="0">CPU 0%</div>
+  </div>
+
+  <div class="irow" id="idle-dim">
+    <div class="ws-hd">
+      <span class="idx">II</span>
+      <span class="lab">
+        <span class="anim-inline" data-idle="1" data-src="orbit"></span>
+        REASONING <span class="dim">— · T+00:00</span>
+      </span>
+      <span class="st" data-state="idle">IDLE</span>
+    </div>
+    <div class="note"><b>B · 灰化静帧。</b>同一块动画，但降为 <code>--g2</code> 且不闪烁。
+      位置不变 → 布局不跳；颜色变灰 → 不抢注意力。代价：它在骗人（看着像在跑）。</div>
+    <div class="cpu" data-cpu="0">CPU 0%</div>
+  </div>
+
+  <div class="irow" id="idle-shipped">
+    <div class="ws-hd">
+      <span class="idx">II</span>
+      <span class="lab">
+        <span class="anim-inline" id="idle-shipped-anim"></span>
+        REASONING <span class="dim">— · T+00:00</span>
+      </span>
+      <span class="st" data-state="idle">IDLE</span>
+    </div>
+    <div class="note"><b>✓ 已实现 · 稀疏慢闪。</b>阈值 <code>hash &gt; 0.91</code> 的点，每 6 帧（≈540ms）重排一次。
+      比「呼吸」更像机器醒着：既不流动（不冒充输出），也不完全静止（不冒充卡死）。已落地于 <code>src/braille.ts</code>。</div>
+    <div class="cpu" data-cpu="1">CPU &lt;1%</div>
+  </div>
+
+  <div class="irow" id="idle-breath">
+    <div class="ws-hd">
+      <span class="idx">II</span>
+      <span class="lab">
+        <span class="anim-inline" data-src="trace"></span>
+        REASONING <span class="dim">— · T+00:00</span>
+      </span>
+      <span class="st" data-state="idle">IDLE</span>
+    </div>
+    <div class="note"><b>C · 慢速呼吸。</b>波形不动速度，而是让幅度以 <code>2.4s</code> 周期涨落一次。
+      语义是「待机」而不是「在跑」，且幅度变化不靠淡入（§5 R11）。</div>
+    <div class="cpu" data-cpu="1">CPU 3%</div>
+  </div>
+
+  <div class="irow" id="idle-await">
+    <div class="ws-hd">
+      <span class="idx">II</span>
+      <span class="lab">REASONING <span class="dim">等待操作员确认</span></span>
+      <span class="st" data-state="wait">AWAITING YOU</span>
+    </div>
+    <div class="note"><b>D · 换成实心橙。</b>不该用动画回答的场合：等审批、等回答。
+      此时 <code>AWAITING YOU</code> 是唯一该亮的东西（§2 一色一义：橙 = 操作者在场）。</div>
+    <div class="cpu" data-cpu="0">CPU 0%</div>
+  </div>
+</section>
+
+<section class="idle">
+  <div class="ihd">
+    <span class="n">MAP</span>
+    <b>动作类型 → 动画</b>
+    <em>全部取自已批准候选（01/04/05）；空闲与完成是新增的两个端态</em>
+  </div>
+
+  <div class="irow">
+    <div class="ws-hd"><span class="idx">II</span>
+      <span class="lab"><span class="anim-inline" id="map-idle"></span>REASONING <span class="dim">IDLE</span></span>
+      <span class="st" data-state="idle">IDLE</span></div>
+    <div class="note"><b>idle → 05 稀疏慢闪。</b>机器醒着但没在干活；每 540ms 重排一次，不流动。</div>
+    <div class="cpu" data-cpu="1">THINK·slow</div>
+  </div>
+
+  <div class="irow">
+    <div class="ws-hd"><span class="idx">II</span>
+      <span class="lab"><span class="anim-inline" id="map-thinking"></span>REASONING <span class="dim">SCANNING</span></span>
+      <span class="st" data-state="idle">SCANNING</span></div>
+    <div class="note"><b>thinking → 05 SPARK。</b>点各自放电，语义与推理最贴；密度最高，只有真在想在跑。</div>
+    <div class="cpu" data-cpu="1">THINK·fast</div>
+  </div>
+
+  <div class="irow">
+    <div class="ws-hd"><span class="idx">II</span>
+      <span class="lab"><span class="anim-inline" id="map-streaming"></span>REASONING <span class="dim">STREAMING</span></span>
+      <span class="st" data-state="idle">STREAMING</span></div>
+    <div class="note"><b>streaming → 01 TRACE。</b>波形向右跑，读作「文字正在流出」。</div>
+    <div class="cpu" data-cpu="1">THINK·fast</div>
+  </div>
+
+  <div class="irow">
+    <div class="ws-hd"><span class="idx">II</span>
+      <span class="lab"><span class="anim-inline" id="map-running"></span>REASONING <span class="dim">RUNNING</span></span>
+      <span class="st" data-state="idle">RUNNING</span></div>
+    <div class="note"><b>running → 04 FALL。</b>列在往下滴，读作「命令在吐输出」。</div>
+    <div class="cpu" data-cpu="1">EXEC</div>
+  </div>
+
+  <div class="irow">
+    <div class="ws-hd"><span class="idx">II</span>
+      <span class="lab"><span class="anim-inline" id="map-done"></span>REASONING <span class="dim">SETTLED</span></span>
+      <span class="st" data-state="idle">SETTLED</span></div>
+    <div class="note"><b>done → 收拢成基线，1.2s 后回到 idle。</b>完成是一个瞬间，不是一个状态。</div>
+    <div class="cpu" data-cpu="0">THINK·stop</div>
+  </div>
+</section>
+
+<section class="probe">
+  <div>
+    <h4>GRID LOCK</h4>
+    <div id="p-lock">measuring…</div>
+  </div>
+  <div>
+    <h4>GLYPH STACK</h4>
+    <div id="p-font">measuring…</div>
+  </div>
+  <div>
+    <h4>COST</h4>
+    <div id="p-cost">measuring…</div>
+  </div>
+  <div>
+    <h4>NOTE</h4>
+    <div>盲文点阵 = 2×4 点/字符，横向分辨率是 text 的 2 倍。<br>
+    字符本身无描边、无渐变，纯实心点 —— 符合 §2 R4。</div>
+  </div>
+</section>
+
+<script>
+/* ============================================================
+   dot bitmap → braille string
+   ============================================================ */
+const DOTS = [[0x01, 0x08], [0x02, 0x10], [0x04, 0x20], [0x40, 0x80]];
+
+function braille(bitmap) {
+  const h = bitmap.length, w = bitmap[0]?.length ?? 0;
+  const cellRows = Math.ceil(h / 4), cellCols = Math.ceil(w / 2);
+  let out = "";
+  for (let cy = 0; cy < cellRows; cy++) {
+    for (let cx = 0; cx < cellCols; cx++) {
+      let v = 0x2800;
+      for (let dr = 0; dr < 4; dr++) {
+        for (let dc = 0; dc < 2; dc++) {
+          const y = cy * 4 + dr, x = cx * 2 + dc;
+          if (bitmap[y] && bitmap[y][x]) v |= DOTS[dr][dc];
+        }
+      }
+      out += String.fromCodePoint(v);
+    }
+    if (cy < cellRows - 1) out += "\n";
+  }
+  return out;
+}
+
+const blank = (w, h) => Array.from({ length: h }, () => new Array(w).fill(0));
+const put = (b, x, y, v = 1) => { if (b[y] && b[y][x] !== undefined) b[y][x] = v; };
+
+/* registry of the dot-matrix renderers (used by the idle rows too) */
+const RENDERERS = { trace, orbit, wave, fall, spark, bars, gather };
+
+/* deterministic noise — same frame looks the same, so nothing "shivers" */
+function hash(x, y, s = 0) {
+  let h = Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263) + Math.imul(s | 0, 1442695041);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+const TAU = Math.PI * 2;
+
+/* ============================================================
+   01 TRACE — a waveform that never repeats
+   ============================================================ */
+function trace(t) {
+  const W = 20, H = 8, b = blank(W, H);
+  for (let x = 0; x < W; x++) {
+    const v = Math.sin(x * 0.41 + t * 0.62) * 0.55 + Math.sin(x * 0.17 - t * 0.34) * 0.45;
+    const hgt = Math.max(1, Math.round((v * 0.5 + 0.5) * (H - 1) + 1));
+    for (let y = H - hgt; y < H; y++) put(b, x, y);
+    if (hash(x, t % 97) > 0.88) put(b, x, Math.max(0, H - hgt - 1));
+  }
+  return b;
+}
+
+/* ============================================================
+   02 ORBIT — a dot running a ring, with a short tail
+   ============================================================ */
+function orbit(t) {
+  const W = 8, H = 8, b = blank(W, H);
+  const cx = (W - 1) / 2, cy = (H - 1) / 2, r = 2.7;
+  for (let k = 0; k < 7; k++) {
+    const a = t * 0.42 - k * 0.3;
+    put(b, Math.round(cx + Math.cos(a) * r), Math.round(cy + Math.sin(a) * r), k < 3 ? 2 : 1);
+  }
+  if (t % 10 < 5) put(b, Math.round(cx), Math.round(cy), 1);
+  return b;
+}
+
+/* ============================================================
+   03 WAVE — diagonal travelling field
+   ============================================================ */
+function wave(t) {
+  const W = 20, H = 8, b = blank(W, H);
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const v = Math.sin(x * 0.46 + y * 0.55 - t * 0.55);
+      if (v > 0.45) put(b, x, y, v > 0.86 ? 2 : 1);
+    }
+  }
+  return b;
+}
+
+/* ============================================================
+   04 FALL — columns draining, like a data cascade
+   ============================================================ */
+function fall(t) {
+  const W = 16, H = 8, b = blank(W, H);
+  for (let x = 0; x < W; x++) {
+    const speed = 0.35 + hash(x, 7) * 0.5;
+    const phase = hash(x, 3) * (H + 5);
+    const head = ((t * speed + phase) % (H + 5)) - 2;
+    for (let k = 0; k < 3; k++) {
+      const y = Math.round(head - k);
+      if (y >= 0 && y < H) put(b, x, y, k === 0 ? 2 : 1);
+    }
+  }
+  return b;
+}
+
+/* ============================================================
+   05 SPARK — dots firing on their own periods (neuron-like)
+   ============================================================ */
+function spark(t) {
+  const W = 16, H = 8, b = blank(W, H);
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const p = hash(x, y), period = 5 + Math.floor(p * 11), phase = hash(y, x + 91) * period;
+      const local = (t + phase) % period;
+      if (local < 1) put(b, x, y, 2);
+      else if (local < 2) put(b, x, y, 1);
+      else if (hash(x, y, t % 61) > 0.985) put(b, x, y, 1);
+    }
+  }
+  return b;
+}
+
+/* ============================================================
+   06 BARS — equaliser, one bar per braille cell
+   ============================================================ */
+function bars(t) {
+  const W = 16, H = 8, b = blank(W, H);
+  const cells = W / 2;
+  for (let c = 0; c < cells; c++) {
+    const v = Math.abs(Math.sin(c * 0.62 + t * 0.52)) * 0.7 + Math.abs(Math.sin(c * 0.27 - t * 0.33)) * 0.3;
+    const hgt = Math.max(1, Math.round(v * (H - 1)));
+    for (let y = H - hgt; y < H; y++) {
+      put(b, c * 2, y, y === H - hgt ? 2 : 1);
+      put(b, c * 2 + 1, y, y === H - hgt ? 2 : 1);
+    }
+  }
+  return b;
+}
+
+/* ============================================================
+   07 GATHER — dots converge on the centre, then burst
+   ============================================================ */
+function gather(t) {
+  const W = 12, H = 8, b = blank(W, H);
+  const cx = (W - 1) / 2, cy = (H - 1) / 2;
+  const cycle = 14, phase = t % cycle, p = phase / cycle;
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * TAU + t * 0.12;
+    const r = 4.2 * (1 - p) + 0.2;
+    put(b, Math.round(cx + Math.cos(a) * r), Math.round(cy + Math.sin(a) * r * 0.9), p > 0.6 ? 2 : 1);
+  }
+  if (p > 0.78) {
+    for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) put(b, Math.round(cx) + dx, Math.round(cy) + dy, 2);
+  }
+  return b;
+}
+
+/* ============================================================
+   08 RUNNER — the classic single-cell spinner, for comparison
+   ============================================================ */
+const RUNNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+const runner = (t) => RUNNER[t % RUNNER.length];
+
+/* ============================================================
+   single-line variants (4 dot rows) — the header is ONE line at
+   18px, so a full 8-row pattern cropped to line 1 is nearly empty.
+   These are what would actually ship in the thinking header.
+   ============================================================ */
+const LINE = {
+  /* waveform, 4 rows tall — amplitude now lives in 4 steps, not 8 */
+  trace(t) {
+    const W = 20, H = 4, b = blank(W, H);
+    for (let x = 0; x < W; x++) {
+      const v = Math.sin(x * 0.41 + t * 0.62) * 0.55 + Math.sin(x * 0.17 - t * 0.34) * 0.45;
+      const hgt = Math.max(1, Math.round((v * 0.5 + 0.5) * (H - 1) + 1));
+      for (let y = H - hgt; y < H; y++) put(b, x, y);
+      if (hash(x, t % 97) > 0.88) put(b, x, Math.max(0, H - hgt - 1));
+    }
+    return b;
+  },
+  /* a dot circling a flattened ellipse — reads as motion in one line */
+  orbit(t) {
+    const W = 8, H = 4, b = blank(W, H);
+    const cx = (W - 1) / 2, cy = (H - 1) / 2, rx = 3.2, ry = 1.5;
+    for (let k = 0; k < 5; k++) {
+      const a = t * 0.42 - k * 0.34;
+      put(b, Math.round(cx + Math.cos(a) * rx), Math.round(cy + Math.sin(a) * ry), k < 2 ? 2 : 1);
+    }
+    return b;
+  },
+  /* diagonal drift, 4 rows */
+  wave(t) {
+    const W = 20, H = 4, b = blank(W, H);
+    for (let y = 0; y < H; y++)
+      for (let x = 0; x < W; x++) {
+        const v = Math.sin(x * 0.46 + y * 0.55 - t * 0.55);
+        if (v > 0.45) put(b, x, y, v > 0.86 ? 2 : 1);
+      }
+    return b;
+  },
+  /* columns draining, 4 rows */
+  fall(t) {
+    const W = 16, H = 4, b = blank(W, H);
+    for (let x = 0; x < W; x++) {
+      const speed = 0.35 + hash(x, 7) * 0.5;
+      const head = Math.round(((t * speed + hash(x, 3) * (H + 5)) % (H + 5)) - 2);
+      for (let k = 0; k < 2; k++) {
+        const y = head - k;
+        if (y >= 0 && y < H) put(b, x, y, k === 0 ? 2 : 1);
+      }
+    }
+    return b;
+  },
+  /* sparse firing dots, 4 rows */
+  spark(t) {
+    const W = 16, H = 4, b = blank(W, H);
+    for (let y = 0; y < H; y++)
+      for (let x = 0; x < W; x++) {
+        const p = hash(x, y), period = 5 + Math.floor(p * 11), phase = hash(y, x + 91) * period;
+        const local = (t + phase) % period;
+        if (local < 1) put(b, x, y, 2);
+        else if (local < 2) put(b, x, y, 1);
+      }
+    return b;
+  },
+  /* equaliser, 4 rows */
+  bars(t) {
+    const W = 16, H = 4, b = blank(W, H);
+    for (let c = 0; c < W / 2; c++) {
+      const v = Math.abs(Math.sin(c * 0.62 + t * 0.52)) * 0.7 + Math.abs(Math.sin(c * 0.27 - t * 0.33)) * 0.3;
+      const hgt = Math.max(1, Math.round(v * (H - 1)));
+      for (let y = H - hgt; y < H; y++) { put(b, c * 2, y, y === H - hgt ? 2 : 1); put(b, c * 2 + 1, y, y === H - hgt ? 2 : 1); }
+    }
+    return b;
+  },
+  /* dots converging on the centre, 4 rows */
+  gather(t) {
+    const W = 12, H = 4, b = blank(W, H);
+    const cx = (W - 1) / 2, cy = (H - 1) / 2;
+    const p = (t % 14) / 14;
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * TAU + t * 0.12, r = 3.4 * (1 - p) + 0.1;
+      put(b, Math.round(cx + Math.cos(a) * r), Math.round(cy + Math.sin(a) * r * 0.6), p > 0.6 ? 2 : 1);
+    }
+    return b;
+  },
+};
+
+/* ============================================================
+   card registry
+   ============================================================ */
+const CARDS = [
+  { n: "01", key: "trace", name: "TRACE", cn: "波形扫描",
+    render: trace, cell: [13, 14],
+    why: "一条永不重复的波形，读作「信号正在流」。分辨率靠点阵翻倍，13px 下仍有 8 段纵向高度。",
+    v: "best", vt: "推荐 · 主区" },
+  { n: "02", key: "orbit", name: "ORBIT", cn: "环绕",
+    render: orbit, cell: [13, 14],
+    why: "最通用的「忙」语义，任何人一眼就懂。8×8 点阵（4 字符宽）在 13px 下仍然清楚；代价是它只说「在跑」，不说「在推理」。",
+    v: "ok", vt: "可用 · 头部" },
+  { n: "03", key: "wave", name: "WAVE", cn: "对角场",
+    render: wave, cell: [13, 14],
+    why: "整体一起呼吸，像一台扫描中的雷达。密度太高，挨着正文会抢注意力。",
+    v: "ok", vt: "可用 · 大块" },
+  { n: "04", key: "fall", name: "FALL", cn: "数据瀑布",
+    render: fall, cell: [13, 14],
+    why: "列在落下，语义偏向「输出/下载」而不是「思考」；且落点会跳出边界，读数条里不好收。",
+    v: "no", vt: "不建议" },
+  { n: "05", key: "spark", name: "SPARK", cn: "神经放电",
+    render: spark, cell: [13, 14],
+    why: "每个点有自己的周期，忽明忽暗 —— 最像「神经元在放电」，语义与推理最贴。密度低、不抢眼，适合缩到 2 字符。",
+    v: "best", vt: "推荐 · 状态位" },
+  { n: "06", key: "bars", name: "BARS", cn: "电平条",
+    render: bars, cell: [13, 14],
+    why: "LCARS 本来就有的读数语言（电平/负载）。一眼可读，但更像「吞吐量」而不是「推理」。",
+    v: "ok", vt: "可用 · 读数带" },
+  { n: "07", key: "gather", name: "GATHER", cn: "汇聚",
+    render: gather, cell: [13, 14],
+    why: "点向中心收拢再一次爆开，读作「正在汇集证据」；一个循环 14 帧，节奏偏慢但很有叙事感。",
+    v: "ok", vt: "可选 · 单用" },
+  { n: "08", key: "runner", name: "RUNNER", cn: "经典单字",
+    render: null, cell: [1, 1],
+    why: "业界最常见的那一个。单字符太小、且没有「本机」的仪表感 —— 列在这里只作对照。",
+    v: "no", vt: "对照" },
+];
+
+/* ============================================================
+   render
+   ============================================================ */
+const cards = document.getElementById("cards");
+const nodes = [];
+for (const c of CARDS) {
+  const el = document.createElement("article");
+  el.className = "card" + (c.v === "best" ? " pick" : "");
+  el.innerHTML = `
+    <div class="spine"></div>
+    <div class="ch"><span class="n">${c.n}</span><b>${c.name}</b><em>${c.cn}</em>
+      <button class="use" data-on="0" title="把这个放进头部预览">USE</button>
+      <span class="st"></span></div>
+    <div class="body"><pre class="anim"></pre><div class="dots"></div></div>
+    <div class="fits">
+      <span class="fx"><b>11PX</b><pre data-s="11"></pre></span>
+      <span class="fx"><b>13PX</b><pre data-s="13"></pre></span>
+      <span class="fx"><b>18PX</b><pre data-s="18"></pre></span>
+      <span class="fx hdr"><b>HEADER · 18PX</b><pre data-s="hdr"></pre></span>
+    </div>
+    <div class="cd"><div class="why">${c.why}</div><div class="verdict" data-v="${c.v}">${c.vt}</div></div>`;
+  cards.append(el);
+  nodes.push({
+    card: c, el,
+    pre: el.querySelector(".anim"),
+    dots: el.querySelector(".dots"),
+    st: el.querySelector(".ch .st"),
+    use: el.querySelector(".use"),
+    fits: [...el.querySelectorAll(".fits pre")],
+  });
+}
+
+/* dot map: 5px cells, honouring the "hot" level */
+function paintDots(host, bitmap) {
+  const h = bitmap.length, w = bitmap[0].length;
+  const total = h * w;
+  if (host.childElementCount !== total) {
+    host.style.gridTemplateColumns = `repeat(${w}, 5px)`;
+    host.replaceChildren(...Array.from({ length: total }, () => document.createElement("i")));
+    host._cache = Array.from({ length: h }, () => new Array(w).fill(-1));
+  }
+  let i = 0;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++, i++) {
+      const v = bitmap[y][x];
+      if (host._cache[y][x] !== v) {
+        host._cache[y][x] = v;
+        host.children[i].dataset.on = String(v ? v : 0);
+      }
+    }
+  }
+}
+
+/* row B is a STATIC dim glyph — written once, never redrawn */
+function paintIdleStatic() {
+  document.querySelector("#idle-dim .anim-inline").textContent = braille(LINE.orbit(1));
+}
+
+/* ============================================================
+   the clock: fixed step, one tick = one drawn frame
+   ============================================================ */
+let step = 90, t = 0, running = true, lastDraw = 0, draws = [], frameMs = 0;
+
+/* which candidate the live header mock shows */
+let headKey = "trace";
+/* idle breathing: scale the waveform's amplitude toward its mid line, one
+   cycle per 24 frames (@90ms = 2.16s). Operates on a 4-row bitmap. */
+function breathe(bm, frame) {
+  const h = bm.length, w = bm[0].length;
+  const p = (frame % 24) / 24;
+  const amp = 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(p * TAU));
+  const mid = h - 1;
+  const out = blank(w, h);
+  for (let x = 0; x < w; x++) {
+    let top = h;
+    for (let y = 0; y < h; y++) if (bm[y][x]) { top = y; break; }
+    if (top === h) continue;
+    const nh = Math.round(mid + (top - mid) * amp);
+    for (let y = Math.max(0, nh); y < h; y++) out[y][x] = bm[y][x];
+  }
+  return out;
+}
+
+function draw() {
+  t++;
+  const started = performance.now();
+  for (const n of nodes) {
+    if (n.card.render) {
+      const bm = n.card.render(t);
+      const str = braille(bm);
+      n.pre.textContent = str;
+      paintDots(n.dots, bm);
+      const w = n.pre.getBoundingClientRect().width;
+      n.st.textContent = `${n.card.cell[1] >= 4 ? `${bm[0].length}×${bm.length}` : "1×4"} · ${Math.round(w)}px`;
+      /* the size-fit strip: the same frame at the sizes it would ship at,
+         plus the 4-cell single-line crop the thinking header would use */
+      for (const f of n.fits) {
+        const s = f.dataset.s;
+        if (s === "hdr") {
+          f.style.fontSize = "18px";
+          f.textContent = n.card.key === "runner" ? runner(t) : braille(LINE[n.card.key](t)).slice(0, 4);
+        } else {
+          f.style.fontSize = `${s}px`;
+          f.textContent = Number(s) <= 11 ? str.split("\n")[0].slice(0, 8) : str;
+        }
+      }
+    } else {
+      n.pre.textContent = runner(t);
+      n.dots.replaceChildren();
+      n.st.textContent = "1×4";
+      for (const f of n.fits) {
+        const s = f.dataset.s;
+        if (s === "hdr") { f.style.fontSize = "18px"; f.textContent = runner(t); }
+        else { f.style.fontSize = `${s}px`; f.textContent = runner(t); }
+      }
+    }
+  }
+  /* the mock header: the picked candidate at real 18px, SINGLE line (4 dot rows),
+     cropped to 4 cells so it fits beside the readouts without pushing them */
+  const head = braille(LINE[headKey](t));
+  document.getElementById("mock-anim").textContent = head.slice(0, 4);
+  document.getElementById("mock-who").textContent = CARDS.find((c) => c.key === headKey)?.name ?? headKey;
+  document.getElementById("mock-state").textContent = t % 12 < 9 ? "SCANNING" : "SETTLED";
+
+  /* the idle rows: row B is static (painted once), row C breathes */
+  const brEl = document.querySelector("#idle-breath .anim-inline");
+  brEl.textContent = braille(breathe(LINE.trace(t), t)).slice(0, 4);
+
+  /* the shipped idle: sparse dots, reshuffled every 6 ticks, TWO cell rows */
+  const idleBm = () => {
+    const w = 10, h = 8, slow = Math.floor(t / 6), b = blank(w, h);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (hash(x, y, slow) > 0.91) put(b, x, y);
+    return b;
+  };
+  /* the shipped band is two cell rows, so every preview crops to 4 cells wide
+     and keeps both lines — one line was what looked unfinished */
+  const twoRows = (bm) => braille(bm).split("\n").slice(0, 2).map((l) => l.slice(0, 4)).join("\n");
+
+  const shEl = document.querySelector("#idle-shipped-anim");
+  if (shEl) shEl.textContent = twoRows(idleBm());
+
+  /* the shipped phase → motion map (mirrors src/braille.ts, 8 dot rows) */
+  const MAP = {
+    idle: idleBm,
+    thinking: () => spark(t),
+    streaming: () => trace(t),
+    running: () => fall(t),
+    done: () => {
+      const w = 20, h = 8, b = blank(w, h), k = Math.min(1, t / 9);
+      for (let x = 0; x < w; x++) {
+        const v = Math.sin(x * 0.41) * 0.55 + Math.sin(x * 0.17) * 0.45;
+        const hgt = Math.max(1, Math.round((v * 0.5 + 0.5) * (h - 1) * (1 - k) + 1));
+        for (let y = h - hgt; y < h; y++) put(b, x, y);
+      }
+      return b;
+    },
+  };
+  for (const k of Object.keys(MAP)) {
+    const el = document.getElementById(`map-${k}`);
+    if (el) el.textContent = twoRows(MAP[k]());
+  }
+
+  document.getElementById("f-frame").textContent = String(t).padStart(3, "0");
+
+  frameMs = performance.now() - started;
+  draws.push(frameMs);
+  if (draws.length > 60) draws.shift();
+}
+
+let acc = 0, prev = performance.now();
+function loop(now) {
+  requestAnimationFrame(loop);
+  const dt = now - prev;
+  prev = now;
+  if (!running) return;
+  acc += dt;
+  if (acc < step) return;
+  acc = acc % step;
+  draw();
+  lastDraw = now;
+}
+
+requestAnimationFrame(loop);
+
+/* ============================================================
+   controls
+   ============================================================ */
+function seg(id, fn) {
+  const root = document.getElementById(id);
+  root.addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    for (const x of root.querySelectorAll("button")) x.setAttribute("aria-pressed", String(x === b));
+    fn(b.dataset.v);
+  });
+}
+seg("speed", (v) => { step = Number(v); document.getElementById("f-ms").textContent = `${v}ms`; document.getElementById("f-step").textContent = `~${Math.round(1000 / step)} fps`; });
+seg("size", (v) => { document.documentElement.style.setProperty("--size", `${v}px`); });
+seg("motion", (v) => {
+  document.body.dataset.motion = v === "reduced" ? "reduced" : "full";
+  document.getElementById("f-rm").textContent = v === "reduced" ? "ON" : "OFF";
+  running = v !== "reduced";
+  if (v === "reduced") drawStatic();
+  else draw();
+});
+
+/* reduced motion: one still frame, nothing moves (AGENTS §5 R12) */
+function drawStatic() {
+  const snap = t;
+  t = 1;
+  paintIdleStatic();
+  draw();
+  t = snap;
+  document.getElementById("f-frame").textContent = "STATIC";
+}
+paintIdleStatic();
+seg("run", () => { running = !running; document.querySelector("#run button").textContent = running ? "PAUSE ✕" : "RESUME ▸"; });
+
+/* frame stepping: advance exactly one frame (pauses the clock) */
+seg("frame", (v) => {
+  if (v === "all") { running = true; return; }
+  running = false;
+  document.querySelector("#run button").textContent = "RESUME ▸";
+  draw();
+});
+
+/* "use in header" — pick which candidate the live mock shows */
+for (const n of nodes) {
+  if (!n.card.render) { n.use.disabled = true; n.use.style.opacity = ".35"; continue; }
+  n.use.addEventListener("click", () => {
+    headKey = n.card.key;
+    for (const x of nodes) x.use.dataset.on = x === n ? "1" : "0";
+    draw();
+  });
+}
+nodes.find((n) => n.card.key === headKey)?.use.setAttribute("data-on", "1");
+
+/* ============================================================
+   probes
+   ============================================================ */
+const cv = document.createElement("canvas").getContext("2d");
+function measure(text, font) { cv.font = font; return cv.measureText(text).width; }
+
+function probe() {
+  const cs = getComputedStyle(document.querySelector(".anim"));
+  const size = parseFloat(cs.fontSize);
+  /* every braille codepoint must have the same advance, else the strip drifts */
+  const widths = [];
+  for (let i = 0; i < 256; i += 17) widths.push(measure(String.fromCodePoint(0x2800 + i), `400 ${size}px ${cs.fontFamily}`));
+  const min = Math.min(...widths), max = Math.max(...widths);
+  const lock = max - min < 0.5;
+  document.getElementById("p-lock").innerHTML = lock
+    ? `<span class="ok">✓ 单点前进宽度恒定</span> · advance <code>${min.toFixed(2)}px</code> @ ${size}px · 256 码位抽样 16 个`
+    : `<span class="bad">✕ 前进宽度不一致</span> · ${min.toFixed(2)}–${max.toFixed(2)}px（缺字形、回退到别的字体）`;
+
+  /* which family actually answers for U+28FF */
+  const candidates = ["Apple Braille", "Noto Sans Symbols 2", "Segoe UI Symbol", "DejaVu Sans Mono", "IBM Plex Mono", "Menlo", "monospace"];
+  const rows = candidates.map((f) => {
+    const w = measure("⠿", `400 ${size}px "${f}", monospace`);
+    return `${f} <code>${w.toFixed(1)}</code>`;
+  });
+  document.getElementById("p-font").innerHTML = rows.join(" · ");
+
+  const avg = draws.reduce((a, b) => a + b, 0) / Math.max(1, draws.length);
+  document.getElementById("p-cost").innerHTML =
+    `${nodes.filter((n) => n.card.render).length} 张点阵 · <code>${avg.toFixed(2)}ms</code>/帧（含写 DOM）· 每帧 ${nodes.reduce((a, n) => a + (n.card.render ? n.card.render(1)[0].length * n.card.render(1).length : 0), 0)} 个点`;
+
+  document.getElementById("f-glyph").textContent = lock ? "LOCKED" : "FALLBACK";
+  document.getElementById("f-glyph").style.color = lock ? "var(--moon)" : "var(--tang)";
+}
+setTimeout(probe, 300);
+setInterval(probe, 2000);
+
+/* reduced motion from the OS also stops the clock (AGENTS §5 R12) */
+if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+  document.body.dataset.motion = "reduced";
+  running = false;
+  document.querySelector("#motion button[data-v=reduced]").setAttribute("aria-pressed", "true");
+  document.querySelector("#motion button[data-v=full]").setAttribute("aria-pressed", "false");
+  drawStatic();
+}
+</script>
+</body>
+</html>
