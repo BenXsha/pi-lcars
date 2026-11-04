@@ -100,6 +100,22 @@ if (!pushUrls.length) {
 }
 say(`  ·   push targets: ${pushUrls.join("  +  ")}`);
 
+/* every push URL must answer before anything is tagged: an unauthorized remote
+ * is the one failure that used to show up only after the tag existed */
+for (const url of pushUrls) {
+  try {
+    await git(["ls-remote", "--heads", url, "main"], { timeout: 60_000 });
+    say(`  ok  reachable: ${url}`);
+  } catch {
+    bad(`cannot push to ${url} (authentication or the repo is gone).
+      GitHub over SSH needs the key on the account:
+        pbcopy < ~/.ssh/id_rsa.pub      # then add it at github.com/settings/keys
+        ssh -T git@github.com           # expect: Hi <user>!
+      Or switch that push URL to HTTPS with a token:
+        git remote set-url --push origin https://github.com/BenXsha/pi-lcars.git`);
+  }
+}
+
 let who = "";
 try {
   who = (await npm(["whoami", `--registry=${REGISTRY}`])).stdout.trim();
