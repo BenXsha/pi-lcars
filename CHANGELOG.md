@@ -7,6 +7,17 @@ Release notes are written **before** the version is bumped: `scripts/build-relea
 reads the section for the current `package.json` version and prints it inside the
 share bundle's `README.txt`, and fails the build when there is no such section.
 
+## [0.5.1] — 2026-11-04
+
+### Fixed
+
+- **Broken previews on npm and the pi gallery.** The README pointed at
+  `docs/console.png` relatively; npm renders that against the published tarball
+  and pi.dev rewrites it to `cdn.jsdelivr.net/npm/pi-lcars@<ver>/docs/…`, which
+  404s because `docs/` is deliberately not shipped in the package. Both images
+  are now absolute repository URLs, so a version's README keeps rendering after
+  the package grows or moves.
+
 ## [0.5.0] — 2026-11-04
 
 The release that puts the console one keystroke away from the terminal: the

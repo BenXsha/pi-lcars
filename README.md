@@ -3,12 +3,12 @@
 A web console for [pi](https://pi.dev) where the agent transcript reads like an LCARS station display —
 **but every pixel is driven by real session events.** No mock data, no scripted demo.
 
-![the mission log](docs/console.png)
+![the mission log](https://gitee.com/benshawn/pi-lcars/raw/main/docs/console.png)
 
 <sub>The mission log: sessions on the left, the live transcript in the middle (tool rows, diffs,
 sub-agent calls), context and tool calls on the right, `ACTIVITY` reading the machine's state above it.</sub>
 
-![the three-zone workspace](docs/stream.png)
+![the three-zone workspace](https://gitee.com/benshawn/pi-lcars/raw/main/docs/stream.png)
 
 <sub>`VIEW → STREAM`: the same session cut into three instruments — `I CONVERSATION`, `II THINKING`
 (with the dot matrix), `III TERMINAL` — each scrolling on its own, tied together by exchange.</sub>

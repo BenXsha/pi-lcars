@@ -1163,6 +1163,9 @@ browser ──EventSource(/api/stream)──► server.mjs ──session.subscri
   `AutocompleteItem`）在本文件里**本地声明类型**，不写 `peerDependencies`——否则 `npx pi-lcars`
   的用户会多背一个从没用到的依赖。
 - **命令归操作员，不是模型**：不注册成 tool，模型看不到它（§7「只呈现真实能力」）。
+- **README 里的图片必须写绝对 URL**（`https://gitee.com/.../raw/main/docs/*.png`）：npm 与 pi.dev 都会把相对路径
+  重写成**已发布 tarball** 里的位置（pi.dev 用 jsDelivr），而 `docs/` 故意不进包 —— 相对路径必然 404。
+  `0.5.0` 就是这么踩的，`0.5.1` 修的。
 - 画廊收录规则：npm 关键词 **`pi-package`**（唯一门槛，无投稿表单）+ 可选 `pi.image` /
   `pi.video` 预览；`pi.extensions` 指向扩展入口；`test/extension.mjs` 里有一条断言直接读
   `package.json` 校验这三件事，`pi install` 才不会装到一个「命令不存在」的包。

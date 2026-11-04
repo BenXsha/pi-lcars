@@ -1,6 +1,6 @@
 {
   "name": "pi-lcars",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "LCARS agent console for pi — one command boots the web UI and the in-process pi backend",
   "license": "MIT",
   "author": {
