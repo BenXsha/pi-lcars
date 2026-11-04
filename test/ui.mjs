@@ -492,6 +492,22 @@ try {
       railRows[railFork].ml === `${railRows[railFork].depth * 14}px`,
     JSON.stringify(railRows),
   );
+  const railGeom = await evaluate(
+    `[...document.querySelectorAll('.lsessions .sess')].map((el) => {
+      const num = el.querySelector('.num')?.getBoundingClientRect();
+      const t = el.querySelector('.l1')?.getBoundingClientRect();
+      const gut = el.querySelector('.gut')?.getBoundingClientRect();
+      return {
+        gutBeforeNum: gut && num ? Math.round(num.left - gut.right) >= 0 : null,
+        numBeforeTitle: num && t ? Math.round(t.left - num.right) > 0 : null,
+      };
+    })`,
+  );
+  check(
+    "the gutter, numeral and title keep their own columns",
+    railGeom.length > 0 && railGeom.every((g) => g.gutBeforeNum === true && g.numBeforeTitle === true),
+    JSON.stringify(railGeom),
+  );
   check(
     "every rail row keeps a fold gutter",
     railRows.length > 0 && (await evaluate(`document.querySelectorAll('.lsessions .sess .gut').length`)) === railRows.length,

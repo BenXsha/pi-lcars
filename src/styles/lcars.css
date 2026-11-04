@@ -1415,7 +1415,8 @@ button { cursor: pointer; }
   color: var(--orange);
 }
 .sess .num {
-  grid-column: 1;
+  /* column 2: the fold gutter owns column 1 (see the grid on .sess) */
+  grid-column: 2;
   grid-row: 1 / span 2;
   align-self: center;
   justify-self: end;
@@ -1425,7 +1426,7 @@ button { cursor: pointer; }
   color: color-mix(in srgb, var(--orange) 70%, #000);
 }
 .sess .l1 {
-  grid-column: 2;
+  grid-column: 3;
   font: 700 12.5px/22px var(--text);
   letter-spacing: 0.01em;
   color: var(--w);
@@ -1435,7 +1436,7 @@ button { cursor: pointer; }
 }
 .sess .l1[data-empty="1"] { color: var(--g2); font-weight: 400; }
 .sess .l2 {
-  grid-column: 2;
+  grid-column: 3;
   font: 400 11px/17px var(--din);
   letter-spacing: 0.1em;
   color: color-mix(in srgb, var(--orange) 62%, #000);
@@ -1444,7 +1445,7 @@ button { cursor: pointer; }
   white-space: nowrap;
 }
 .sess .rt {
-  grid-column: 3;
+  grid-column: 4;
   grid-row: 1 / span 2;
   align-self: center;
   font: 700 11px/2 var(--din);
