@@ -126,6 +126,32 @@ try {
       "",
     ].join("\n"),
   );
+  /* lineage fixture: a parent, a fork of it, and an unrelated session. Written
+   * through the real SDK so the child's header carries `parentSession` exactly
+   * the way pi writes it — the panels group by that header and nothing else. */
+  const { loadSdk } = await import("../server/pi/sdk.mjs");
+  const lineage = await (async () => {
+    try {
+      const { SessionManager } = await loadSdk();
+      const msg = (text) => ({ role: "user", content: [{ type: "text", text }], timestamp: new Date().toISOString() });
+      const asst = (text) => ({ role: "assistant", content: [{ type: "text", text }], timestamp: new Date().toISOString() });
+      const parent = SessionManager.create(workspace, sessions);
+      parent.appendMessage(msg("parent session: rate limit the API by token"));
+      parent.appendMessage(asst("looking at the middleware first"));
+      parent.appendSessionInfo("lineage parent");
+      const parentPath = parent.getSessionFile();
+      const child = SessionManager.forkFrom(parentPath, workspace, sessions);
+      child.appendMessage(msg("fork: limiting by the first forwarded-for hop instead"));
+      child.appendMessage(asst("then the bucket key changes too"));
+      const other = SessionManager.create(workspace, sessions);
+      other.appendMessage(msg("unrelated session"));
+      return { parentPath, childPath: child.getSessionFile() };
+    } catch (e) {
+      check("lineage fixture", false, e.message);
+      return null;
+    }
+  })();
+
   const env = { ...process.env, CI: "1", LCARS_STATE_DIR: state, LCARS_SESSIONS: sessions, LCARS_TRUST_PROJECT: "0" };
   server = spawn(process.execPath, [BIN, "--json", "--no-open", "--port", String(PORT)], {
     cwd: workspace,
@@ -223,6 +249,27 @@ try {
   check("console boots with a session", ready);
   check("transcript is the landing view", await inTranscript());
 
+  // bring the seeded lineage into the LIVE registry: opening a foked transcript
+  // is what makes the left rail show a tree (the history station reads disk)
+  if (lineage) {
+    for (const path of [lineage.parentPath, lineage.childPath]) {
+      const r = await fetch(`${base}/api/session`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ op: "open", path }),
+      }).then((x) => x.json()).catch(() => null);
+      check(`lineage session opens: ${path.split("/").pop().slice(0, 12)}`, r?.ok === true, JSON.stringify(r?.error ?? null));
+    }
+    const boot = await fetch(`${base}/api/bootstrap`).then((x) => x.json()).catch(() => null);
+    const forked = (boot?.data?.sessions ?? []).filter((x) => x.parentPath);
+    check(
+      "the live list carries the fork's parent path",
+      forked.length === 1 && String(forked[0].parentPath).endsWith(lineage.parentPath.split("/").pop()),
+      JSON.stringify((boot?.data?.sessions ?? []).map((x) => [x.id, Boolean(x.parentPath)])),
+    );
+    await sleep(600);
+  }
+
   /* ------------------------------------- 3b. the log's activity strip */
   // the same dot matrix the STREAM zone carries, read once for the whole
   // session: header, then strip, then the scrolled log
@@ -294,6 +341,64 @@ try {
     }
     check(`nav ${st.view}: transcript replaced`, !(await inTranscript()));
   }
+
+  /* -------------------------------------- 4a2. HISTORY groups by lineage */
+  await click(".lnav .station:nth-child(4)");
+  await sleep(1200);
+  const lineageRows = async () =>
+    evaluate(
+      `[...document.querySelectorAll('.hist-list .hrow')].map((el) => ({
+        title: (el.querySelector('.ht')?.textContent ?? '').trim().slice(0, 24),
+        depth: Number(el.dataset.depth),
+        fork: el.dataset.fork,
+        pad: el.style.paddingLeft || '',
+        gut: el.querySelector('.gut .fold') ? 'fold' : el.querySelector('.gut .forkmark') ? 'mark' : '-',
+        meta: (el.querySelector('.hm')?.textContent ?? '').replace(/\\s+/g, ' '),
+      }))`,
+    );
+  let histRows = await lineageRows();
+  for (let i = 0; i < 20 && histRows.length < 3; i++) {
+    await sleep(900);
+    histRows = await lineageRows();
+  }
+  const parentRow = histRows.find((r) => r.gut === "fold");
+  const forkRow = histRows.find((r) => r.fork === "1");
+  check(
+    "history groups a fork under the session it came from",
+    !!parentRow && !!forkRow && forkRow.depth === parentRow.depth + 1 && forkRow.pad === `${(parentRow.depth + 1) * 18}px`,
+    JSON.stringify(histRows.map((r) => [r.depth, r.gut, r.title.slice(0, 12)])),
+  );
+  check(
+    "the fork says where it came from",
+    /↳/.test(forkRow?.meta ?? "") && histRows.filter((r) => r.depth === 0).length >= 2,
+    JSON.stringify(histRows.map((r) => r.meta.slice(0, 40))),
+  );
+
+  const foldBtn = `document.querySelector('.hist-list .hrow .gut .fold')`;
+  await evaluate(`${foldBtn}?.click()`);
+  await sleep(500);
+  const collapsed = await lineageRows();
+  check(
+    "folding a parent hides the branch and says how many",
+    collapsed.length === histRows.length - 1 && !collapsed.some((r) => r.depth === parentRow.depth + 1) && /1 hidden/.test(collapsed.find((r) => r.gut === "fold")?.meta ?? ""),
+    JSON.stringify(collapsed.map((r) => [r.depth, r.meta.slice(0, 46)])),
+  );
+  const folded = await evaluate(`localStorage.getItem('lcars.fold.history')`);
+  check("the fold survives a reload", typeof folded === "string" && folded.includes(".jsonl"), String(folded).slice(0, 60));
+  await evaluate(`${foldBtn}?.click()`);
+  await sleep(400);
+
+  const searchBox = `document.querySelector('.hist-search input')`;
+  await evaluate(`(() => { const i = ${searchBox}; i.value = 'fork'; i.dispatchEvent(new Event('input', { bubbles: true })); return 1; })()`);
+  await sleep(1500);
+  const searched = await lineageRows();
+  check(
+    "searching flattens the tree instead of lying about it",
+    searched.length >= 1 && searched.every((r) => r.depth === 0 && r.pad === ""),
+    JSON.stringify(searched.map((r) => [r.depth, r.title.slice(0, 14)])),
+  );
+  await evaluate(`(() => { const i = ${searchBox}; i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); return 1; })()`);
+  await sleep(900);
 
   /* -------------------------------------------- 4a. MCP add form fields */
   await click(".lnav .station:nth-child(1)");
@@ -367,6 +472,33 @@ try {
   await sleep(300);
   check("deep-linked station still exits to the transcript", await inTranscript());
 
+  /* ------------------------------------ 5b. the rail groups by lineage too */
+  // the same parent → fork pair the history fixture wrote, seen from the left
+  // rail: nested, indented, and with a fold gutter on EVERY row so the columns
+  // do not shift when a parent folds
+  const railRows = await evaluate(
+    `[...document.querySelectorAll('.lsessions .sess')].map((el) => ({
+      depth: Number(el.dataset.depth),
+      fork: el.dataset.fork,
+      ml: el.style.marginLeft || '',
+      gut: el.querySelector('.gut .fold') ? 'fold' : el.querySelector('.gut .forkmark') ? 'mark' : '-',
+    }))`,
+  );
+  const railParent = railRows.findIndex((r) => r.gut === "fold");
+  const railFork = railRows.findIndex((r) => r.fork === "1");
+  check(
+    "the rail nests a fork under its parent",
+    railParent >= 0 && railFork > railParent && railRows[railFork].depth === railRows[railParent].depth + 1 &&
+      railRows[railFork].ml === `${railRows[railFork].depth * 14}px`,
+    JSON.stringify(railRows),
+  );
+  check(
+    "every rail row keeps a fold gutter",
+    railRows.length > 0 && (await evaluate(`document.querySelectorAll('.lsessions .sess .gut').length`)) === railRows.length,
+    `${railRows.length} rows`,
+  );
+
+
   /* ------------------------------------------------------ 6. panes */
   const leftBefore = await attr(".app", "data-left");
   await click(".pane-foot:not(.is-right)");
@@ -397,6 +529,24 @@ try {
   const legend = await evaluate(`[...document.querySelectorAll('.legend span')].map((el) => el.textContent.trim())`);
   check("resources meter claims only what it knows", JSON.stringify(legend) === JSON.stringify(["USED", "FREE"]), JSON.stringify(legend));
   check("resources meter states what is missing", /not reported/i.test(await evaluate(`document.querySelector('.rnote')?.textContent ?? ''`)));
+
+  /* ------------------------------- 6c. a browser warning is not a fault */
+  // Chrome reports ResizeObserver loop notices as window `error` events with no
+  // stack. Before the filter, visiting HISTORY replaced the console with the
+  // SCRIPT ERROR screen for that warning.
+  const benignProbe = await evaluate(
+    `(async () => {
+      window.dispatchEvent(new ErrorEvent('error', { message: 'ResizeObserver loop completed with undelivered notifications.' }));
+      await new Promise((r) => setTimeout(r, 400));
+      return { panic: !!document.querySelector('.panic'), app: !!document.querySelector('.app') };
+    })()`,
+  );
+  check(
+    "a ResizeObserver notice does not paint the fault screen",
+    benignProbe?.panic === false && benignProbe?.app === true,
+    JSON.stringify(benignProbe),
+  );
+
 
   /* ------------------------------------------------------ 7. decks */
   const chips = await evaluate(`[...document.querySelectorAll('.shelf .ctl')].map((el) => el.textContent.trim())`);

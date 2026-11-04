@@ -730,6 +730,12 @@ TUI 的 `/tree` 对应物。服务端 `POST /api/session {op:"tree"}` 把 `manag
   带 `{ready, scanning, progress, scanned, matched}`；前端在 `scanning` 时每 1.8s 轮询，扫完自动落地。
 - 端点只做内存过滤（标题 / 全文 / cwd / id），排序按修改时间倒序，最多 200 条；不阻塞、不分页。
 - 每行：`4px 脊（forked = lavender）| 首句（单行）| cwd · N msgs · 相对时间 · forked/name | OPEN FORK RENAME ×`。
+- **按血缘分组**：同一套 `sessionTree()`，`data-depth` + `padding-left: depth × 18px` +
+  左侧 2px `--lav` 内脊；有子会话的行给 `▾/▸`（`aria-expanded`），被 fork 的行在元信息里写
+  `↳ <父会话标题>`。折叠状态存 `localStorage.lcars.fold.history`。
+- **搜索时拍平成一条条**：命中集合本来就散落，硬套树只会骗人；这时每行仍保留 `↳` 与父标题。
+- **父会话不在这批结果里就是根**（历史列表限 200 条、会话会删）：宁可让它出现在顶层，
+  也不能让它带着整棵子树消失。
 - **删除是两段式**：点垃圾桶 → 整行转 tomato 底色 + `DELETE / KEEP`，不做系统 confirm。
 - 改名用行内输入（Enter 提交 / Esc 取消），不弹窗。
 - 打开 / fork 直接复用 `/api/session {op:"open"|"fork", path}`，fork 后自动切到新会话。
@@ -869,6 +875,17 @@ composer 上方出现 `QUEUED n` 条带，逐条显示待投递文本 + `deliver
   11.5px 正文体、单行省略；没有消息时显示 `UNTITLED SESSION`（灰、常规字重）。改名优先于摘要。
 - 第二行是 9.5px 元信息 `模型 / 短 ID`；右列 9px `LIVE / QUEUED / HELD / 相对时间 · 条数`。
 - **选中 = 实心色块 + 黑字**；未选中 = 该色 10% 混黑底 + 2px 内描边 + 彩色字。
+- **父子会话按血缘分组**（`src/sessionTree.ts`）：fork 出来的会话排在**它来自的那个会话下面**，
+  不是按"最近改动"散落在别处 —— 因为要看的就是"这一支是从哪儿分出来的"。
+  - 行结构 `[12px fold gutter][34px 序号][标题 / 元信息][状态][删除]`；**gutter 恒在**，
+    这样折叠表亲时列不会横移。有子会话的行给 `▾/▸`（`aria-expanded`，12px），
+    只有自己是被 fork 的行给 `↳`（`--lav`，§2"并行/血缘"）。
+  - 缩进 `depth × 14px` + 左侧 2px `--lav` 内脊（深度越深透明度越低）：子行的**条更短**，
+    这是 LCARS 的语言（条长随内容），不是通用树控件的缩进线。
+  - 排序：兄弟按时间新→旧；**根按整棵子树的最新时间**排序 —— 一个活跃的 fork 会把它的父会话
+    顶到前面去，那正是它该在的位置。
+  - 折叠状态存 `localStorage.lcars.fold.sessions`（`src/folds.ts`），刷新保留；
+    折叠时元信息写 `· N HIDDEN`，不假装子会话不存在。
 - **动作条（NEW SESSION）与列表项必须不同档**，否则三个橙色块互相打架。动作条用中性 `--g1` 底 +
   24px 图标格 + 11px 标签 + 右侧胶囊圆角，高度 40（比会话块 52 矮一档）；hover/聚焦直接**反色成实心橙 + 黑字**，无过渡。
   层级因此是：cap（实心橙，最大）→ 选中会话（实心橙，块）→ 动作条（中性，条）→ 未选中会话（淡橙，块）。
@@ -1078,6 +1095,8 @@ composer 上方出现 `QUEUED n` 条带，逐条显示待投递文本 + `deliver
 | 2026-xx-xx | **发布前门禁 `scripts/check-release.mjs`**（notes 必须是当前版本且是最新一节 / 工作树干净 / `bin` 可执行 / LICENSE 在 / `files[]` 条目真实存在 / `publishConfig` 钉在 npmjs），并接进 `prepublishOnly`（连同 `npm test`）；分享包的 `README.txt` 新增 `WHAT'S NEW IN <ver>` 段，内容**从 CHANGELOG.md 抽取**，抽不到就 `exit 1` | 发布最容易犯的四个错都是「发出去之后才发现」：版本 bump 了但没写 notes、tarball 来自脏树、`bin` 丢了执行位、`files[]` 打错一个字导致包静默变瘦。把 notes 写进 CHANGELOG 并由脚本生成分享包文案，等于强制「先写说明再发版」，也不会出现两份文案对不上的情况。另外给 `release/` 的收件人一个「这版改了什么」的入口 —— 之前那份 README.txt 只有安装说明 | `scripts/check-release.mjs`（新增）、`scripts/build-release.mjs`（`plainNotes()` + `WHAT'S NEW`）、`package.json`（`prepublishOnly` / `files` 加 CHANGELOG）、`CHANGELOG.md`（新增）、`.gitignore`、`bin/pi-lcars.mjs`（+x）、AGENTS §11.1 |
 | 2026-xx-xx | **加了 pi 扩展 `/lcars`**（`extensions/lcars.ts`）+ launcher 的 `status --json` / `open`，并给包加上 `pi-package`/`pi-extension` 关键词、`pi.extensions`、`pi.image`；`test/extension.mjs`（16 条）进 `npm test` | 用户要「推荐到 pi 社区 / 官方 packages」。官方 gallery（pi.dev/packages）是 **npm 索引**，唯一门槛是 `pi-package` 关键词，条目会承诺 `pi install npm:pi-lcars` —— 而我们原本包里没有任何 pi 资源，那句话会是空承诺，直接违反 §7「只呈现真实能力」。所以先让那句话成真：TUI 里一个命令起这台控制台。实现上坚持**不复制启动逻辑**（调同一个 launcher），并补 `status --json` 让扩展能 reattach；`open` 顺手成为 CLI 也能用的动作 | `extensions/lcars.ts`（新增）、`bin/pi-lcars.mjs`（`status --json` / `open`）、`test/extension.mjs`（新增）、`package.json`（`files` / `keywords` / `pi` / `bugs` / `prepublishOnly` 链）、`docs/console.png`、`docs/stream.png`、`README.md`、`CHANGELOG.md`、AGENTS §11.0 |
 | 2026-xx-xx | **发布收敛成一条命令 `npm run ship`**（干净树+门禁 → tag → **一次 push 到两个远端** → publish → 轮询 registry），并把元数据与预览图搬到 GitHub / jsDelivr；`check-release` 新增三条断言（README 图片必须绝对 URL、`pi.image` 必须在 CDN、`repository`/`bugs` 必须指向公开 GitHub 仓库） | 用户在 GitHub 导入了镜像（`github.com/BenXsha/pi-lcars`），问「后续发布怎么做」。双远端最容易错的一步是 `git remote set-url --add --push` 只写一次 —— 它会把隐式的 fetch URL 顶掉，变成单远端推送；所以把顺序（Gitee 先、GitHub 后）和失败恢复（tag 已建但 npm 未发时只需补公钥再 push+publish）写进 §11.1。图片改 jsDelivr `gh` 通道是因为本机 `raw.githubusercontent.com` 直接不可达（curl 000），而 jsDelivr 的 `@main` 与 `@v0.5.1` 都是 200。元数据指向 GitHub 是因为社区的 issue/PR 只在那边有意义 | `scripts/ship.mjs`（新增）、`scripts/check-release.mjs`（3 条新断言）、`package.json`（`ship` 脚本 / `repository` / `homepage` / `bugs` / `pi.image`）、`README.md`（jsDelivr 图片 + Gitee 镜像说明）、`CHANGELOG.md`、AGENTS §11.1 |
+| 2026-xx-xx | **SESSIONS 与 HISTORY 按父子会话分组**：新增纯函数 `src/sessionTree.ts`（深度优先展平、兄弟新→旧、**根按子树最新时间**排序、父不在结果集里就当根、折叠记数、环与 8 层上限）；服务端 `registry` 从会话 header 的 `parentSession` 取 `parentPath` 一并下发给左轨；两处共用 `src/folds.ts` 的折叠状态（`lcars.fold.sessions` / `lcars.fold.history`）；HISTORY 搜索时**拍平**并保留 `↳ 父标题` | 用户要求「按父子会话关系进行结构化管理」。pi 把 fork 记在子会话 header 的 `parentSession` 里，但两个面板都按"最近改动"平铺 —— 一支倒掉的实验性 fork 会飘到列表另一头，正好丢掉"它从哪儿分出来"这个唯一的信息。所以分组放在**一个纯函数**里（可单测 13 条），两个面板只负责画：左轨 `[12px gutter][34px 序号]…` + 缩进 14px/层，历史行 `padding-left 18px/层`，都用 `--lav` 表示血缘（§2 并行/子代理）。HISTORY 搜索拍平是因为命中集合本来就散落，硬套树等于撒谎 | `src/sessionTree.ts`、`src/folds.ts`（新增）、`server/pi/registry.mjs`（`parentPath`）、`src/api.ts`、`src/views/console/Sidenav.tsx`、`src/views/stations/History.tsx`、`src/styles/lcars.css`、`test/session-tree.mjs`（新增）、`test/ui.mjs`（血缘 fixture + 6 条断言）、AGENTS §7.6m / §7.7 |
+| 2026-xx-xx | **把浏览器自己的调度告警从 panic 面里摘出去**（`isBenignError`：`ResizeObserver loop …` / `Script error.`）。此前访问 HISTORY 会被 Chrome 这条无栈的 `error` 事件顶成 `SCRIPT ERROR` 全屏 | 做分组时实测：`/#history` 一进去就整屏 SCRIPT ERROR，旧 dist 同样复现 —— 说明早就存在，只是没有稳定的触发路径。这类消息没有栈、没有源码位置，用户也无事可做，把它当致命错误等于"为了一个警告把界面炸掉"。门禁里加了一条：派发这条消息后 `.panic` 不得出现、`.app` 必须还在 | `src/panic.ts`、`test/ui.mjs`（`a ResizeObserver notice does not paint the fault screen`）、AGENTS §11 踩过的坑 |
 
 ---
 

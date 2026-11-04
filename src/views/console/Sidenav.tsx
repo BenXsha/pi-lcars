@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { actions } from "../../store";
 import { t } from "../../i18n";
 import { ago } from "../../format";
@@ -7,6 +7,8 @@ import { Logo } from "../../components/Logo";
 import { FileTree } from "../../components/FileTree";
 import { Station, TopCap } from "../../components/ui";
 import { NAV, type View } from "./nav";
+import { sessionTree } from "../../sessionTree";
+import { useFolds } from "../../folds";
 
 /* ------------------------------------------------------------- sidenav */
 export function Sidenav({
@@ -26,7 +28,7 @@ export function Sidenav({
   onNewSession,
   onPickWorkspace,
 }: {
-  sessions: { id: string; name?: string; title?: string | null; items: number; running: boolean; queued: boolean; lastTs: number | null; pending: boolean; modelId: string; cwd: string }[];
+  sessions: { id: string; name?: string; title?: string | null; path?: string | null; parentPath?: string | null; items: number; running: boolean; queued: boolean; lastTs: number | null; pending: boolean; modelId: string; cwd: string }[];
   activeId: string | null;
   view: View;
   onView: (v: View) => void;
@@ -42,9 +44,24 @@ export function Sidenav({
   onNewSession: () => void;
   onPickWorkspace: () => void;
 }) {
-  const sorted = [...sessions].sort((a, b) => (b.lastTs ?? 0) - (a.lastTs ?? 0));
   const listRef = useRef<HTMLDivElement>(null);
   const [cramped, setCramped] = useState(false);
+  const [folds, toggleFold] = useFolds("lcars.fold.sessions");
+
+  // A fork belongs under the session it came from, not wherever "last touched"
+  // happens to put it — that is the whole point of showing lineage. The tree is
+  // depth-first with the branch state persisted, so a collapsed parent stays
+  // collapsed across reloads (src/sessionTree.ts owns the ordering rules).
+  const tree = useMemo(
+    () =>
+      sessionTree(sessions, {
+        path: (s) => s.path ?? s.id,
+        parent: (s) => s.parentPath ?? null,
+        age: (s) => s.lastTs ?? 0,
+        collapsed: folds,
+      }),
+    [sessions, folds],
+  );
 
   useEffect(() => {
     const el = listRef.current;
@@ -106,14 +123,17 @@ export function Sidenav({
       </button>
 
       <div class={`lsessions ${collapsed ? "is-mini" : ""}`} ref={listRef} style={mode === "files" ? { display: "none" } : undefined}>
-        {sorted.length === 0 ? <div class="lempty">no sessions</div> : null}
-        {sorted.map((s, i) => (
+        {tree.length === 0 ? <div class="lempty">no sessions</div> : null}
+        {tree.map(({ row: s, depth, kids, hidden }, i) => (
           <div
             key={s.id}
             class="sess"
             data-active={s.id === activeId ? "1" : "0"}
             data-run={s.running ? "1" : "0"}
             data-mini={collapsed ? "1" : "0"}
+            data-depth={depth}
+            data-fork={s.parentPath ? "1" : "0"}
+            style={collapsed ? undefined : { marginLeft: `${depth * 14}px` }}
             role="button"
             tabIndex={0}
             title={`${s.name ?? s.id}\n${s.cwd}`}
@@ -128,6 +148,28 @@ export function Sidenav({
               }
             }}
           >
+            {collapsed ? null : (
+              <span class="gut">
+                {kids ? (
+                  <button
+                    type="button"
+                    class="fold"
+                    aria-expanded={folds.has(s.path ?? s.id) ? "false" : "true"}
+                    title={hidden ? `${hidden} hidden` : `${kids} fork${kids === 1 ? "" : "s"}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleFold(s.path ?? s.id);
+                    }}
+                  >
+                    <Icon name={folds.has(s.path ?? s.id) ? "act-expand" : "act-collapse"} size={12} />
+                  </button>
+                ) : s.parentPath ? (
+                  <span class="forkmark" title="forked session">
+                    ↳
+                  </span>
+                ) : null}
+              </span>
+            )}
             <span class="num">{String(Number(s.id.match(/^s(\d+)/)?.[1] ?? i + 1)).padStart(2, "0")}</span>
             {collapsed ? null : (
               <>
@@ -136,6 +178,8 @@ export function Sidenav({
                 </span>
                 <span class="l2">
                   {s.modelId.toUpperCase()} / {s.id.slice(0, 7).toUpperCase()}
+                  {s.parentPath ? " · FORK" : ""}
+                  {hidden ? ` · ${hidden} HIDDEN` : ""}
                 </span>
               </>
             )}

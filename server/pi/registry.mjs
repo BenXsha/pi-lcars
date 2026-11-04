@@ -62,6 +62,9 @@ export class Registry {
       session: null,
       loader: null,
       path: manager.getSessionFile?.() ?? null,
+      // pi writes `parentSession` into a forked session's header, so lineage
+      // comes from the transcript, not from bookkeeping in this process
+      parentPath: manager.getHeader?.()?.parentSession ?? null,
       name: manager.getSessionName?.() ?? undefined,
       title: "",
       items: [],
@@ -558,6 +561,7 @@ export class Registry {
       name: s.name,
       title: s.name ?? (s.title || null),
       path: s.path,
+      parentPath: s.parentPath ?? null,
       cwd: s.cwd,
       modelId: s.meta.modelId,
       thinking: s.meta.thinking,

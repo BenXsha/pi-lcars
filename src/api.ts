@@ -108,6 +108,8 @@ export type SessionSummary = {
   name?: string;
   title?: string | null;
   path?: string;
+  /** the transcript this session was forked from, when it is a fork */
+  parentPath?: string | null;
   cwd: string;
   modelId: string;
   thinking: string;

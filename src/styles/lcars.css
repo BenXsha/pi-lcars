@@ -1353,10 +1353,54 @@ button { cursor: pointer; }
 .lnew:active .ic { color: #000; }
 
 /* session block: two lines, 52px, solid when active */
+
+/* ---- lineage gutter (rail + history) -------------------------------
+   A fork is drawn as an indented, shorter bar with a lavender marker: forks are
+   lineage/parallel work, which is what lavender already means (§2). The toggle
+   is the same 12px block in both panels. */
+.sess .gut,
+.hrow .gut {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  color: var(--lav);
+}
+.sess .gut .fold,
+.hrow .gut .fold {
+  display: grid;
+  place-items: center;
+  width: 12px;
+  height: 100%;
+  padding: 0;
+  color: var(--g3);
+  background: none;
+}
+.sess .gut .fold:hover,
+.hrow .gut .fold:hover { color: var(--orange); }
+.sess .gut .fold[aria-expanded="false"],
+.hrow .gut .fold[aria-expanded="false"] { color: var(--orange); }
+.sess .forkmark,
+.hrow .forkmark {
+  font: 400 12px/1 var(--mono);
+  color: var(--lav);
+  opacity: 0.8;
+}
+/* the child's bar is shorter and marked, so lineage reads without a line */
+.sess[data-depth="1"] { border-radius: 0 var(--r-1) 0 0; box-shadow: inset 2px 0 0 var(--lav); }
+.sess[data-depth="2"] { box-shadow: inset 2px 0 0 color-mix(in srgb, var(--lav) 55%, transparent); }
+.sess[data-depth="3"] { box-shadow: inset 2px 0 0 color-mix(in srgb, var(--lav) 30%, transparent); }
+.hrow[data-depth="1"] { box-shadow: inset 2px 0 0 var(--lav); }
+.hrow[data-depth="2"] { box-shadow: inset 2px 0 0 color-mix(in srgb, var(--lav) 55%, transparent); }
+.hrow[data-depth="3"] { box-shadow: inset 2px 0 0 color-mix(in srgb, var(--lav) 30%, transparent); }
+.sess[data-depth="1"] .num, .sess[data-depth="2"] .num, .sess[data-depth="3"] .num { font-size: 17px; }
+
 .sess {
   position: relative;
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) auto;
+  /* [fold gutter][numeral][title/meta][status][delete] — the gutter is always
+     there so a fork does not shift the columns when its parent folds */
+  grid-template-columns: 12px 34px minmax(0, 1fr) auto;
   grid-template-rows: 20px 15px;
   align-content: center;
   gap: 0 8px;
@@ -2049,6 +2093,7 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 .lnew.is-mini .ic { margin: 0; }
 
 .lsessions.is-mini { gap: 3px; }
+.sess[data-mini="1"] .gut { display: none; }
 .sess[data-mini="1"] {
   grid-template-columns: 1fr;
   grid-template-rows: 1fr;
@@ -2950,7 +2995,7 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 .hist-list { display: flex; flex-direction: column; gap: 1px; max-width: 980px; }
 .hrow {
   display: grid;
-  grid-template-columns: 4px minmax(0, 1fr) auto;
+  grid-template-columns: 12px 4px minmax(0, 1fr) auto;
   gap: 10px;
   align-items: center;
   min-height: 44px;

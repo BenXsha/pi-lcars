@@ -8,6 +8,20 @@
 
 type Detail = { message: string; stack?: string; source: string };
 
+/**
+ * Messages that arrive as `error` events but describe the browser's own
+ * scheduling, not a fault of ours. Chrome fires the ResizeObserver notice on
+ * `window.onerror` with no stack, and it reproduced on every HISTORY visit —
+ * replacing the console with a SCRIPT ERROR screen for a warning. Nothing is
+ * actionable about them, so they are logged and skipped.
+ */
+const BENIGN: RegExp[] = [
+  /ResizeObserver loop (limit exceeded|completed with undelivered notifications)/i,
+  /^Script error\.?$/i, // cross-origin script: no message, no source, no stack
+];
+
+export const isBenignError = (message: string): boolean => BENIGN.some((re) => re.test(String(message).trim()));
+
 let installed = false;
 let reporting = false;
 
@@ -100,11 +114,13 @@ export function installPanicSurface() {
 
   window.addEventListener("error", (e) => {
     const { message, stack } = describe(e.error ?? e.message);
+    if (isBenignError(message)) return;
     paint({ message, stack, source: e.filename ? "script error" : "runtime error" });
   });
 
   window.addEventListener("unhandledrejection", (e) => {
     const { message, stack } = describe(e.reason);
+    if (isBenignError(message)) return;
     paint({ message, stack, source: "unhandled rejection" });
   });
 

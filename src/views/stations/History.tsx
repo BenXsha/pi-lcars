@@ -1,8 +1,10 @@
-import {useEffect, useState} from "preact/hooks";
+import {useEffect, useMemo, useState} from "preact/hooks";
 import {api, type HistoryResult} from "../../api";
 import {shortPath} from "../../format";
 import {Icon} from "../../components/Icon";
 import {imeBusy} from "../../ime";
+import {sessionTree} from "../../sessionTree";
+import {useFolds} from "../../folds";
 
 /* --------------------------------------------------------------- history */
 export function HistoryPanel({ onOpen, onFork }: { onOpen: (path: string) => void; onFork: (path: string) => void }) {
@@ -42,6 +44,30 @@ export function HistoryPanel({ onOpen, onFork }: { onOpen: (path: string) => voi
   };
 
   const sessions = data?.sessions ?? [];
+  const [folds, toggleFold] = useFolds("lcars.fold.history");
+
+  // Same lineage rule as the rail (src/sessionTree.ts): a fork sits under the
+  // session it came from. A search result is a different question — matches are
+  // scattered by definition — so a query shows a flat list instead, and the row
+  // says which session it was forked from.
+  const tree = useMemo(() => {
+    if (q.trim()) {
+      return sessions.map((row) => ({ row, depth: 0, kids: 0, hidden: 0 }));
+    }
+    return sessionTree(sessions, {
+      path: (r) => r.path,
+      parent: (r) => r.parent,
+      age: (r) => new Date(r.modified).getTime(),
+      collapsed: folds,
+    });
+  }, [sessions, folds, q]);
+
+  const byPath = useMemo(() => new Map(sessions.map((r) => [r.path, r])), [sessions]);
+  const parentTitle = (row: { parent: string | null }) => {
+    if (!row.parent) return null;
+    const p = byPath.get(row.parent);
+    return p ? p.title : null; // not in the page: the parent is further back
+  };
 
   return (
     <div class="pv">
@@ -50,8 +76,9 @@ export function HistoryPanel({ onOpen, onFork }: { onOpen: (path: string) => voi
         {data && !data.ready && data.scanning ? " · SCANNING" : ""}
       </div>
       <div class="pv-sub">
-        Every transcript on this machine, newest first. A scan reads all of them, so it runs in the background and this
-        list fills in when it lands — {data ? `${data.scanned} indexed` : "…"}.
+        Every transcript on this machine, grouped by lineage: a fork sits under the session it came from. A scan reads
+        all of them, so it runs in the background and this list fills in when it lands — {data ? `${data.scanned} indexed` : "…"}.
+        Searching flattens the list.
       </div>
 
       <div class="hist-search">
@@ -85,8 +112,32 @@ export function HistoryPanel({ onOpen, onFork }: { onOpen: (path: string) => voi
       {sessions.length === 0 && data?.ready ? <div class="pv-note">nothing matches</div> : null}
 
       <div class="hist-list">
-        {sessions.map((h) => (
-          <div class="hrow" key={h.path} data-confirm={confirmPath === h.path ? "1" : "0"}>
+        {tree.map(({ row: h, depth, kids, hidden }) => (
+          <div
+            class="hrow"
+            key={h.path}
+            data-confirm={confirmPath === h.path ? "1" : "0"}
+            data-depth={depth}
+            data-fork={h.parent ? "1" : "0"}
+            style={depth ? { paddingLeft: `${depth * 18}px` } : undefined}
+          >
+            <span class="gut">
+              {kids && !q.trim() ? (
+                <button
+                  type="button"
+                  class="fold"
+                  aria-expanded={folds.has(h.path) ? "false" : "true"}
+                  title={hidden ? `${hidden} hidden` : `${kids} fork${kids === 1 ? "" : "s"}`}
+                  onClick={() => toggleFold(h.path)}
+                >
+                  <Icon name={folds.has(h.path) ? "act-expand" : "act-collapse"} size={12} />
+                </button>
+              ) : h.parent ? (
+                <span class="forkmark" title={h.parent}>
+                  ↳
+                </span>
+              ) : null}
+            </span>
             <span class="st" data-fork={h.parent ? "1" : "0"} />
             <div class="hb">
               {editPath === h.path ? (
@@ -114,7 +165,8 @@ export function HistoryPanel({ onOpen, onFork }: { onOpen: (path: string) => voi
               )}
               <div class="hm">
                 {shortPath(h.cwd)} · {h.messages} msgs · {ago(h.modified)}
-                {h.parent ? " · forked" : ""}
+                {h.parent ? ` · ↳ ${parentTitle(h) ?? "forked"}` : ""}
+                {hidden ? ` · ${hidden} hidden` : ""}
                 {h.name ? ` · ${h.name}` : ""}
               </div>
             </div>
