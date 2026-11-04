@@ -72,6 +72,25 @@ check(
   ["README.md", "CHANGELOG.md", "bin/", "dist/", "server/"].every((f) => (pkg.files ?? []).includes(f)),
   (pkg.files ?? []).join(" "),
 );
+/* 6. README images must be ABSOLUTE. npm renders a relative path against the
+ *    published tarball and pi.dev rewrites it to jsDelivr of that tarball — both
+ *    404 as soon as the file is not shipped (0.5.0 shipped exactly that bug). */
+const readme = readFileSync(join(ROOT, "README.md"), "utf8");
+const relImages = [...readme.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)]
+  .map((m) => m[1])
+  .filter((src) => !/^https:\/\//.test(src));
+check("README images are absolute urls", relImages.length === 0, relImages.join(", ") || "all absolute");
+check(
+  "the preview image is served from a cdn",
+  /^https:\/\/cdn\.jsdelivr\.net\/gh\//.test(pkg.pi?.image ?? ""),
+  pkg.pi?.image ?? "(no pi.image)",
+);
+check(
+  "the canonical repo is the public one",
+  /github\.com\/BenXsha\/pi-lcars/.test(pkg.repository?.url ?? "") && /github\.com/.test(pkg.bugs?.url ?? ""),
+  `${pkg.repository?.url ?? "?"} · ${pkg.bugs?.url ?? "?"}`,
+);
+
 check(
   "publishing is pinned to the public registry",
   pkg.publishConfig?.registry === "https://registry.npmjs.org" && pkg.publishConfig?.access === "public",

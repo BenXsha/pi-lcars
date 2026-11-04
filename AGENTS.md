@@ -1077,6 +1077,7 @@ composer 上方出现 `QUEUED n` 条带，逐条显示待投递文本 + `deliver
 | 2026-xx-xx | **LOG 加了 `LATEST` 尾部控制（浮层）+ `ctrl+end` / `ctrl+home` 快捷键**，语义对齐 pi TUI 的 `tui.altScreen.bottom`（"回到末端并继续跟随"）。控制条从**在流 bar** 改成**绝对定位浮层**（新增 `.scroll-wrap` 包装层），并补 `CTRL END` 提示 | 用户要「快速到达底部当前会话的按钮，像原生 pi 终端 tui 那样的效果」。原来那条 `LATEST` 是 `flex: 0 0 32px` 的在流条：一滚动就**把输入区顶高 32px**（写草稿时最难受），而且只有鼠标一条路、没有任何键位提示。改成浮层后零布局位移，并照抄 TUI 的键：`ctrl+end` 回尾并恢复跟随、`ctrl+home` 回顶（回顶自然释放跟随，于是按钮浮现）。**输入框占键时让路**：`ctrl+end` 在 textarea 里是"光标到文末"，与 §4.3b 同一处 `imeBusy` 门禁 | `src/views/Console.tsx`（`.scroll-wrap`、`jumpRef`、`ctrl+end`/`ctrl+home` 监听）、`src/styles/lcars.css`（`.scroll-wrap` / `.jumpbar` 浮层 + 黑缝环 + 提示色）、`test/ui.mjs`（6 条：浮现 / 浮层不移布局 / 键提示 / 点击回尾 / ctrl+home·end / 输入框占键）、AGENTS §7.6s |
 | 2026-xx-xx | **发布前门禁 `scripts/check-release.mjs`**（notes 必须是当前版本且是最新一节 / 工作树干净 / `bin` 可执行 / LICENSE 在 / `files[]` 条目真实存在 / `publishConfig` 钉在 npmjs），并接进 `prepublishOnly`（连同 `npm test`）；分享包的 `README.txt` 新增 `WHAT'S NEW IN <ver>` 段，内容**从 CHANGELOG.md 抽取**，抽不到就 `exit 1` | 发布最容易犯的四个错都是「发出去之后才发现」：版本 bump 了但没写 notes、tarball 来自脏树、`bin` 丢了执行位、`files[]` 打错一个字导致包静默变瘦。把 notes 写进 CHANGELOG 并由脚本生成分享包文案，等于强制「先写说明再发版」，也不会出现两份文案对不上的情况。另外给 `release/` 的收件人一个「这版改了什么」的入口 —— 之前那份 README.txt 只有安装说明 | `scripts/check-release.mjs`（新增）、`scripts/build-release.mjs`（`plainNotes()` + `WHAT'S NEW`）、`package.json`（`prepublishOnly` / `files` 加 CHANGELOG）、`CHANGELOG.md`（新增）、`.gitignore`、`bin/pi-lcars.mjs`（+x）、AGENTS §11.1 |
 | 2026-xx-xx | **加了 pi 扩展 `/lcars`**（`extensions/lcars.ts`）+ launcher 的 `status --json` / `open`，并给包加上 `pi-package`/`pi-extension` 关键词、`pi.extensions`、`pi.image`；`test/extension.mjs`（16 条）进 `npm test` | 用户要「推荐到 pi 社区 / 官方 packages」。官方 gallery（pi.dev/packages）是 **npm 索引**，唯一门槛是 `pi-package` 关键词，条目会承诺 `pi install npm:pi-lcars` —— 而我们原本包里没有任何 pi 资源，那句话会是空承诺，直接违反 §7「只呈现真实能力」。所以先让那句话成真：TUI 里一个命令起这台控制台。实现上坚持**不复制启动逻辑**（调同一个 launcher），并补 `status --json` 让扩展能 reattach；`open` 顺手成为 CLI 也能用的动作 | `extensions/lcars.ts`（新增）、`bin/pi-lcars.mjs`（`status --json` / `open`）、`test/extension.mjs`（新增）、`package.json`（`files` / `keywords` / `pi` / `bugs` / `prepublishOnly` 链）、`docs/console.png`、`docs/stream.png`、`README.md`、`CHANGELOG.md`、AGENTS §11.0 |
+| 2026-xx-xx | **发布收敛成一条命令 `npm run ship`**（干净树+门禁 → tag → **一次 push 到两个远端** → publish → 轮询 registry），并把元数据与预览图搬到 GitHub / jsDelivr；`check-release` 新增三条断言（README 图片必须绝对 URL、`pi.image` 必须在 CDN、`repository`/`bugs` 必须指向公开 GitHub 仓库） | 用户在 GitHub 导入了镜像（`github.com/BenXsha/pi-lcars`），问「后续发布怎么做」。双远端最容易错的一步是 `git remote set-url --add --push` 只写一次 —— 它会把隐式的 fetch URL 顶掉，变成单远端推送；所以把顺序（Gitee 先、GitHub 后）和失败恢复（tag 已建但 npm 未发时只需补公钥再 push+publish）写进 §11.1。图片改 jsDelivr `gh` 通道是因为本机 `raw.githubusercontent.com` 直接不可达（curl 000），而 jsDelivr 的 `@main` 与 `@v0.5.1` 都是 200。元数据指向 GitHub 是因为社区的 issue/PR 只在那边有意义 | `scripts/ship.mjs`（新增）、`scripts/check-release.mjs`（3 条新断言）、`package.json`（`ship` 脚本 / `repository` / `homepage` / `bugs` / `pi.image`）、`README.md`（jsDelivr 图片 + Gitee 镜像说明）、`CHANGELOG.md`、AGENTS §11.1 |
 
 ---
 
@@ -1170,31 +1171,39 @@ browser ──EventSource(/api/stream)──► server.mjs ──session.subscri
   `pi.video` 预览；`pi.extensions` 指向扩展入口；`test/extension.mjs` 里有一条断言直接读
   `package.json` 校验这三件事，`pi install` 才不会装到一个「命令不存在」的包。
 
-### 11.1 发布（npm）
+### 11.1 发布（npm + 双远端）
 
-顺序是死的，四步走完才算发出去：
-
-```
-1  node scripts/check-release.mjs     # 门禁：notes / clean tree / bin 可执行 / LICENSE / files[]
-2  git add -A && git commit           # 清树（门禁要求 tarball 能由某个 commit 复现）
-3  npm publish                        # prepublishOnly = 门禁 + npm test；prepack = vite build
-4  npm view pi-lcars@<ver> version --registry=https://registry.npmjs.org
+```bash
+node scripts/check-release.mjs          # 静态门禁（notes / 干净树 / files[] / 图片绝对 URL / 元数据指向）
+npm run ship -- --dry-run               # 打印计划：tag、两个远端的 push URL、目标 registry
+npm run ship -- --yes                   # tag + 推送两个远端 + npm publish + 轮询 latest 直到落地
 ```
 
-- **`publishConfig` 把发布钉在 `registry.npmjs.org`**：本机 `~/.npmrc` 的默认 registry 是
-  `registry.npmmirror.com`（装包走镜像更快），而 `publishConfig.registry` 对 `npm publish` 生效，
-  所以发布不会被镜像吞掉 —— `npm publish --dry-run` 会打印
-  `Publishing to https://registry.npmjs.org with tag latest and public access`，先看这一行。
-- **`prepublishOnly` 不跑在 `npm pack` 上**：`npm run release` 只用 prepack（构建 + 打包），
-  所以做分享包不会白等一次全量测试；只有真的推 npm 才付这 3–4 分钟。
-- **`dist/` 不进 git**，由 `prepack` 现场构建；门禁里只有 `dist/` 允许「不存在」
-  （全新 clone 时它还没生成），其余 `files[]` 条目必须真的在盘上。
-- **token 只进 `~/.npmrc`，永不进仓库**（`.gitignore` 已含 `.npmrc`）：
-  `read -rsp "token: " T && printf '//registry.npmjs.org/:_authToken=%s\n' "$T" >> ~/.npmrc`
-  —— 只对 npmjs 生效，镜像默认值不受影响。账号开了 2FA 时用 **Automation / Granular(write)** token，
-  否则 `npm publish` 会要 `--otp=`。
-- 版本号只改两处：`package.json` 与 `package-lock.json`（`packages[""].version`）；
-  UI 里显示的版本由 vite 从 `package.json` 注入（§7.6q），不需要手改。
+`ship` 的顺序与理由：
+
+| 步 | 做什么 | 为什么是这个顺序 |
+|---|---|---|
+| 1 | 干净树 + `check-release` | 在改动任何东西之前就拒绝；半路失败最贵 |
+| 2 | 建 `v<ver>` tag | 发布后 tag 就是"这次发的是哪个 commit"的唯一答案 |
+| 3 | `git push origin main --follow-tags` | **origin 带两个 push URL**（Gitee + GitHub），一次推送同步两处；顺序 Gitee→GitHub，先保证国内那份 |
+| 4 | `npm publish` | 它自己的 `prepublishOnly` 再跑一遍门禁 + `npm test`，`prepack` 现场构建 `dist/` |
+| 5 | 轮询 registry | npm 是**异步**入库（PUT 202），`latest` 通常 1–6 分钟才翻；不要以为失败 |
+
+硬规则：
+
+- **两个远端，一次推送**：`git remote set-url --add --push origin <gitee>` + `… --add --push origin <github>`。
+  `git remote -v` 会显示两行 push URL；只写一次就是单远端（第一次 `--add --push` 会把隐式的
+  fetch URL 顶掉，这是最容易搞错的一步）。
+- **GitHub 用 SSH 需要公钥在账号里**：`ssh -T git@github.com` 回 "Hi <user>!" 才算通；
+  `Permission denied (publickey)` 时 push 会在第 3 步失败（此时本地 tag 已建、npm 未发，
+  按提示补公钥后重跑 `git push` + `npm publish` 即可，不用重新 tag）。
+- **版本不可变**：同号已发布只能换号；`ship` 第 1 步就会用 `npm view` 挡掉。
+- **token 只进 `~/.npmrc`**，永不进仓库（`.gitignore` 已含）；每次发布前从剪贴板临时写入，
+  发完 `sed -i '' '/_authToken/d' ~/.npmrc`。
+- **README 图片必须绝对 URL**：npm 与 pi.dev 会把相对路径重写成「已发布 tarball」里的位置，
+  而 `docs/` 不进包 → 必然 404（0.5.0 踩过，现在 `check-release` 有断言）。
+  当前用 jsDelivr 的 `gh` 通道（`@main`），GitHub 可达性与缓存都比 `raw.githubusercontent` 稳。
+- 画廊（pi.dev/packages）按自己的节奏重建索引，新版本可能滞后数分钟到数小时；`npm` 侧立刻生效。
 
 ## 12. 未决问题（待用户裁决）
 

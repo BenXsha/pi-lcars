@@ -3,12 +3,12 @@
 A web console for [pi](https://pi.dev) where the agent transcript reads like an LCARS station display —
 **but every pixel is driven by real session events.** No mock data, no scripted demo.
 
-![the mission log](https://gitee.com/benshawn/pi-lcars/raw/main/docs/console.png)
+![the mission log](https://cdn.jsdelivr.net/gh/BenXsha/pi-lcars@main/docs/console.png)
 
 <sub>The mission log: sessions on the left, the live transcript in the middle (tool rows, diffs,
 sub-agent calls), context and tool calls on the right, `ACTIVITY` reading the machine's state above it.</sub>
 
-![the three-zone workspace](https://gitee.com/benshawn/pi-lcars/raw/main/docs/stream.png)
+![the three-zone workspace](https://cdn.jsdelivr.net/gh/BenXsha/pi-lcars@main/docs/stream.png)
 
 <sub>`VIEW → STREAM`: the same session cut into three instruments — `I CONVERSATION`, `II THINKING`
 (with the dot matrix), `III TERMINAL` — each scrolling on its own, tied together by exchange.</sub>
@@ -40,7 +40,8 @@ The layout is built for a 1600×1000 desktop and verified down to **1280×800**
 (`1440×900` and `1280×800` are asserted on every `npm test`). Below 1180 the
 three-zone STREAM view stacks into one column.
 
-Release notes live in [CHANGELOG.md](CHANGELOG.md).
+Release notes live in [CHANGELOG.md](CHANGELOG.md). Mirrored on Gitee for readers
+behind the GFW: [gitee.com/benshawn/pi-lcars](https://gitee.com/benshawn/pi-lcars).
 
 ### From inside pi
 
@@ -85,6 +86,7 @@ npm test         # themes (9x12) + pi-env (18) + fonts (12) + braille (29) + mcp
 
 SMOKE_MODEL=1 npm test   # also does one real turn + fork (costs a model call)
 node scripts/check-release.mjs   # pre-publish gate: notes, clean tree, package contents
+npm run ship -- --dry-run        # whole release: gates, tag, push both remotes, publish
 ```
 
 | env | default | purpose |

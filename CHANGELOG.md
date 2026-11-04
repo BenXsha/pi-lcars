@@ -7,6 +7,28 @@ Release notes are written **before** the version is bumped: `scripts/build-relea
 reads the section for the current `package.json` version and prints it inside the
 share bundle's `README.txt`, and fails the build when there is no such section.
 
+## [0.5.2] — 2026-11-04
+
+### Changed
+
+- **The canonical repository is GitHub** (`github.com/BenXsha/pi-lcars`); Gitee
+  stays as a mirror for readers behind the GFW. `repository`, `homepage` and
+  `bugs` point at GitHub, so the gallery's repo link and npm's "issues" link
+  land where the community actually is.
+- **Preview images come from jsDelivr** (`cdn.jsdelivr.net/gh/BenXsha/pi-lcars@main/docs/…`):
+  CDN-cached, no signed redirect, and reachable from both regions.
+
+### Added
+
+- **`npm run ship`** — the whole release in one command: gates, tag, push to both
+  remotes, publish, then poll the registry until `latest` is the new version.
+  Dry run by default; `--yes` to execute. It refuses at the gate rather than
+  half-way, because a release that fails after the push leaves a tag nobody can
+  install.
+- `check-release` grew three gates: README images must be absolute URLs, the
+  preview image must be on a CDN, and `repository`/`bugs` must point at the
+  public GitHub repo.
+
 ## [0.5.1] — 2026-11-04
 
 ### Fixed
