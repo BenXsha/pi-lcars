@@ -34,7 +34,13 @@ npm i -g pi-lcars       # or install it, then just `pi-lcars`
 when busy), `--host` the bind address, `--policy off|risky|all` the approval
 gate, `--json` prints `{url,port,pid,cwd}` on the first stdout line.
 
-### Requirements
+The layout is built for a 1600×1000 desktop and verified down to **1280×800**
+(`1440×900` and `1280×800` are asserted on every `npm test`). Below 1180 the
+three-zone STREAM view stacks into one column.
+
+Release notes live in [CHANGELOG.md](CHANGELOG.md).
+
+## Requirements
 
 - Node **>= 22.19** (pi's own minimum)
 - pi itself — the installer (`curl -fsSL https://pi.dev/install.sh | sh`, or
@@ -52,9 +58,10 @@ platform-correct install command instead of failing with a stack trace.
 npm install
 npm run dev      # client at :5173, proxies /api → :4173
 npm run server   # in another shell: real pi session, SSE on :4173
-npm test         # pi-env (18) + fonts (12) + mcp-config (27) + endpoints (66) + launcher (28) + ui (160) checks
+npm test         # themes (9x12) + pi-env (18) + fonts (12) + braille (29) + mcp-config (27) + endpoints (66) + launcher (28) + ui (193) checks
 
 SMOKE_MODEL=1 npm test   # also does one real turn + fork (costs a model call)
+node scripts/check-release.mjs   # pre-publish gate: notes, clean tree, package contents
 ```
 
 | env | default | purpose |
@@ -85,7 +92,9 @@ server/            Node, no runtime deps beyond the pi SDK
   pi/stream.mjs    pi events → UI items
 src/               Vite + Preact + TS client
   styles/          tokens (structure) + themes (colour) + fonts (@font-face) + lcars (components)
-  components/      Elbow · ToolStrip · ApprovalDeck · FieldRow · Icon …
+  components/      Elbow · ToolStrip · ApprovalDeck · FieldRow · Braille · Icon …
+  braille.ts       dot-matrix phases: idle · thinking · streaming · running · done
+  views/console/   LogState (the ACTIVITY strip) · phase.ts (one voice for both bands)
   format.ts        pure readouts: sizes, tokens, mm:ss, ages, paths (no DOM)
   ime.ts           the one IME gate every keydown consults
   drafts.ts        per-session composer drafts + sent-history (localStorage)

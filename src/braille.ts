@@ -1,10 +1,14 @@
 /* ============================================================
    Braille dot-matrix renderers — the thinking band's ambient motion.
 
-   A braille cell is 2x4 dots, so a strip one cell tall carries twice the
-   horizontal resolution of text at the same width. We render a bitmap and
-   fold it into U+2800–U+28FF; the result is a real glyph string, not a
-   canvas — it inherits colour, can be selected, and costs no compositing.
+   The band used to fold this bitmap into braille (U+2800–U+28FF). That was a
+   neat trick, but a braille glyph's dot is only ~14% of the font size and the
+   cell carries wide side bearings, so the rhythm was uneven (11px inside a
+   cell, 19px between cells at 44px type). The matrix is now DRAWN — one SVG
+   path of round dots at a fixed pitch — keeping the braille CADENCE (a cell is
+   6 x 4.5px per dot at 18px type, so two cell rows = 8 dot rows = 36px) while
+   making the dot size a decision instead of a side effect of the typeface.
+   Still one node, still `currentColor`, still no canvas.
 
    The band answers one question: *what is the model doing right now*.
    Five phases, five distinct motions, no decoration:
@@ -16,19 +20,12 @@
      done       settle   — the waveform collapses to a baseline, then idles
 
    Everything here is pure: same (phase, frame, width) gives the same
-   string, which is what makes it testable without a DOM.
+   bitmap, which is what makes it testable without a DOM.
    ============================================================ */
 
 export type Phase = "idle" | "thinking" | "streaming" | "running" | "done";
 
-/** braille dot weights, indexed [row][column] inside one 2x4 cell */
-const DOTS = [
-  [0x01, 0x08],
-  [0x02, 0x10],
-  [0x04, 0x20],
-  [0x40, 0x80],
-];
-
+/** 0 = off, 1 = dim/trailing, 2 = bright/head */
 export type Bitmap = number[][];
 
 export const blank = (w: number, h: number): Bitmap =>
@@ -48,26 +45,26 @@ export function hash(x: number, y: number, s = 0): number {
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 
-/** Fold a bitmap into braille. One cell row per 4 bitmap rows, 8 per row. */
-export function braille(bm: Bitmap): string {
-  const h = bm.length;
-  const w = bm[0]?.length ?? 0;
-  const rows = Math.ceil(h / 4);
-  const cols = Math.ceil(w / 2);
+/**
+ * One frame as an SVG path: every lit cell becomes a zero-length segment, and
+ * `stroke-linecap: round` turns it into a dot. `weight` selects the layer
+ * (1 = trailing/dim, 2 = head/bright), which is how "fall" and "spark" show a
+ * direction — the bitmap already carries it.
+ *
+ * The grid is not square: a braille cell holds 2 columns for every 4 rows, so
+ * the horizontal pitch is wider than the vertical one (6 vs 4.5px at the
+ * console's 18px cell size).
+ */
+export function dots(bm: Bitmap, pitchX: number, pitchY = pitchX, weight?: 1 | 2): string {
   let out = "";
-  for (let cy = 0; cy < rows; cy++) {
-    for (let cx = 0; cx < cols; cx++) {
-      let v = 0x2800;
-      for (let dr = 0; dr < 4; dr++) {
-        for (let dc = 0; dc < 2; dc++) {
-          const y = cy * 4 + dr;
-          const x = cx * 2 + dc;
-          if (bm[y] && bm[y][x]) v |= DOTS[dr][dc];
-        }
-      }
-      out += String.fromCodePoint(v);
+  for (let y = 0; y < bm.length; y++) {
+    for (let x = 0; x < (bm[y]?.length ?? 0); x++) {
+      const v = bm[y][x];
+      if (!v) continue;
+      if (weight && v !== weight) continue;
+      // +0.01 keeps the segment non-degenerate in every renderer
+      out += `M${(x + 0.5) * pitchX} ${(y + 0.5) * pitchY}h.01`;
     }
-    if (cy < rows - 1) out += "\n";
   }
   return out;
 }
@@ -89,7 +86,9 @@ function trace(t: number, w: number, h: number): Bitmap {
 /** sparse dots that reshuffle slowly — "awake, but not working" */
 function standby(t: number, w: number, h: number): Bitmap {
   const b = blank(w, h);
-  // one reshuffle every 6 ticks (~540ms): calm, but never frozen
+  // one reshuffle every 6 ticks (~540ms): calm, but never frozen.
+  // 9% fill: on a fine grid (8 rows) that is the quiet tick the braille band
+  // always had — denser would read as work, not as standby.
   const slow = Math.floor(t / 6);
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
@@ -151,11 +150,11 @@ const MOTION: Record<Phase, (t: number, w: number, h: number) => Bitmap> = {
 };
 
 /**
- * One frame of the band, as a string.
- * `t` is a frame counter (one tick = one drawn frame), `w` a dot width.
+ * One frame of the band, as a bitmap (`w` x `h` dots).
+ * `t` is a frame counter (one tick = one drawn frame).
  */
-export function frame(phase: Phase, t: number, w: number, h = 4): string {
-  return braille(MOTION[phase](t, w, h));
+export function frame(phase: Phase, t: number, w: number, h = 4): Bitmap {
+  return MOTION[phase](t, w, h);
 }
 
 /* ------------------------------------------------------- phase from data */
@@ -203,6 +202,21 @@ export function phaseOf({ items, running, since = Infinity }: PhaseInput): Phase
   const last = items[items.length - 1];
   if (last && since < DONE_HOLD) return "done";
   return "idle";
+}
+
+/**
+ * The phase for a whole session, from the same items the views render.
+ * `agentRunning` is the transport's own flag: a run can be in flight for
+ * seconds without emitting an item (model latency), and a strip that says
+ * IDLE while the head says RUNNING is a contradiction the operator can see.
+ */
+export function phaseFor(items: PhaseItem[], agentRunning = false, now = Date.now()): Phase {
+  const streaming = items.some((it) => it.kind === "assistant" && it.streaming);
+  return phaseOf({
+    items,
+    running: streaming || agentRunning,
+    since: now - (items[items.length - 1]?.ts ?? 0),
+  });
 }
 
 export const PHASE_LABEL: Record<Phase, string> = {

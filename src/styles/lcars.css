@@ -671,8 +671,20 @@ button { cursor: pointer; }
   justify-content: space-between;
   gap: 16px;
   padding: 8px 8px 0;
-  min-height: 52px;
+  /* a fixed band, not a min-height: it is chrome, and the zones below are
+     measured from it. flex: 0 0 keeps it from being shrunk by .center */
+  flex: 0 0 52px;
+  height: 52px;
+  overflow: hidden;
 }
+/* the head is one line tall at every width: the title truncates (and the
+   subtitle loses its tail) rather than wrapping into the shelf below.
+   At 1280 the title block had 276px and the wrapped subtitle pushed 66px of
+   content into a 52px box (§4.2b). */
+.center-head .ttl { min-width: 0; }
+.center-head h1,
+.center-head p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.center-head .chips { flex: 0 0 auto; flex-wrap: nowrap; }
 .center-head h1 {
   font: 700 18px/1.3 var(--din);
   letter-spacing: 0.02em;
@@ -680,7 +692,7 @@ button { cursor: pointer; }
 }
 .center-head p {
   margin-top: 3px;
-  font: 400 11.5px/2 var(--din);
+  font: 400 11.5px/1.55 var(--din);
   letter-spacing: 0.12em;
   color: var(--g3);
 }
@@ -715,6 +727,58 @@ button { cursor: pointer; }
 
 /* transcript blocks */
 .log { display: flex; flex-direction: column; padding: 4px 8px 8px; }
+
+/* ---- the log's activity strip -------------------------------------
+   Same grammar as a zone strip (§7.6r): [14px leg][quiet key block]
+   [value band][state block]. It sits between the header and the log, so the
+   answer to "what is the machine doing" stays put while the transcript
+   scrolls — the band's column count is measured, never guessed. */
+.logstate {
+  /* quiet tone is --g3, not --g2: the label sits on a --g1 block, and
+     --g2 on --g1 is 3.1:1 — below AA for an 11px label (§4.2b) */
+  --tone: var(--g3);
+  /* one band row: the strip is exactly as tall as its dot matrix */
+  flex: 0 0 36px;
+  height: 36px;
+  display: flex;
+  align-items: stretch;
+  gap: var(--gap);
+}
+.logstate[data-tone="moon"] { --tone: var(--moon); }
+.logstate[data-tone="orange"] { --tone: var(--orange); }
+.logstate[data-tone="tang"] { --tone: var(--tang); }
+.logstate .ls-spine { flex: 0 0 14px; background: var(--tone); }
+.logstate .ls-lb {
+  flex: 0 0 92px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--g1);
+  color: var(--tone);
+  font: 700 11px/1 var(--din);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+/* the value band: the dot matrix itself, same object the STREAM zones use */
+.logstate .ls-band { flex: 1 1 auto; min-width: 0; }
+.logstate .ls-st {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  padding: 0 12px 0 10px;
+  background: var(--g1);
+  color: var(--t3);
+  border-radius: 0 var(--r-pill) var(--r-pill) 0;
+  font: 700 11px/1 var(--din);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+/* the state block is the only part allowed to go solid */
+.logstate[data-live="1"] .ls-st { background: var(--tone); color: #000; }
+/* quiet phases keep the strip but drop the colour: nothing is being watched */
+.logstate[data-live="0"] .ls-spine { background: var(--g1); }
 .blk + .blk { margin-top: var(--gap); }
 .blk.turn { margin-top: var(--seam); }
 .blk.approval-blk { margin: var(--seam) 0; }
@@ -1936,6 +2000,13 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 
 @media (max-width: 1400px) {
   .shelf .station-tag { display: none; }
+  /* the call count is already in the rail's TOOL CALLS panel — the head keeps
+     the title instead (1440 x 900, 1280 x 800) */
+  .center-head .chips [data-aux="1"] { display: none; }
+  /* the quick-pad matrix gives the input field its width back: at 1280 the
+     field was 248px against a 336px auxiliary column */
+  .cmdbar .cmd-aux { flex-basis: 272px; width: 272px; }
+  .cmdbar .aux-primary > .btn:last-child { flex-basis: 92px; }
 }
 @media (max-width: 1180px) {
   .ctl .k { display: none; }
@@ -3384,12 +3455,15 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
    between the columns and the conversation band, so the columns visibly
    feed the band where the answer comes back to be confirmed.
    ============================================================ */
+/* the answer band is the one column that must not be squeezed: at 1280 the
+   fixed 360px left column left the terminal with 292px. clamp() keeps the
+   proportions instead of adding a breakpoint per width (§4.2b). */
 .ws {
   flex: 1 1 auto;
   min-height: 0;
   display: grid;
   gap: var(--seam);
-  grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, clamp(280px, 38%, 360px)) minmax(0, 1fr);
   grid-template-rows: minmax(120px, 0.78fr) minmax(90px, 0.58fr) minmax(196px, 1.55fr);
   padding: 4px 8px 8px; /* same gutters as .log, so the zones line up with it */
 }
@@ -3428,19 +3502,22 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
   justify-content: center;
   background: var(--tone);
   color: #000;
-  border-radius: 14px 0 var(--r-1) 0;
+  /* square at the bottom-right: that corner is where the arm continues out of
+     the numeral block, so a radius there would carve a notch into the elbow */
+  border-radius: 14px 0 0 0;
   font: 400 12.5px/1 var(--deco);
   letter-spacing: 0.04em;
 }
-/* the curved arm: concave fillet from the header's underside into the body's
-   leg, painted over the seam and above the (scrolling) body */
+/* the curved arm: concave fillet from the header's underside into the leg.
+   Width matches the numeral block (34) so the two read as one piece; the
+   fillet is r = 34 - 14, ending on the 14px leg. */
 .ws-arm {
   position: absolute;
   left: 0;
   top: 28px;
   z-index: 2;
-  width: 28px;
-  height: 18px;
+  width: 34px;
+  height: 20px;
   color: var(--tone);
   pointer-events: none;
 }
@@ -3485,7 +3562,8 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
   align-items: center;
   padding: 0 12px 0 10px;
   background: var(--g1);
-  color: var(--g2);
+  /* --t3, not --g2: quiet labels sit on a --g1 block (g2/g1 = 3.1:1) */
+  color: var(--t3);
   border-radius: 0 var(--r-pill) var(--r-pill) 0;
   font: 700 10.5px/1 var(--din);
   letter-spacing: 0.08em;
@@ -3494,35 +3572,56 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 }
 .ws-hd .st[data-live="1"] { background: var(--tone); color: #000; }
 
-/* ---- the ambient band: two braille cell rows in the seam between the
-   header strip and the body. It reads as part of the header's underside
-   (same tone, same left offset as the body's leg) rather than a new panel.
-   Colour is the zone tone; the glyph carries the meaning, not the hue. ---- */
+/* ---- the ambient band: a drawn dot matrix in the seam between the header
+   strip and the body. It reads as part of the header's underside (same tone,
+   sitting on the same leg) rather than as a new panel.
+   Colour is the zone tone; the dot carries the meaning, not the hue.
+   8 dot rows (two braille cell rows) at a 6 x 4.5px pitch = a 36px band —
+   the cadence of 18px braille type, drawn instead of set: a glyph's dot is
+   ~14% of its font size and its cell carries wide side bearings, so the
+   rhythm came out uneven (see src/braille.ts). ---- */
 .ws-band {
+  --band-dot: 3.2px;
   display: block;
   flex: 0 0 auto;
-  height: 30px;
-  margin-left: 14px;
   padding: 0;
   overflow: hidden;
-  font-family: "Apple Braille", "Noto Sans Symbols 2", "Segoe UI Symbol", "DejaVu Sans Mono", var(--mono);
-  font-size: 13px;
-  line-height: 15px;
-  letter-spacing: 0;
-  white-space: pre;
   color: var(--tone);
   opacity: 0.6;
   user-select: none;
   pointer-events: none;
-  -webkit-font-smoothing: antialiased;
 }
+.ws-band svg { display: block; }
+/* one round dot per lit cell: a zero-length segment plus a round cap */
+.ws-band path {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: var(--band-dot);
+}
+/* weight 1 is the trail (draining columns, sparking dots), weight 2 the head */
+.ws-band .bw1 { opacity: 0.55; }
 /* idle is quieter than work, but it is still the thing that makes an empty
-   session feel alive — 0.26 read as "broken", not as "calm" */
-.ws-band[data-phase="idle"] { opacity: 0.34; }
-.ws-band[data-phase="done"] { opacity: 0.44; }
+   session feel alive - 0.26 read as "broken", not as "calm"; 0.34 was dim
+   enough that the dots read smaller than they are */
+.ws-band[data-phase="idle"] { opacity: 0.4; }
+.ws-band[data-phase="done"] { opacity: 0.46; }
+
+/* ---- the leg: one rail for the whole instrument ---- */
+/* The arm ends 20px into the band, so the leg has to keep going underneath it
+   — as a border on a wrapper that owns the band AND the scrolling body. A
+   margin on the band (the old way) left a 30px hole in the rail right below
+   the fillet, which reads as "the instrument is cut in half". */
+.ws-mid {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+  border-left: 14px solid var(--tone);
+}
 
 /* ---- the body: the only scrolling surface in each instrument ---- */
-/* the leg of the bent arm: a 14px solid rail the whole instrument hangs from */
 .ws-body {
   flex: 1 1 auto;
   min-height: 0;
@@ -3530,7 +3629,6 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
   flex-direction: column;
   gap: var(--gap);
   padding: 8px 8px 8px 10px;
-  border-left: 14px solid var(--tone);
   overflow-y: auto;
   overflow-x: hidden;
   background: var(--g0);
@@ -3665,7 +3763,11 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 .ws-body .row.turn { margin-top: 0; }
 
 .ws-t .lb {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font: 700 10.5px/1 var(--din);
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -3676,6 +3778,7 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
   font: 400 10.5px/1 var(--mono);
   color: var(--g3);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 .ws-t .tm {
   margin-left: auto;
@@ -3939,6 +4042,18 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 .term-note[data-tone="error"] .lb,
 .term-note[data-tone="error"] .tx { color: var(--tomato); }
 
+/* the thinking strip's tail readouts drop by INSTRUMENT width, not viewport
+   width: at 1280 the column is 280 and at 1180 the zones stack into one
+   full-width column — a media query would get that backwards. Words and the
+   T+ stamp also live in the exchange footer, so they are the first to go. */
+.ws-zone[data-zone="thinking"] .ws-body { container-type: inline-size; }
+@container (max-width: 290px) {
+  .ws-t .w { display: none; }
+}
+@container (max-width: 250px) {
+  .ws-t .tm { display: none; }
+}
+
 /* one column when the zones would be too narrow to read */
 @media (max-width: 1180px) {
   .ws {
@@ -4045,28 +4160,60 @@ button.nm:focus-visible { outline: 2px solid #000; outline-offset: -3px; }
 
 /* ------------------------------------------------------------- jump bar */
 /* Appears only when the reader has scrolled away from the tail. */
+/* the transcript scroller and the tail control that floats over its lower
+   right corner — the control must never move the composer (§7.6b) */
+.scroll-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  position: relative;
+  display: flex;
+}
+.scroll-wrap > .scroll { flex: 1 1 auto; min-width: 0; }
+
+/* "back to the tail, and follow again" — pi's ctrl+end, as a block you can hit
+   with the mouse. Solid orange (it is an action, not a badge), with the black
+   icon slot the ENTER block uses, and a 4px black seam so it reads as floating
+   above the grid rather than belonging to a row. */
 .jumpbar {
-  flex: 0 0 32px;
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 3;
   height: 32px;
-  margin: 0 var(--seam) var(--gap) var(--seam);
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 12px;
-  background: var(--g1);
-  color: var(--orange);
-  font: 700 11px/1 var(--din);
-  letter-spacing: 0.14em;
-  border-radius: 0 var(--r-pill) var(--r-pill) 0;
-  box-shadow: inset 4px 0 0 var(--orange);
-  text-align: left;
-}
-.jumpbar .ar { font-size: 13px; line-height: 1; }
-.jumpbar:hover {
+  padding: 0 12px 0 0;
   background: var(--orange);
   color: #000;
-  box-shadow: none;
+  border-radius: 0 var(--r-pill) var(--r-pill) 0;
+  box-shadow: 0 0 0 4px var(--bg);
+  font: 700 11px/1 var(--din);
+  letter-spacing: 0.12em;
+  white-space: nowrap;
 }
+.jumpbar .ar {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 32px;
+  background: #000;
+  color: var(--orange);
+  border-radius: 0 var(--r-1) var(--r-1) 0;
+  font-size: 14px;
+  line-height: 1;
+}
+.jumpbar .k {
+  font: 400 10.5px/1 var(--mono);
+  letter-spacing: 0.06em;
+  /* 75% black over orange = 6.7:1; 55% was 3.9:1 — too light for 10.5px */
+  color: color-mix(in srgb, #000 75%, var(--orange));
+}
+/* waiting output: the count is the reason to press, so it goes full contrast */
+.jumpbar[data-new="1"] .lb { color: #000; }
+.jumpbar[data-new="0"] .lb { color: color-mix(in srgb, #000 78%, var(--orange)); }
+.jumpbar:hover { filter: brightness(1.12); }
 
 /* ------------------------------------------------------------------ panic */
 /* A crash replaces the console with a fault report — never a blank screen. */

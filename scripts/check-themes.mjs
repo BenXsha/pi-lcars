@@ -64,14 +64,24 @@ const checks = [
   { a: "orange", b: "bg", min: 4.5, why: "streaming label" },
   { a: "amber", b: "bg", min: 4.5, why: "panel header text / warnings" },
   { a: "w", b: "g1", min: 4.5, why: "text on neutral block" },
+  // quiet strip labels (zone state block, log ACTIVITY key) sit on --g1 and use
+  // --t3, a white mix from tokens.css; blend it over the surface before checking
+  { a: "t3", b: "g1", mix: 0.7, min: 4.5, why: "quiet label on neutral block" },
 ];
+
+/** tokens.css text tokens are `color-mix(in srgb, var(--w) N%, #000)` */
+function mixWhite(hex, pct) {
+  const n = parseInt(hex.slice(1), 16);
+  const ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => Math.round(255 * pct + v * (1 - pct)));
+  return "#" + ch.map((v) => v.toString(16).padStart(2, "0")).join("");
+}
 
 let failed = 0;
 for (const { id, vars } of parse(css)) {
   const rows = [];
   for (const c of checks) {
-    const a = c.a.startsWith("#") ? c.a : vars[c.a];
     const b = c.b.startsWith("#") ? c.b : vars[c.b];
+    const a = c.a.startsWith("#") ? c.a : c.mix && b ? mixWhite(b, c.mix) : vars[c.a];
     if (!a || !b) {
       rows.push(`  MISSING  ${c.why} (${c.a} / ${c.b})`);
       failed++;

@@ -1,9 +1,14 @@
 import { useEffect, useRef, useState } from "preact/hooks";
-import { DONE_HOLD, frame, type Phase } from "../braille";
+import { DONE_HOLD, dots, frame, type Phase } from "../braille";
 
 /* ============================================================
-   The thinking band: one braille cell row that says what the model is
-   doing, filling the seam between the zone header and its body.
+   The thinking band: a dot matrix that says what the model is doing,
+   filling the seam between the zone header and its body.
+
+   The dots are DRAWN (one SVG path of round dots), not folded into braille
+   glyphs — see src/braille.ts. The cadence is the braille one: an 18px cell
+   holds 2 x 4 dots, so the grid is 6 x 4.5px and two cell rows (8 dot rows)
+   make a 36px band.
 
    Motion rules are the console's (§5): linear, fixed step, no easing.
    The clock is shared and stepped at 90ms rather than driven by rAF per
@@ -13,6 +18,10 @@ import { DONE_HOLD, frame, type Phase } from "../braille";
 
 /** one tick = one drawn frame; matches the console's --t-1 */
 const STEP = 90;
+
+/** 18px cell = 2 dots x 6px across, 4 dots x 4.5px down */
+const PITCH_X = 6;
+const PITCH_Y = 4.5;
 
 let n = 0;
 let raf = 0;
@@ -55,37 +64,23 @@ function onFrame(fn: (n: number) => void): () => void {
   };
 }
 
-/** advance width of one braille cell at a given font size, cached */
-const widths = new Map<number, number>();
-function cellWidth(px: number): number {
-  const hit = widths.get(px);
-  if (hit) return hit;
-  const cv = document.createElement("canvas").getContext("2d");
-  let w = px; // a braille cell is square in every face that carries the block
-  if (cv) {
-    cv.font = `400 ${px}px "Apple Braille", "Noto Sans Symbols 2", "Segoe UI Symbol", monospace`;
-    const m = cv.measureText("\u2800\u28ff\u2847").width / 3;
-    if (m > 0) w = m;
-  }
-  widths.set(px, w);
-  return w;
-}
-
 export function BrailleBand(props: {
   phase: Phase;
-  /** dot rows: 8 = two braille lines (the default band) */
+  /** dot rows: 8 = two braille cell rows = a 36px band */
   rows?: number;
-  size?: number;
+  /** grid pitch in px (must match .ws-band's --band-dot + gap) */
+  pitchX?: number;
+  pitchY?: number;
   class?: string;
 }) {
   const host = useRef<HTMLSpanElement>(null);
-  const [cells, setCells] = useState(0);
+  const [cols, setCols] = useState(0);
   const [t, setT] = useState(1);
   // "done" is a transient: it plays its settle frame, then reads as idle again
   const [local, setLocal] = useState<Phase>(props.phase);
 
-  const size = props.size ?? 13;
-  // two cell rows: one line reads as a stray artefact, two read as a field
+  const pitchX = props.pitchX ?? PITCH_X;
+  const pitchY = props.pitchY ?? PITCH_Y;
   const rows = props.rows ?? 8;
 
   useEffect(() => {
@@ -107,32 +102,43 @@ export function BrailleBand(props: {
     return onFrame((cur) => setT(cur - base));
   }, [local]);
 
-  // the band fills its slot exactly: cells are fixed-width, so the count has
-  // to come from a measurement rather than from overflow clipping
+  // the matrix fills its slot exactly: columns come from a measurement, so the
+  // band never clips a half dot at the right edge
   useEffect(() => {
     const el = host.current;
     if (!el) return;
     const measure = () => {
       const w = el.clientWidth;
       if (!w) return;
-      setCells(Math.max(1, Math.floor(w / cellWidth(size))));
+      setCols(Math.max(1, Math.floor(w / pitchX)));
     };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
-    // braille advances change once the bundled faces land, so re-measure after
-    document.fonts?.ready?.then(measure).catch(() => {});
     return () => ro.disconnect();
-  }, [size]);
+  }, [pitchX]);
+
+  const bm = cols ? frame(local, t, cols, rows) : null;
+  const w = cols * pitchX;
+  const h = rows * pitchY;
 
   return (
     <span
       ref={host}
       class={`ws-band${props.class ? ` ${props.class}` : ""}`}
       data-phase={local}
+      data-rows={rows}
+      data-pitch-x={pitchX}
+      data-pitch-y={pitchY}
       aria-hidden="true"
     >
-      {cells ? frame(local, t, cells * 2, rows) : ""}
+      {bm ? (
+        <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
+          {/* trailing dots first, the bright head on top of them */}
+          <path class="bw1" d={dots(bm, pitchX, pitchY, 1)} />
+          <path class="bw2" d={dots(bm, pitchX, pitchY, 2)} />
+        </svg>
+      ) : null}
     </span>
   );
 }

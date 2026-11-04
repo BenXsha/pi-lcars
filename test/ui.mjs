@@ -223,6 +223,54 @@ try {
   check("console boots with a session", ready);
   check("transcript is the landing view", await inTranscript());
 
+  /* ------------------------------------- 3b. the log's activity strip */
+  // the same dot matrix the STREAM zone carries, read once for the whole
+  // session: header, then strip, then the scrolled log
+  const logStrip = await evaluate(
+    `(() => {
+      const ls = document.querySelector('.logstate');
+      if (!ls) return null;
+      const band = ls.querySelector('.ws-band');
+      const svg = band?.querySelector('svg');
+      const path = svg?.querySelector('path');
+      const b = ls.getBoundingClientRect();
+      const bb = band?.getBoundingClientRect();
+      const head = document.querySelector('.center-head').getBoundingClientRect();
+      const scroll = document.querySelector('#scroll').getBoundingClientRect();
+      return {
+        h: Math.round(b.height),
+        rows: Number(band?.dataset.rows),
+        pitch: Number(band?.dataset.pitchX),
+        pitchY: Number(band?.dataset.pitchY),
+        stroke: path ? parseFloat(getComputedStyle(path).strokeWidth) : 0,
+        cols: bb ? Math.floor(bb.width / Number(band.dataset.pitchX)) : 0,
+        dots: [...(svg?.querySelectorAll('path') ?? [])].reduce((n, p) => n + (p.getAttribute('d').match(/M/g) ?? []).length, 0),
+        spine: Math.round(ls.querySelector('.ls-spine').getBoundingClientRect().width),
+        label: ls.querySelector('.ls-lb')?.textContent ?? '',
+        state: ls.querySelector('.ls-st')?.textContent ?? '',
+        phase: ls.dataset.phase,
+        sitsBetweenHeadAndLog: Math.round(b.y) >= Math.round(head.y + head.height) && Math.round(b.y + b.height) <= Math.round(scroll.y),
+        seamToLog: Math.round(scroll.y - (b.y + b.height)),
+      };
+    })()`,
+  );
+  check("the log carries an activity strip", !!logStrip, JSON.stringify(logStrip));
+  check(
+    "the strip is the same dot matrix, read across the whole column",
+    logStrip?.h === 36 && logStrip?.rows === 8 && logStrip?.pitch === 6 && logStrip?.pitchY === 4.5 && logStrip?.cols >= 80,
+    JSON.stringify(logStrip && { h: logStrip.h, rows: logStrip.rows, cols: logStrip.cols, pitch: logStrip.pitch }),
+  );
+  check(
+    "it keys the readout and states the phase",
+    logStrip?.spine === 14 && /ACTIVITY/i.test(logStrip?.label ?? "") && (logStrip?.state ?? "").length > 2,
+    JSON.stringify(logStrip && { spine: logStrip.spine, label: logStrip.label, state: logStrip.state }),
+  );
+  check(
+    "it sits between the header and the log, not inside the scroll",
+    logStrip?.sitsBetweenHeadAndLog === true && logStrip?.seamToLog === 8,
+    JSON.stringify(logStrip && { between: logStrip.sitsBetweenHeadAndLog, seam: logStrip.seamToLog }),
+  );
+
   /* ------------------------------------------------------- 4. stations */
   const STATIONS = [
     { view: "mcp", title: "MCP", marker: ".mcp-connect, .mcp-card" },
@@ -595,6 +643,88 @@ try {
   check("the draft survives a reload", (await value()) === "draft survives reload", await value());
   await clearInput();
 
+  /* --------------------------------- 9b2. the tail control (ctrl+end) */
+  // The harness session is empty, so the transcript cannot overflow on its own:
+  // pad it with an inert block to exercise the follow logic itself. What is
+  // being checked is the shell's behaviour, not the sample data.
+  const tail = await evaluate(
+    `(async () => {
+      const el = document.querySelector('#scroll');
+      const cmdBefore = Math.round(document.querySelector('.cmdwrap').getBoundingClientRect().y);
+      const pad = document.createElement('div');
+      pad.id = 'tallprobe';
+      pad.style.height = '2600px';
+      el.firstElementChild.appendChild(pad);
+      el.scrollTop = 0;
+      el.dispatchEvent(new Event('scroll'));
+      await new Promise((r) => setTimeout(r, 400));
+      const btn = document.querySelector('.jumpbar');
+      const cs = btn ? getComputedStyle(btn) : null;
+      const b = btn?.getBoundingClientRect();
+      const sc = el.getBoundingClientRect();
+      const cmd = document.querySelector('.cmdwrap').getBoundingClientRect();
+      const out = {
+        shown: !!btn,
+        text: btn?.textContent.trim().replace(/\\s+/g, ' ') ?? '',
+        position: cs?.position,
+        floating: !!b && b.y > sc.y && b.y + b.height <= sc.y + sc.height + 1,
+        bottomRight: !!b && sc.x + sc.width - (b.x + b.width) < 40,
+        movedComposer: Math.round(cmd.y) - cmdBefore,
+        hint: /CTRL END/.test(btn?.textContent ?? ''),
+      };
+      // the click goes back to the tail and resumes following
+      btn?.click();
+      await new Promise((r) => setTimeout(r, 400));
+      out.afterClick = { gone: !document.querySelector('.jumpbar'), gap: Math.round(el.scrollHeight - el.scrollTop - el.clientHeight) };
+      // ctrl+end from the page (not from the composer) does the same, ctrl+home releases the tail
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', ctrlKey: true, bubbles: true }));
+      await new Promise((r) => setTimeout(r, 400));
+      out.afterCtrlHome = { atTop: Math.round(el.scrollTop) === 0, btn: !!document.querySelector('.jumpbar') };
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', ctrlKey: true, bubbles: true }));
+      await new Promise((r) => setTimeout(r, 400));
+      out.afterCtrlEnd = { gone: !document.querySelector('.jumpbar'), gap: Math.round(el.scrollHeight - el.scrollTop - el.clientHeight) };
+      // ...but the composer owns ctrl+end while it has focus: park the
+      // transcript at the top, press the key into the textarea, stay at the top
+      el.scrollTop = 0;
+      el.dispatchEvent(new Event('scroll'));
+      await new Promise((r) => setTimeout(r, 300));
+      const ta = document.querySelector('.cmd-field textarea');
+      ta.focus();
+      // a real key press targets the focused field, not the window
+      ta.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', ctrlKey: true, bubbles: true }));
+      await new Promise((r) => setTimeout(r, 400));
+      out.composerOwnsKey = { top: Math.round(el.scrollTop), btn: !!document.querySelector('.jumpbar'), focused: document.activeElement?.tagName };
+      ta.blur();
+      pad.remove();
+      el.dispatchEvent(new Event('scroll'));
+      await new Promise((r) => setTimeout(r, 200));
+      return out;
+    })()`,
+  );
+  check("scrolling away offers a way back to the tail", tail?.shown === true && /LATEST/.test(tail?.text ?? ""), JSON.stringify(tail && { shown: tail.shown, text: tail.text }));
+  check(
+    // it floats over the transcript: an in-flow bar used to shove the composer up
+    "the tail control floats and moves nothing",
+    tail?.position === "absolute" && tail?.floating === true && tail?.bottomRight === true && tail?.movedComposer === 0,
+    JSON.stringify(tail && { pos: tail.position, floating: tail.floating, bottomRight: tail.bottomRight, moved: tail.movedComposer }),
+  );
+  check("it names the keybinding", tail?.hint === true);
+  check(
+    "pressing it returns to the newest message",
+    tail?.afterClick?.gone === true && tail?.afterClick?.gap === 0,
+    JSON.stringify(tail?.afterClick),
+  );
+  check(
+    "ctrl+home / ctrl+end page the transcript like pi's TUI",
+    tail?.afterCtrlHome?.atTop === true && tail?.afterCtrlHome?.btn === true && tail?.afterCtrlEnd?.gone === true && tail?.afterCtrlEnd?.gap === 0,
+    JSON.stringify({ home: tail?.afterCtrlHome, end: tail?.afterCtrlEnd }),
+  );
+  check(
+    "the composer keeps ctrl+end for its own text",
+    tail?.composerOwnsKey?.top === 0 && tail?.composerOwnsKey?.btn === true,
+    JSON.stringify(tail?.composerOwnsKey),
+  );
+
   /* ----------------------------- 9c. three-zone workspace (test view) */
   const streamBadge = `[...document.querySelectorAll('.vsw-b')].find((b) => /STREAM/.test(b.textContent))`;
   const logBadge = `[...document.querySelectorAll('.vsw-b')].find((b) => /^LOG$/.test(b.textContent))`;
@@ -607,6 +737,7 @@ try {
   await evaluate(`${streamBadge}?.click()`);
   await sleep(400);
   check("the workspace replaces the log", await exists(".ws"));
+  check("the strip yields to the zone band in STREAM", !(await exists(".logstate")));
   check(
     "it has exactly the three zones",
     (await evaluate(`[...document.querySelectorAll('.ws-zone')].map((z) => z.dataset.zone).join(',')`)) ===
@@ -675,40 +806,56 @@ try {
   await sleep(300);
   check("the workspace reopens", await exists(".ws"));
 
-  /* the thinking band: ambient motion in the seam under the header */
+  /* the thinking band: a drawn dot matrix in the seam under the header */
   const bandInfo = await evaluate(
     `(() => {
       const z = document.querySelector('.ws-zone[data-zone="thinking"]');
       const band = z?.querySelector('.ws-band');
-      if (!band) return null;
+      const svg = band?.querySelector('svg');
+      if (!band || !svg) return null;
       const hd = z.querySelector('.ws-hd').getBoundingClientRect();
       const b = band.getBoundingClientRect();
       const body = z.querySelector('.ws-body').getBoundingClientRect();
-      const txt = band.textContent;
+      const paths = [...svg.querySelectorAll('path')];
+      const stroke = paths[0] ? parseFloat(getComputedStyle(paths[0]).strokeWidth) : 0;
+      const pitch = Number(band.dataset.pitchX);
       return {
         phase: band.dataset.phase,
-        len: txt.length,
-        lines: txt.split('\\n').length,
-        braille: [...txt].every((c) => c === '\\n' || (c.codePointAt(0) >= 0x2800 && c.codePointAt(0) <= 0x28ff)),
+        rows: Number(band.dataset.rows),
+        pitch,
+        pitchY: Number(band.dataset.pitchY),
+        cols: Math.round(svg.getBoundingClientRect().width / pitch),
+        height: Math.round(b.height),
+        width: Math.round(svg.getBoundingClientRect().width),
+        stroke,
+        dots: paths.reduce((n, p) => n + (p.getAttribute('d').match(/M/g) ?? []).length, 0),
+        layers: paths.length,
         seamTop: Math.round(b.y - (hd.y + hd.height)),
         seamBottom: Math.round(body.y - (b.y + b.height)),
-        fill: band.scrollWidth <= band.clientWidth + 1 && b.width > 100,
+        // the matrix may be a hair wider than its slot (subpixel layout), never wider than one column
+        fill: svg.getBoundingClientRect().width <= b.width + 1 && b.width - svg.getBoundingClientRect().width <= pitch,
         indent: Math.round(b.x - z.getBoundingClientRect().x),
-        height: Math.round(b.height),
       };
     })()`,
   );
   check("the thinking zone carries a motion band", !!bandInfo, JSON.stringify(bandInfo));
-  check("it renders real braille glyphs", bandInfo?.braille === true && bandInfo.len > 8, `${bandInfo?.len} cells`);
   check(
-    "the band carries two cell rows, not a single stray line",
-    bandInfo?.lines === 2 && bandInfo?.height === 30,
-    JSON.stringify(bandInfo && { lines: bandInfo.lines, height: bandInfo.height }),
+    // two braille cell rows: 8 dot rows at a 6 x 4.5px pitch = a 36px band
+    "the band is an eight-row dot matrix",
+    bandInfo?.rows === 8 && bandInfo?.height === 36 && bandInfo?.pitch === 6 && bandInfo?.pitchY === 4.5,
+    JSON.stringify(bandInfo && { rows: bandInfo.rows, height: bandInfo.height, pitch: bandInfo.pitch, py: bandInfo.pitchY }),
+  );
+  check(
+    // the dot is DRAWN, so its size is a decision, not a side effect of the
+    // typeface: 3.2px on a 6 x 4.5px grid (an 18px braille cell, uniform).
+    "the dots are drawn at the cell's own cadence",
+    bandInfo?.stroke > 2.8 && bandInfo?.stroke < 3.6 && bandInfo?.cols >= 40 && bandInfo?.dots > 8,
+    JSON.stringify(bandInfo && { stroke: bandInfo.stroke, cols: bandInfo.cols, dots: bandInfo.dots }),
   );
   check(
     "it fills the slot without spilling",
-    bandInfo?.fill === true,
-    JSON.stringify(bandInfo && { fill: bandInfo.fill, len: bandInfo.len }),
+    bandInfo?.fill === true && bandInfo?.width <= bandInfo?.cols * bandInfo?.pitch + 1,
+    JSON.stringify(bandInfo && { fill: bandInfo.fill, width: bandInfo.width, cols: bandInfo.cols }),
   );
   check(
     "it sits in the seam, indented to the body's leg",
@@ -716,17 +863,56 @@ try {
     JSON.stringify(bandInfo && { top: bandInfo.seamTop, bottom: bandInfo.seamBottom, indent: bandInfo.indent }),
   );
 
+  // the arm used to end 20px above a hole: the band carried a 14px margin
+  // instead of a rail, so the instrument looked cut in half right under the
+  // fillet. The leg is now a border on the wrapper that owns band + body.
+  const leg = await evaluate(
+    `(() => {
+      const z = document.querySelector('.ws-zone[data-zone="thinking"]');
+      const box = (el) => { const b = el.getBoundingClientRect(); return { x: +b.x.toFixed(1), y: +b.y.toFixed(1), w: +b.width.toFixed(1), h: +b.height.toFixed(1) }; };
+      const hd = z.querySelector('.ws-hd');
+      const mid = z.querySelector('.ws-mid');
+      const band = z.querySelector('.ws-band');
+      const body = z.querySelector('.ws-body');
+      const arm = z.querySelector('.ws-arm');
+      const cs = mid ? getComputedStyle(mid) : null;
+      const h = box(hd), m = mid ? box(mid) : null, b = box(band), d = box(body), a = box(arm), zr = box(z);
+      return {
+        border: cs?.borderLeftWidth,
+        sameTone: cs?.borderLeftColor === getComputedStyle(z.querySelector('.ws-hd .idx')).backgroundColor,
+        seamUnderHead: m ? Math.round(m.y - (h.y + h.h)) : null,
+        legToBody: m ? Math.round(m.y + m.h - (d.y + d.h)) : null,
+        bandOnLeg: Math.round(b.x - zr.x),
+        armToBand: Math.round(a.y + a.h - b.y),
+        armW: Math.round(a.w),
+        idxW: Math.round(z.querySelector('.ws-hd .idx').getBoundingClientRect().width),
+      };
+    })()`,
+  );
+  check(
+    "the leg runs from the arm to the body without a hole",
+    leg?.border === "14px" && leg?.sameTone === true && leg?.seamUnderHead === 4 && leg?.legToBody === 0,
+    JSON.stringify(leg),
+  );
+  check(
+    "the arm is as wide as the numeral block and reaches into the band",
+    leg?.armW === leg?.idxW && leg?.bandOnLeg === 14 && leg?.armToBand > 8,
+    JSON.stringify(leg && { armW: leg.armW, idxW: leg.idxW, bandOnLeg: leg.bandOnLeg, armToBand: leg.armToBand }),
+  );
+
   const bandFrames = await evaluate(
     `(async () => {
       const band = document.querySelector('.ws-band');
-      const seen = new Set([band.textContent]);
-      for (let i = 0; i < 7; i++) { await new Promise((r) => setTimeout(r, 220)); seen.add(band.textContent); }
+      // one frame = the two paths' geometry; the matrix has no text to diff
+      const frameOf = () => [...band.querySelectorAll('path')].map((p) => p.getAttribute('d')).join('|');
+      const seen = new Set([frameOf()]);
+      for (let i = 0; i < 7; i++) { await new Promise((r) => setTimeout(r, 220)); seen.add(frameOf()); }
       const phase = band.dataset.phase;
       document.documentElement.dataset.motion = 'reduced';
       await new Promise((r) => setTimeout(r, 700));
-      const a = band.textContent;
+      const a = frameOf();
       await new Promise((r) => setTimeout(r, 800));
-      const frozen = a === band.textContent;
+      const frozen = a === frameOf();
       document.documentElement.dataset.motion = 'system';
       return { distinct: seen.size, phase, frozen };
     })()`,
@@ -870,6 +1056,57 @@ try {
   }
   await cdp.send("Page.navigate", { url: process.env.UI_BASE || handshake.url });
   await sleep(1800);
+
+  /* ------------------------------------- 10c. the two desktop targets */
+  // 1600x1000 is the design size; 1440x900 and 1280x800 are the laptops this
+  // actually runs on. Neither may introduce a horizontal scroll, a wrapped
+  // header, or a sidebar that squeezes the input field (AGENTS §4.2b).
+  for (const [w, h] of [
+    [1440, 900],
+    [1280, 800],
+  ]) {
+    await cdp.send("Emulation.setDeviceMetricsOverride", { width: w, height: h, deviceScaleFactor: 1, mobile: false });
+    await cdp.send("Page.navigate", { url: (process.env.UI_BASE || handshake.url).replace(/\/$/, "") + "/#stream" });
+    await sleep(1800);
+    const fit = await evaluate(
+      `(() => {
+        const head = document.querySelector('.center-head');
+        const field = document.querySelector('.cmd-field');
+        const band = document.querySelector('.ws-band');
+        const zones = {};
+        for (const z of document.querySelectorAll('.ws-zone')) {
+          const zr = z.getBoundingClientRect();
+          const body = z.querySelector('.ws-body');
+          zones[z.dataset.zone] = {
+            w: Math.round(zr.width),
+            h: Math.round(zr.height),
+            body: body ? Math.round(body.getBoundingClientRect().height) : 0,
+          };
+        }
+        return {
+          vp: [innerWidth, innerHeight],
+          doc: document.documentElement.scrollWidth,
+          headOver: head ? head.scrollHeight - head.clientHeight : null,
+          headH: head ? Math.round(head.getBoundingClientRect().height) : null,
+          field: field ? Math.round(field.getBoundingClientRect().width) : null,
+          zones,
+          cols: band ? Math.floor(band.getBoundingClientRect().width / Number(band.dataset.pitchX)) : 0,
+        };
+      })()`,
+    );
+    check(`layout ${w}x${h}: still two columns`, fit?.zones?.thinking?.w > 200 && fit?.zones?.action?.w > 300, JSON.stringify(fit?.zones && { t: fit.zones.thinking, a: fit.zones.action }));
+    check(`layout ${w}x${h}: the header stays one band tall`, fit?.headH === 52 && fit?.headOver === 0, JSON.stringify(fit && { h: fit.headH, over: fit.headOver }));
+    check(`layout ${w}x${h}: the input field keeps its width`, fit?.field >= 300, String(fit?.field));
+    check(
+      `layout ${w}x${h}: every instrument keeps a usable body`,
+      ["thinking", "thread", "action"].every((k) => (fit?.zones?.[k]?.body ?? 0) >= 150),
+      JSON.stringify(fit && Object.fromEntries(Object.entries(fit.zones).map(([k, v]) => [k, v.body]))),
+    );
+    check(`layout ${w}x${h}: the dot matrix still holds 40+ columns`, (fit?.cols ?? 0) >= 40, String(fit?.cols));
+    check(`layout ${w}x${h}: no horizontal scroll`, fit?.doc === w, `${fit?.doc} vs ${w}`);
+  }
+  await cdp.send("Emulation.clearDeviceMetricsOverride");
+  await sleep(600);
 
   /* -------------------------- 11. a crash surfaces, and reports to the server */
   await cdp.send("Page.navigate", { url: process.env.UI_BASE || handshake.url });

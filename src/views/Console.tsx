@@ -14,6 +14,7 @@ import {viewFromHash, NAV, type View} from "./console/nav";
 import {buildTurns} from "./console/turns";
 import {Sidenav} from "./console/Sidenav";
 import {Transcript} from "./console/Transcript";
+import {LogState} from "./console/LogState";
 import {Workspace} from "./console/Workspace";
 import {Composer} from "./console/Composer";
 import {Rail, NewSessionDeck, ModelDeck, ThinkDeck, QuickDeck} from "./console/Rail";
@@ -166,6 +167,30 @@ export function Console() {
     setFollowing(true);
     setUnseen(0);
   };
+  // the handler below must not re-register on every keystroke-driven render
+  const jumpRef = useRef(jumpToLatest);
+  jumpRef.current = jumpToLatest;
+
+  /* Transcript scrolling keeps pi's TUI bindings (§tui.altScreen):
+       ctrl+end  → the transcript end, and follow new output again
+       ctrl+home → the beginning (which also releases the tail, so the
+                   LATEST control appears exactly as it would by hand)
+     The composer owns both keys while it has focus — inside a draft,
+     ctrl+end means "end of text". */
+  useEffect(() => {
+    if (view !== "session" || wsOpen || treeOpen || viewer) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || imeBusy(e)) return;
+      if (e.key !== "End" && e.key !== "Home") return;
+      const t = e.target instanceof HTMLElement ? e.target : null;
+      if (t && (t.tagName === "TEXTAREA" || t.tagName === "INPUT" || t.isContentEditable)) return;
+      e.preventDefault();
+      if (e.key === "End") jumpRef.current();
+      else if (scrollRef.current) scrollRef.current.scrollTop = 0;
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [view, wsOpen, treeOpen, viewer]);
 
   // Escape dismisses whatever is layered over the transcript: view deck, then tree, then workspace.
   useEffect(() => {
@@ -360,7 +385,11 @@ export function Console() {
                 ) : (
                   <span class={`badge ${meta?.running ? "moon" : "dim"}`}>{meta?.running ? "RUNNING" : "IDLE"}</span>
                 )}
-                <span class="badge ice">{countTools(s.items)} CALLS</span>
+                {/* repeated in the rail's TOOL CALLS panel — the first thing
+                    to go when the head runs out of room (§4.2b) */}
+                <span class="badge ice" data-aux="1">
+                  {countTools(s.items)} CALLS
+                </span>
                 {view === "session" ? (
                   /* A mode, not an action: both positions stay on screen and the
                      current one is filled. A single badge whose label flips reads
@@ -432,8 +461,19 @@ export function Console() {
                 }}
               />
             ) : wsOpen && view === "session" ? (
-              <Workspace items={s.items} onOpenDiff={(p, d) => setViewer({ path: p, diff: d })} />
+              <Workspace
+                items={s.items}
+                running={!!meta?.running}
+                onOpenDiff={(p, d) => setViewer({ path: p, diff: d })}
+              />
             ) : (
+            <>
+            {/* the log's own instrument: the same activity the STREAM band shows,
+                read once for the whole session rather than per zone */}
+            {view === "session" ? <LogState items={s.items} running={!!meta?.running} /> : null}
+            {/* the tail control floats over the transcript: an in-flow bar used to
+                shove the composer up by 32px the moment the reader scrolled away */}
+            <div class="scroll-wrap">
             <div class="scroll" id="scroll" ref={scrollRef}>
               <div key={view} class={view === "session" ? "sess-body" : "anim-swap"}>
               {view === "session" ? (
@@ -477,16 +517,28 @@ export function Console() {
               )}
               </div>
             </div>
-            )}
-
+            {/* the same affordance pi's TUI gives with ctrl+end: back to the tail
+                and follow new output again */}
             {view === "session" && !viewer && !treeOpen && !wsOpen && !following ? (
-              <button type="button" class="jumpbar" onClick={jumpToLatest} title="Jump to the newest message">
+              <button
+                type="button"
+                class="jumpbar"
+                data-new={unseen ? "1" : "0"}
+                onClick={jumpToLatest}
+                title="Jump to the newest message (ctrl+end)"
+              >
                 <span class="ar" aria-hidden="true">
                   ↓
                 </span>
-                LATEST{unseen ? ` · ${unseen} NEW` : ""}
+                <span class="lb">LATEST{unseen ? ` · ${unseen} NEW` : ""}</span>
+                <span class="k" aria-hidden="true">
+                  CTRL END
+                </span>
               </button>
             ) : null}
+            </div>
+            </>
+            )}
 
             <Composer session={s.activeId} running={!!meta?.running} disabled={s.link !== "open"} queue={meta?.queue} />
           </main>

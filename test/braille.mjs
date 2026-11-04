@@ -6,7 +6,7 @@
  *
  * Two things rot silently here and both are invisible in a screenshot:
  *
- *   1. the dot→codepoint table drifts, so every pattern renders mirrored or
+ *   1. the dot→position mapping drifts, so every pattern renders mirrored or
  *      transposed (it still *looks* like motion, which is why nobody notices);
  *   2. `phaseOf` starts answering "thinking" for a run that is finished, or
  *      drops the "a command is executing" case — the band then broadcasts the
@@ -14,7 +14,7 @@
  *
  * No browser, no pi process: pure functions only.
  */
-import { braille, frame, phaseOf, hash, blank, DONE_HOLD, PHASE_LABEL } from "../src/braille.ts";
+import { dots, frame, phaseOf, hash, blank, DONE_HOLD, PHASE_LABEL } from "../src/braille.ts";
 
 const results = [];
 let failures = 0;
@@ -23,54 +23,56 @@ function check(name, ok, detail = "") {
   results.push(`${ok ? "ok  " : "FAIL"}  ${name}${detail ? `  — ${detail}` : ""}`);
 }
 
-/* ---------------------------------------------------------- braille folding */
+/* ---------------------------------------------------------- dot geometry */
 
-/* one cell, every dot on: U+28FF is the fully lit 2x4 block */
-check("a fully lit cell folds to U+28FF", braille([[1, 1], [1, 1], [1, 1], [1, 1]]) === "\u28ff");
-
-/* dot 1 (top left) is bit 0, dot 4 (top right) is bit 3 — transposing these is
-   the classic bug and it looks fine until you read the pattern */
-check("top row is dots 1|4", braille([[1, 1], [0, 0], [0, 0], [0, 0]]) === "\u2809");
-check("bottom row is dots 7|8", braille([[0, 0], [0, 0], [0, 0], [1, 1]]) === "\u28c0");
-check("left column is dots 1|2|3|7", braille([[1, 0], [1, 0], [1, 0], [1, 0]]) === "\u2847");
-
+/* the band draws dots: one zero-length segment per lit cell, positioned at the
+   CENTRE of its cell. Transposing x/y here turns every pattern 90° — it still
+   looks like motion, which is exactly why it needs an assertion. */
+const one = (x, y, w = 3, h = 2) => {
+  const b = blank(w, h);
+  b[y][x] = 1;
+  return b;
+};
+check("a dot lands at the centre of its cell", dots(one(0, 0), 10) === "M5 5h.01", dots(one(0, 0), 10));
+check("x is the column, y the row", dots(one(2, 1), 10) === "M25 15h.01", dots(one(2, 1), 10));
+check("an empty frame draws nothing", dots(blank(6, 4), 10) === "", JSON.stringify(dots(blank(6, 4), 10)));
 check(
-  "one cell row per 4 bitmap rows",
-  // 4 dots wide = 2 cells; 12 rows = 3 cell rows, 8 rows = 2
-  braille(blank(4, 12)).replace(/\n/g, "").length === 2 * 3 &&
-    braille(blank(4, 8)).replace(/\n/g, "").length === 2 * 2,
-  `${braille(blank(4, 12)).replace(/\n/g, "").length}, ${braille(blank(4, 8)).replace(/\n/g, "").length}`,
+  "every lit cell gets exactly one dot",
+  (dots(blank(8, 4).map((row, y) => row.map((_, x) => ((x + y) % 3 ? 0 : 1))), 10).match(/M/g) ?? []).length ===
+    blank(8, 4).flat().filter((_, i) => (i % 3 === 0)).length,
 );
-
-/* cell rows are NEWLINE separated. Concatenating them instead still produces a
-   valid-looking braille string, which is why this needs its own assertion:
-   the band silently rendered one overlong line and clipped past its slot. */
+/* the two weights are separate layers, never double-drawn */
+const mixed = blank(3, 1);
+mixed[0][0] = 1;
+mixed[0][1] = 2;
 check(
-  "cell rows are separated by newlines",
-  braille(blank(4, 8)) === "\u2800\u2800\n\u2800\u2800",
-  JSON.stringify(braille(blank(4, 8))),
+  "weights split into two layers",
+  dots(mixed, 10, 10, 1) === "M5 5h.01" && dots(mixed, 10, 10, 2) === "M15 5h.01" && dots(mixed, 10).match(/M/g)?.length === 2,
 );
-check("frame() emits one line per requested cell row", frame("streaming", 3, 12, 8).split("\n").length === 2);
-check("a dot width folds to ceil(w/2) cells", frame("idle", 1, 20, 4).length === 10);
+/* the grid is not square: a braille cell is 2 columns per 4 rows, so the
+   console draws 6px across and 4.5px down — swapping them tilts the field */
+check("the two pitches are independent", dots(one(1, 1, 3, 3), 6, 4.5) === "M9 6.75h.01", dots(one(1, 1, 3, 3), 6, 4.5));
+
 /* ------------------------------------------------------------ the motions */
 
 const PHASES = ["idle", "thinking", "streaming", "running", "done"];
 
 for (const p of PHASES) {
-  const s = frame(p, 4, 20, 4);
-  const range = [...s].every((c) => c.codePointAt(0) >= 0x2800 && c.codePointAt(0) <= 0x28ff);
-  check(`${p} renders only braille codepoints`, range, JSON.stringify(s));
+  const bm = frame(p, 4, 20, 4);
+  const vals = new Set(bm.flat());
+  check(`${p} draws a sane bitmap`, bm.length === 4 && bm[0].length === 20 && [...vals].every((v) => v === 0 || v === 1 || v === 2), JSON.stringify([...vals]));
+  check(`${p} actually draws something`, dots(bm, 11).length > 0);
 }
 
 /* the same frame must draw the same dots, or the band shivers between renders */
 check(
   "frames are deterministic",
-  PHASES.every((p) => frame(p, 7, 20, 4) === frame(p, 7, 20, 4)),
+  PHASES.every((p) => dots(frame(p, 7, 20, 4), 11) === dots(frame(p, 7, 20, 4), 11)),
 );
 
 /* the whole point: five states look like five different things. Compare each
    pair at a frame where every motion has had time to develop. */
-const shots = Object.fromEntries(PHASES.map((p) => [p, frame(p, 5, 24, 4)]));
+const shots = Object.fromEntries(PHASES.map((p) => [p, dots(frame(p, 5, 24, 4), 11)]));
 const pairs = [];
 for (let i = 0; i < PHASES.length; i++) {
   for (let j = i + 1; j < PHASES.length; j++) {
@@ -80,13 +82,13 @@ for (let i = 0; i < PHASES.length; i++) {
 check("no two phases share a frame", pairs.length === 0, pairs.join(", ") || "all distinct");
 
 /* idle must not be still (it is ambient) but must move slower than work */
-const idleFrames = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((t) => frame("idle", t, 20, 4)));
-const workFrames = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((t) => frame("thinking", t, 20, 4)));
+const idleFrames = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((t) => dots(frame("idle", t, 20, 4), 11)));
+const workFrames = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((t) => dots(frame("thinking", t, 20, 4), 11)));
 check("idle still moves, but less than working", idleFrames.size > 1 && idleFrames.size < workFrames.size);
 
 /* "done" collapses to a baseline and stays there — it must not keep flickering */
-const settled = frame("done", 12, 24, 4);
-const settledLater = frame("done", 40, 24, 4);
+const settled = dots(frame("done", 12, 24, 4), 11);
+const settledLater = dots(frame("done", 40, 24, 4), 11);
 check("the done frame settles and holds", settled === settledLater);
 
 /* hash drives every scatter pattern, so it has to be uniform-ish, not clustered */

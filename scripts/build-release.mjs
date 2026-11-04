@@ -225,7 +225,56 @@ Write-Host "  remove:  npm uninstall -g --prefix \\"$prefix\\" pi-lcars"
 Write-Host ""
 `;
 
+/* ---------------------------------------------------------- release notes */
+/* The share bundle has to say what changed, and it must not be a second copy
+ * that drifts: the notes come from CHANGELOG.md's section for this exact
+ * version. No section → no bundle, so a release cannot ship without notes. */
+const changelog = readFileSync(join(ROOT, "CHANGELOG.md"), "utf8");
+const section = changelog.split(/^## /m).find((chunk) => chunk.startsWith(`[${pkg.version}]`));
+if (!section) {
+  console.error(`\n  CHANGELOG.md has no "## [${pkg.version}]" section.`);
+  console.error(`  Write the release notes for ${pkg.version} first, then run this again.\n`);
+  process.exit(1);
+}
+/* markdown → monospace-friendly plain text: keep the nesting, drop the syntax.
+ * Wrapped bullet lines get the list's indent so the block still reads as a list
+ * in a 78-column terminal. */
+function plainNotes(md) {
+  const inline = (t) =>
+    t
+      .replace(/\*\*([^*]+)\*\*/g, "$1")
+      .replace(/\*([^*\n]+)\*/g, "$1")
+      .replace(/`([^`]+)`/g, "$1")
+      .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1");
+
+  const out = [];
+  let inList = false;
+  for (const raw of md.split("\n")) {
+    const line = inline(raw);
+    if (/^### /.test(line)) {
+      out.push("", line.slice(4).toUpperCase(), "");
+      inList = false;
+      continue;
+    }
+    if (/^\s*- /.test(line)) {
+      out.push("  - " + line.replace(/^\s*- /, "").trim());
+      inList = true;
+      continue;
+    }
+    if (!line.trim()) {
+      out.push("");
+      inList = false;
+      continue;
+    }
+    out.push((inList ? "    " : "") + line.trim());
+  }
+  return out.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+const whatsnew = plainNotes(section.split("\n").slice(1).join("\n"));
+
 /* --------------------------------------------------------------- README */
+const newsHead = `WHAT'S NEW IN ${pkg.version}`;
 const banner = `pi-lcars ${pkg.version}`;
 const readme = `${banner}
 ${"=".repeat(banner.length)}
@@ -238,6 +287,12 @@ it the way a TNG bridge would.
 Everything runs on your machine: the server binds 127.0.0.1, there is no
 telemetry and no account. Nothing from this bundle talks to the network except
 pi itself (model calls, web search, MCP servers you configure).
+
+
+${newsHead}
+${"-".repeat(newsHead.length)}
+
+${whatsnew}
 
 
 WHAT THIS FOLDER HOLDS

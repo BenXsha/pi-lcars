@@ -9,3 +9,4 @@ tmp/
 .pi/
 release/
 release.zip
+.npmrc

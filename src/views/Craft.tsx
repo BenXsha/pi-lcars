@@ -1,6 +1,7 @@
 import { useState } from "preact/hooks";
 import type { Item } from "../api";
 import { Workspace } from "./console/Workspace";
+import { LogState } from "./console/LogState";
 import { ICONS, type IconName } from "../icons";
 import { THEMES, appliedTheme, applyTheme, type ThemeId } from "../theme";
 import { Icon } from "../components/Icon";
@@ -468,6 +469,21 @@ export function Craft() {
           <Section id="workspace" title="WORKSPACE / 三区" note="I 指令 · II 推理 · III 执行 — 交换的 footer 把三者连起来">
             <div style={{ display: "flex", flexDirection: "column", height: "900px" }}>
               <Workspace items={WS_ITEMS} />
+            </div>
+          </Section>
+
+          <Section
+            id="logstrip"
+            title="ACTIVITY / 会话读数条"
+            note="同一份点阵，放在 log 上：4 点行 × 11px 间距 = 44px，点 6px；相位色即脊色"
+          >
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              <div style={{ width: "936px", maxWidth: "100%" }}>
+                <LogState items={WS_ITEMS} />
+              </div>
+              <div style={{ width: "676px", maxWidth: "100%" }}>
+                <LogState items={[]} />
+              </div>
             </div>
           </Section>
 

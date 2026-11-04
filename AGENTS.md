@@ -279,8 +279,24 @@ LCARS 原版用 `Swiss 911 Ultra Compressed`（压缩粗体）。**本项目不�
 - 正文 `--w` on `--bg` = 21:1；次级 `--g3` = 7.4:1。
 - **`--g2` 只用于非文本**（分隔、装饰）。因为它曾以 3.66:1 被当作 9–11px 标签色，
   现在主题里的 `--g2` 已提到 ≈5:1，并且 `check-themes.mjs` 对它的要求从 3:1 改成 **4.5:1**。
+- **块上的"安静"文字用 `--t3`，不用 `--g2`/`--g3`**：`--g2` 在 `--g1` 上只有 3.1:1、`--g3` 在三个主题里
+  也只有 4.2–4.5:1。`--t3` 是 70% 白混黑（`tokens.css`），合成到 `--g1` 后 9 个主题全部 ≥ 6.6:1，
+  `check-themes.mjs` 已把这一对（含混色计算）纳入门禁。
 - 界面缩放用 `zoom`（`--ui-scale` = 0.9 / 1 / 1.1），不改任何 px 值 —— 保证 4px 网格与半高圆角不被破坏。
-- 响应式只看**空间够不够**，不做"缩字号"：1600 列为 320/328，1280 起 288/300，1100 起 256/272，< 1100 不再给右栏。
+- 响应式只看**空间够不够**，不做"缩字号"。三个目标视口都进 `test/ui.mjs` 门禁（`layout 1440x900:` / `layout 1280x800:`）：
+
+| 视口 | 左栏/右栏 | 中央 | 该档改什么 |
+|---|---|---|---|
+| 1600×1000（设计尺寸） | 320 / 328 | 952 | —（STREAM 左列 356 / 终端 562，点阵 27 格） |
+| 1440×900（笔记本主流） | 288 / 300 | 852 | 无宽度改动（`≤1400` 档不生效）：输入框仍有 408px；STREAM 左列 312 / 终端 500，点阵 49 列 |
+| 1280×800（最小桌面） | 288 / 300 | 692 | `≤1400` 档生效：隐去顶栏重复的 `CALLS`（右栏有 TOOL CALLS）、`cmd-aux` 336 → 272（输入框 248 → 312）；STREAM 左列落到 `clamp` 下界 280，终端 372（曾只剩 292），点阵 44 列 |
+| < 1180 | 256 / 272 | — | STREAM 退成单列；< 1100 不再给右栏 |
+
+- **顶栏是固定一条带**（`flex: 0 0 52px`，`overflow: hidden`）：标题与副标题一律单行省略，永不换行顶高 ——
+  1280 下副标曾折成两行，把 66px 内容塞进 52px 的盒子。
+- **STREAM 左列用 `clamp(280px, 38%, 360px)`** 而不是断点：仪器宽度跟着中央区走，
+  按视口断点会在「1180 以下单列」时反向算错。同理，思考块头部的尾部读数（词数 / `T+`）
+  用 **container query**（`@container (max-width: 290px/250px)`）按**仪器宽度**隐藏，不按视口。
 
 ### 4.3 输入面（不许"看不出来是输入框"）
 
@@ -609,10 +625,27 @@ TUI 的 `/tree` 对应物。服务端 `POST /api/session {op:"tree"}` 把 `manag
   这台仪器忙不忙、要不要求你。
 - 编号块、状态块都只做**单侧圆角**（右端）；正文体用 `--r-2`（14px），对话区同样是 `--r-2`——
   圆角尺寸随块的大小走，不做四角同半径（§3 R5）。
-- **每台仪器都是一把曲臂（折线臂）**，和 standby / 工具行同一套语法：编号块的**左上外角 r=14** →
-  `.ws-arm`（28×18 的 SVG，凹圆角 r=14，跨过 4px 黑缝，`z-index:2` 盖在滚动体之上）→ 躯体左边的
-  **14px 实色竖腿**（`border-left`）→ 读数条（`.ws-foot`）里用 `inset 14px` 让腿一直跑到脚。
+- **每台仪器都是一把曲臂（折线臂）**，和 standby / 工具行同一套语法：编号块的**左上外角 r=14**、
+  右下角**保持直角**（那里是肘继续往外走的地方）→ `.ws-arm`（**34×20** 的 SVG，凹圆角 r=20，
+  宽度与编号块同宽 34，跨过 4px 黑缝并探进点阵带 16px，`z-index:2` 盖在滚动体之上）→
+  **14px 实色竖腿**（`.ws-mid` 的 `border-left`，见下）→ 读数条（`.ws-foot`）里用 `inset 14px` 让腿一直跑到脚。
   曲臂画在**头部**而不是躯体里：躯体是 `overflow-y:auto`，放里面会被裁掉。
+- **腿必须是连续的**：`.ws-mid` 把「点阵带 + 躯体」包在一起，14px 竖腿画在**它**的 `border-left` 上。
+  早期把 14px 当 `margin-left` 写在带上，于是曲臂下面留了一段 30px 的黑洞 —— 仪器像被切成两半。
+  `test/ui.mjs` 的 `the leg runs from the arm to the body without a hole` 钉住这条（缝 4px、腿 14px、色与编号块同）。
+- **点阵带（`.ws-band`）是画出来的矩阵，不是盲文字形**，但**尺寸就是 18px 字号的那套 braille cell**：
+  一个 cell = 2 点 × 6px 宽、4 点 × 4.5px 高，所以**两行 cell = 8 个点行 = 36px 带**，
+  点径 3.2px（`stroke-linecap: round` 画在零长线段上）。列数：1600 的思考区 56、1440 的 49、1280 的 44；
+  LOG 条（宽得多）1600 下 128 列。
+  **为什么不用字形**：点径与点距由字体决定 —— 盲文点径恒为字号 13.75%、cell 自带边距，
+  放大了点只会让"格内/跨格"两种点距差异变得更刺眼。画出来才能让**点径与间距各自独立**，
+  而尺寸仍按 cell 的节拍走（§4.4：11px 是底线，但点阵不是字）。**列数由测量得出**
+  （`ResizeObserver` + `pitchX`），不用 `overflow:hidden` 硬裁。
+- **点阵带出现在两处，同一个组件**（`BrailleBand`）：STREAM 的 THINKING 区（脊色 = 区色 moon），
+  以及 **MISSION LOG 的 `ACTIVITY` 条**（`.logstate`，36px，`[14px 脊][ACTIVITY 键块][点阵][状态块]`，
+  夹在 `.center-head` 与 `#scroll` 之间，不随转录滚动）。LOG 是**会话级**仪器，所以它的脊色 = **相位色**
+  （thinking=moon / streaming=orange / running=tang / idle=g3 灰），而不是某个区的区色。
+  两处的相位由**同一个** `phaseFor(items, agentRunning)` 推出 —— 一处说 IDLE、另一处说 STREAMING 是不可能的。
 - **三区共用同一条读数条语法**：`[实心 cap][同色 9% 色带][读数]`。终端命令行是 `$`/`▸` 实心 cap +
   状态色带；思考块是编号实心 cap（moon）+ 文本带。这一层统一之后，两个上分区的"仪器感"来自同一个句子，
   不是各画各的。
@@ -804,7 +837,28 @@ composer 上方出现 `QUEUED n` 条带，逐条显示待投递文本 + `deliver
 - **网络段**必须与实现一致：无遥测、默认只绑 `127.0.0.1`、对外流量仅来自 pi 本身。
 - 正文走 `i18n`（中英），包名/许可证/商标声明保持原文，不翻译专有名词。
 
-### 7.7 会话块（列表项）
+#### 7.6s 回到尾部（`LATEST`）——pi TUI 的 `ctrl+end` 的鼠标版
+
+转录区是唯一滚动区，读长会话时必然要往回滚；pi 的 TUI 用 `tui.altScreen.bottom`（默认 **`ctrl+end`**）
+"回到转录末端并继续跟随新输出"，网页壳照抄这条语义：
+
+| 输入 | 行为 |
+|---|---|
+| 滚到离底 > 48px | 释放跟随（`following=false`），`LATEST` 控制浮现；此后每条新 item 计入 `N NEW` |
+| 点 `LATEST` / `ctrl+end` | 回到底部、恢复跟随、清零计数（与 TUI 的 "and follow new output" 一致） |
+| `ctrl+home` | 回到开头（同时释放跟随，于是 `LATEST` 自然浮现 —— 顶部到底部的路径不靠鼠标也能走完） |
+
+- **它是浮层，不是一条 bar**：早期版本是 `flex: 0 0 32px` 的在流条，读者一滚动就把输入区顶高 32px。
+  现在 `[↓ 28px 黑底图标槽][LATEST · N NEW][CTRL END]` 绝对定位在 **`.scroll-wrap`**（新增的
+  `position: relative` 包装层）内的右下角 12px，外加 **4px 黑缝环**（`box-shadow: 0 0 0 4px var(--bg)`）——
+  浮在网格之上但仍属黑缝语言，且**永不影响 composer 的位置**。
+- 颜色：实心 `--orange` + 黑字（它是**动作**，不是徽标）；图标槽是 ENTER 块那套黑底挖槽；
+  `CTRL END` 提示用 75% 黑压在橙上（6.7:1），不是装饰性灰。
+- **输入框占键时让路**：`ctrl+end` 在 `textarea` 里意味着"光标到文末"，所以 `keydown` 命中
+  `TEXTAREA / INPUT / contentEditable` 时直接返回（与 §4.3b 的 IME 门禁同一处判断）。
+- 只在 LOG 视图出现：`view === "session" && !viewer && !treeOpen && !wsOpen`。
+
+## 7.7 会话块（列表项）
 
 会话不是"小卡片"，是**实心块 + 双行读数**：
 
@@ -999,6 +1053,29 @@ composer 上方出现 `QUEUED n` 条带，逐条显示待投递文本 + `deliver
 | 2026-xx-xx | 输入区改版：图片 / 语音两个输入模式并入**左侧 `ENTRY` 控制块**（黑色挖槽图标键 + 底部一行 `CTRL K`/`STEER`/`LISTENING`/`N/6 IMG`），附件 chip 与键盘提示**共用同一行**，不再单独占一行；新增**浏览器原生语音输入**（`SpeechRecognition`，能力探测） | 原来 attach 键挂在提示行右端、附件 chip 又自占一行：一附件就把输入区顶高一层，而 ENTRY 块只放两个单词，等于把「输入模式」和「输入框」拆成了两块界面。并进 ENTRY 块后，一块负责「怎么输入」，一块负责「输入什么」，chip 只借用提示那一行 | `src/views/Console.tsx`（`Composer` 的 `entry-acts` / `attach-strip` / `toggleVoice`）、`src/styles/lcars.css`（`.entry-acts` / `.iact` / `.cmd-help .achip`）、`src/i18n.ts`（`cmd.voice*` / `cmd.listening`）、`scripts/build-icons.mjs`（`act-mic` / `act-mic-off`）、AGENTS §4.3b |
 
 | 2026-xx-xx | **页面级微动效收敛成三种动作**：ENTER（`wipe`/`wipe-down`）、CHANGE（`swap` steps(1)）、BUSY（`scan`/`sweep` steps(3)）。新增落点：站位标题块 90ms、左轨选中条与选中会话、面板头与列表行（次级 60ms 延迟）、工具结果落地（state 转 `ok`/`error` 时 `.out`/`.err`）、子代理嵌套行、查看器/分支树/分区工作区 140ms、`LATEST` 条、shelf 读数 swap、`LINKING` 徽标 scan、命令条顶部 2px 扫描条（`data-run` + `sweep`，`left:0→67%` 而非 translate，避免画出边界）；`COPIED` 用 swap | 用户要「更多页面级组件的微动效」。LCARS 的生动来自**构件在状态之间整块切换**，不是淡入/位移/弹簧，所以先把可用动作限定成三种，再让每个新落点都能说出自己属于哪一种；`busy` 的 translate 会越出命令条右沿（右边就是右栏），故改用 `left` 步进。所有落点在 `[data-motion="reduced"]` 与 `prefers-reduced-motion` 下拍平，扫描条退化为静止细线 | `src/styles/lcars.css`（motion 段 + `.cmdbar{position:relative}`）、`src/views/Console.tsx`（`.ttl` keyed wipe、`data-run`、`LINKING` `data-scan`）、`src/components/ui.tsx`（`ControlChip` 值 keyed swap）、AGENTS §5、`test/ui.mjs`（160 检查仍全绿） |
+| 2026-xx-xx | **字体改为内置**：D-DIN 400/700（仪表）、Michroma 400（装饰）、IBM Plex Mono 400/600（代码），共 5 个 woff2 / 74,588 B，SIL OFL 1.1，从上游原样下载，`public/fonts/OFL-*.txt` 与文件同放，`scripts/fetch-fonts.mjs` 可复现（校验 `wOF2` 魔数、记录 sha256、生成 `src/fontPack.ts`）。CJK 仍不内置 | 用户要求「找合适的字体内置，并符合开源规范」。调研 `fontspace.io`（WordPress 聚合站，非 fontspace.com）：它把 Helvetica Neue / Microgramma / Eurostile / Lucida Grande 等商业字体也当免费发，页面上的 `License:` 一行不是授权书，下载包里没有 `OFL.txt` —— **发现可以在这里，取证只能在上游**；抽查 556 条 techno/sci-fi 相关条目只有 15 条写着「开放/可商用」，其中真正 OFL 的仍是 Orbitron / Rajdhani / Fredoka 这类 Google Fonts 老面孔。内置真正的原因是网格确定：实测 D-DIN 比 macOS DIN Alternate 窄 2–3%（`SUBAGENTWORKFLOW` 129 vs 133px，`GET_SUBAGENT_RESULT` 150 vs 154px），而 §7.5 8b 的「臂长随名字」正是靠这些宽度立的；同一张 1600px 版面不该在 Windows（Bahnschrift）与 Linux（无 DIN）上换一副骨架 | `scripts/fetch-fonts.mjs`、`src/styles/fonts.css`（新增，`main.tsx` 首先导入）、`src/styles/tokens.css`（`--din`/`--mono`）、`src/fontPack.ts`（生成）、`src/fonts.ts`（`decoFace()` 改 async，先 `document.fonts.load` 再比宽）、`src/views/About.tsx`（字族行 + `FONT PAYLOAD`）、`src/i18n.ts`（`about.fontsBody` / `about.role*`）、`public/fonts/`（3 份 OFL + README.txt）、`package.json`（`fonts` 脚本）、AGENTS §4.1 / §7.6q |
+| 2026-xx-xx | Markdown 渲染修三处：① `.md` 正文行高 `2.0 → 1.6`、行内代码 `15/2 → 15/1.4`、代码块 `13.5/2 → 13.5/1.55`，并让块内 `<code>` 归零（`padding:0`/`background:none`/`font:inherit`）；② 查看器的 `.md` 预览改走 `breaks:false` 方言（`CHAT` 保留 `breaks:true`）；③ 表格补 `align` 支持（`:--`/`:-:`/`--:` → `th[align]`/`td[align]`，右列 `tabular-nums`）+ 表头 11px 全大写 + `.md-tbl` 横向滚动容器 | 用户报「纯文本和代码区块行高拉开了过多间距，表格渲染不够完美」。实测三个独立病灶：正文 16px 配 32px 行高（§4.2 规定 24–26px）；行内代码 15/2 的 30px 行盒把所在段落顶高；代码块 13.5/2 的 27px 行距 + 行内内距叠在 `<pre>` 内距上。表格那边则是 `marked` 的 `align` 属性没有任何样式接住（数字列全左对齐），且 `.md` 是 flex 列、表格 min-content 会把整列撑宽。`breaks:true` 用在文档预览上是第四个病灶：README 的软换行每行变一个 `<br>`，这才是「纯文字看着间距大」的直接原因 | `src/components/Markdown.tsx`（`build(breaks)` 双实例 + `table` renderer + `breaks` prop）、`src/components/FileViewer.tsx`（`breaks={false}`）、`src/styles/lcars.css`（`.md` / `.md :not(pre) > code` / `.codeblk .cb-bd code` / `.md-tbl` / `th[align]`）、`src/views/Craft.tsx`（`?craft#markdown` 样例）、`test/ui.mjs`（8 条 markdown 断言）、AGENTS §3.5b |
+| 2026-xx-xx | **按站点拆模块（解耦）**：`src/views/Console.tsx` 4686 → 567 行，只留 shell（顶栏 / 三栏 / deck 栈）；会话构件进 `views/console/`（Sidenav · Transcript · Workspace · Terminal · Composer · Rail · blocks · nav · tools · turns），六个站位进 `views/stations/`（Mcp · Providers · Tree · History · Skills · Settings，每个文件一个 `XxxPanel`）。服务端同样拆：`server/index.mjs` 979 → 288 行，只留 config / 共享对象 / handler / 生命周期；31 个端点按站分到 `server/routes/{core,session,files,providers,mcp,skills,history}.mjs`，每个是 `(ctx) => routes` 工厂，端点体逐字切出、不改一行逻辑 | 一个 4000 行文件里改任何一处都要先读完整文件；更糟的是跨站耦合：`imeBusy` 被 5 个组件各自引用、字节格式化有 4 份实现（两种格式）、`?session=` 的取值方式在 20 处手工重复。拆分的判据不是「行数」而是**谁能改谁**：现在一个站位的改动只看它自己的文件，`?session=` 只由 `server/index.mjs` 的 `sessionOf()` 解释，query 只由 `server/http.mjs` 的 `query()` 解释 | `src/views/console/*`、`src/views/stations/*`、`src/views/Console.tsx`、`server/routes/*.mjs`、`server/http.mjs`、`server/index.mjs`、`src/views/Craft.tsx`（Workspace 改从 `./console/Workspace` 引入）、README 结构清单、AGENTS §11 |
+| 2026-xx-xx | **纯函数独立成模块**：新增 `src/format.ts`（`fmtSize` / `fmtSizeShort` / `fmtTok` / `mmss` / `ago` / `shortPath` / `pad2` / `firstLine` / `wordsOf`，零 DOM、零 import）与 `src/ime.ts`（`imeBusy`）。组件只 import，不再各自实现 | 同一个量在不同站位读法不同（`fmtBytes` 与 `fmtSize` 逐字重复、FileTree/FileViewer 又各写了一份紧凑版），而 IME 门禁这种「错一次就吞词」的判断被复制到 5 个 keydown 里 —— 复制品迟早会分叉，分叉就是行为不一致 | `src/format.ts`、`src/ime.ts`、`src/components/ui.tsx`、`src/components/FileTree.tsx`、`src/components/FileViewer.tsx`、`src/views/*` |
+| 2026-xx-xx | **死代码清理 + 门禁**：删 `demo/`（v0 原生实现，2173 行，无任何入口引用、不参与构建/测试/发布，README 与 PLAN 同步）；删未引用图标 9 个（`status-run` `status-warn` `act-theme` `fld-show` `fld-hide` `role-compact` `diff-add` `diff-del` `diff-file`，57 icons / 21 KB）；删 5 条死 CSS（`.anim-blink` `.tab-new` `.station .bdg` `.pane-tgl` `.attach-strip .as-lb`）与 3 个死 token（`--row` `--name` `--meta`，都是旧工具行网格的残留）；删服务端 5 个死导出（`listHistory` `fmtMs` `isInside` `customProviderIds` `sdkTried`）；`tsconfig.json` 开 `noUnusedLocals` | `listHistory` 是 `queryHistory` 的阻塞重复实现（55 行，注释写着「给脚本/测试用」但两边都没用）；`--row/--name/--meta` 是 §7.5 8b「折线臂」之前的四列网格残留；`sdkTried` 只被自己赋值。**发现方式必须是工具而不是肉眼**：用 tsc 的 `noUnusedLocals` 扫未用局部、用 `\b符号\b` 全仓扫描扫未用导出、用类名反查扫未用 CSS、用可达性遍历扫未引用文件 —— 肉眼看 4000 行 CSS 只会漏 | 删除 `demo/`、`.gitignore`（`release.zip`）、`scripts/build-icons.mjs`、`src/icons.ts`（生成）、`src/styles/lcars.css`、`src/styles/tokens.css`、`server/pi/{history,format,fs,providers,sdk}.mjs`、`tsconfig.json` |
+| 2026-xx-xx | 解耦后**用「行为快照」而不是「看起来没报错」验收**：写 `/tmp` 的一次性 sweep，在同一台机器上分别对拆前/拆后的服务端跑 41 个端点用例（GET 全量 + POST 用不合法的 body，让处理器跑到校验分支），把响应**形状**（易变值归一化）落成 JSON 再 diff；客户端靠 `npm test` 的 160 条 UI 断言 + `tsc --noEmit` | 纯机械搬运仍会搬错（本次就踩到：`historyCache as historyCacheRef` 的别名在切出路由时丢了，`CWD` 从 `let` 变成 `ctx.cfg` 的 getter 时差点写成拷贝，`ROOT` 因为出现在字符串 `"ROOT"` 里被误判为依赖）。tsc 对 `.mjs` 不设防，`node --check` 也不查未定义标识符 —— 只有「真的打一遍端点并比形状」能抓住运行时缺绑定。别名与 getter 两条结论已经写进 `server/routes/*` 与 `server/index.mjs` 的注释里 | `server/index.mjs`（`cfg` getter + `sessionOf`）、`server/routes/history.mjs`（`historyCache as historyCacheRef`）、验证脚本（一次性，未入库） |
+| 2026-xx-xx | **braille-thinking 动效研究页**：`boards/braille-thinking.html` —— 8 个盲文点阵候选（TRACE/ORBIT/WAVE/FALL/SPARK/BARS/GATHER/RUNNER），每卡带①实心盲文条②5px 点阵对照图③11/13/18px 字号适配条④18px **头部单行 4 格**裁切预览。控制项：速度(60/90/140/240ms)·字号·FULL/REDUCED·PAUSE·单帧 STEP。**空闲态另立一节**（A 不放 / B 灰化静帧 / C 慢速呼吸 / D 换成实心橙 AWAITING YOU） | 用户要「继续优化，只有第一个波形正确显示」——根因是 `paintDots` 只建了 `h` 个子节点却按 `h*w` 索引，第一张卡就抛异常、整帧循环死掉；修好后暴露出第二个真问题：**头部是单行 4 点行（18px），把 8 行图案裁第一行几乎全空** → 于是每个候选都补了一份 `LINE`（4 行专用）渲染器 | `boards/braille-thinking.html`、`AGENTS.md` |
+| 2026-xx-xx | 盲文点阵的**单行与多行必须分开渲染**：thinking 头部只有 4 个点行（18px），8 行图案裁行后是空图 | 采样时发现头部预览一片空白（`⠀⠀`）；不是 bug，是拿错了尺寸的素材。**同一语义要两种尺寸，就必须有两种实现**，不能靠裁切 | `boards/braille-thinking.html`（`LINE` 表） |
+| 2026-xx-xx | 空闲态四种设计：**A 不放**（最诚实：没推理就没区块）· **B 灰化静帧**（位置不变、颜色变灰，但等于骗人）· **C 慢速呼吸**（幅度以 24 帧周期涨落，语义是「待机」不是「在跑」）· **D 换实心橙 AWAITING YOU**（等审批/等回答时唯一该亮的东西，§2 一色一义） | 用户要求「增补一个空闲状态的设计」。空闲态的难点不是画什么，而是**「没有推理」和「推理刚开始」不能长得一样** —— 动的东西表示在跑，所以空闲态只能动幅度、不能动相位 | `boards/braille-thinking.html`（`.idle` 节） |
+| 2026-xx-xx | 单帧 `STEP` 按钮 + 顶栏 `FRAME` 读数；REDUCED 模式拍平成一张静止帧（`STATIC`）而不是停住旧帧 | 审动画必须能一帧一帧看，90ms 循环下人眼抓不到变化点；REDUCED 下停在一个旧帧会骗人（像卡住），拍一张新帧才是「不动的当前状态」 | `boards/braille-thinking.html` |
+| 2026-xx-xx | **THINKING 区加一条盲文氛围带**（`src/braille.ts` + `src/components/Braille.tsx` + `.ws-band`）：一条 30px（**两行** braille cell）的点阵带，落在 `.ws-hd` 与 `.ws-body` 之间的 4px 缝里（左缩进 14px 对齐躯体竖腿）。相位由 `phaseOf()` 从**真实 items** 推出：`idle` 稀疏慢闪 / `thinking` SPARK / `streaming` TRACE / `running` FALL / `done` 收拢成基线后 1.2s 回 idle。头部的**文字读数与动画同源**（`SCANNING / STREAMING / RUNNING / SETTLED / IDLE`），两者不可能互相矛盾 | 用户要「填充到 thinking 标题栏下方的动画，按模型动作类型区分」。三个已选候选（01 TRACE / 04 FALL / 05 SPARK）正好对应三种工作态，空闲与完成是另加的两个端态。**分区判定用优先级而不是时间戳**：命令在跑 > 文字在流 > 只有推理，因为「谁在干活」优先于「谁在说话」；`done` 做成**瞬时**（1.2s）而不是状态，否则一次跑完会在屏幕上永远停留一个"完成" | `src/braille.ts`、`src/components/Braille.tsx`、`src/views/console/Workspace.tsx`、`src/styles/lcars.css`、`test/braille.mjs`、`test/ui.mjs`、`package.json`、`boards/braille-thinking.html` |
+| 2026-xx-xx | 盲文带的**步进是 90ms 固定拍，且全局共用一个 rAF**；reduced motion 下完全不起时钟（保持一帧静止） | 十五个实例各跑一个 rAF 会以刷新率重绘一个 11fps 的动画（§5 要求固定步进，不是"跟着屏幕刷新"）。共用时钟后 N 个实例的开销与 1 个相同；reduced motion 停在一个**新画的**静止帧，而不是卡在旧帧上冒充"卡死" | `src/components/Braille.tsx` |
+| 2026-xx-xx | 盲文点的**折叠方向有单元测试**（dot1=0x01 左上、dot4=0x08 右上、dot7=0x40 左下、dot8=0x80 右下） | 转置/镜像的 bug 看起来**仍然是动效**，肉眼验收抓不到，只有在真实设备上给盲文读者看才会暴露；`test/braille.mjs` 用一行 U+28FF 全亮格 + 四个单点格把映射钉死 | `test/braille.mjs` |
+| 2026-xx-xx | 盲文带从**一行改成两行**（4 → 8 dot rows，15px → 30px）；`braille()` 的 cell 行之间补上 `\n` | 用户反馈「STREAM 里只看到一排符号，表现得不够全面」——第一版确实是单行。修的过程中发现第二个真 bug：`braille()` 把多个 cell 行**直接拼接**、没有换行符，于是两行被画成一行 76 格、横向溢出被 `overflow:hidden` 裁掉；而单行时这个 bug 完全看不出来。**「扩成两行」这件事本身就把隐藏的拼接 bug 暴露了** | `src/braille.ts`、`src/components/Braille.tsx`、`src/styles/lcars.css`、`test/braille.mjs`（新增换行断言）、`test/ui.mjs`、`boards/braille-thinking.html` |
+| 2026-xx-xx | **点阵从 13px 提到 18px**（`.ws-band` 两行 36px、cell 宽 12.3px），并新增读数门禁 `the dot matrix is large enough to read as a matrix`（字号 + 每行 ≥ 20 格） | 用户反馈「点阵偏小」。13px 时点距只有 4.4×3.25px，一屏 8 个点行读起来是一条**纹理**而不是一台**矩阵**；18px 在同样宽度下少 40% 的格数（27 格），但每个点的面积翻倍 —— 点阵要的是「点能被看见」，不是「格能被数清」。门禁存在的理由同 §3.5b 的行高：这类数字不写断言就会被下一次调参悄悄改回去 | `src/components/Braille.tsx`（`size` 默认 18）、`src/styles/lcars.css`（`.ws-band` font-size/line-height/height 36）、`test/ui.mjs`、AGENTS §7.6r |
+| 2026-xx-xx | **曲臂下面的腿改成连续的**：新增 `.ws-mid` 包住「点阵带 + 躯体」，14px 竖腿从 `.ws-body` 的 `border-left` 移到 `.ws-mid` 的 `border-left`；编号块右下角改直角，`.ws-arm` 从 28×18 改成 **34×20**（与编号块同宽，r=20） | 用户反馈「左侧曲臂下面留空过多」。实测就是一条 30px 的黑洞：带子用 `margin-left:14px` 让位给腿，而腿只画在**躯体**上，于是从曲臂末端（y=126）到躯体顶端（y=146）之间那 20–30px 既没有带子也没有腿 —— 仪器被切成两半。把腿抬到父容器上，黑缝（band↔body 的 4px）也被同一根 border 盖住，腿才真的从肘一路跑到脚；顺手把臂宽对齐编号块（28 ≠ 34 曾在编号块下方留一个 6px 的台阶） | `src/views/console/Workspace.tsx`（`Zone` 的 `.ws-mid` / 34×20 的 `path`）、`src/styles/lcars.css`（`.ws-mid` / `.ws-arm` / `.ws-hd .idx` 圆角 / `.ws-body` 去掉 border）、`test/ui.mjs`（腿连续性两条断言）、AGENTS §7.6r |
+| 2026-xx-xx | **1440×900 与 1280×800 定为交付视口**，三档全部进 UI 门禁（每档 6 条：两列/顶栏 52/输入框 ≥300/三区 body ≥150/点阵 ≥20 格/无横向滚动）。配套三处修正：顶栏改固定 52px 且标题副标题单行省略；`≤1400` 隐去顶栏重复的 `CALLS` 并把 `cmd-aux` 336→272；STREAM 左列改 `clamp(280px, 38%, 360px)` | 用户要求「补充 1440×900、1280×800 适配」。实测三处真实的挤压：① 1280 下 `center-head` 内容是 66px 顶在 52px 的盒子里（副标折行）；② 输入框只剩 248px 而右侧快捷键矩阵占 336px，主输入反倒比副操作窄；③ STREAM 左列固定 360px，把终端压到 292px —— 终端是「现在在跑什么」的地方，不该是最窄的一列。左列用 `clamp` 而不是断点，是因为仪器宽度随中央区走，而视口在 1180 以下会换成单列（断点会在那一档反向算错）；思考块头部的尾部读数同理改用 **container query** 按仪器宽度隐藏 | `src/styles/lcars.css`（`.center-head` / `.ws` 栅格 / `≤1400` 段 / `@container`）、`src/views/Console.tsx`（`data-aux`）、`test/ui.mjs`（`layout 1440x900:` / `layout 1280x800:` 共 12 条）、AGENTS §4.2b / §12 |
+| 2026-xx-xx | **点阵带从盲文字形改成画出来的矩阵**：4 点行 × 11px 间距 = 44px 带，6px 圆点（零长线段 + `stroke-linecap: round`），列数由测量得出（1600 思考区 30 列 / 1280 的 24 列）；权重 1/2 分成两层（`bw1` 55% / `bw2` 100%），"命令在跑"的头部因此比尾巴亮 | 用户连续两轮反馈「点阵偏小」，13px → 18px → 24px 都还嫌小 —— 根因不在字号，而在**字形**：盲文点径恒为字号的 13.75%，44px 字号下也只有 3×6px 的竖椭圆，而且字形自带 17px 左边距，点距变成"格内 11px、跨格 19px"的成对节奏。点的大小必须是**决定**而不是字体的副作用，所以改成自己画：同一份 bitmap、同一个组件、同一个 `currentColor`，但点径、间距、圆角都可控。同时把 `idle` 的稀疏度从 9% 提到 16%（120 格时代 9% 只剩 11 个点，等于空条） | `src/braille.ts`（`dots()` / `frame()` 返回 bitmap / 删除字形折叠）/ `src/components/Braille.tsx`、`src/styles/lcars.css`（`.ws-band` 与 `path` 描边）、`test/braille.mjs`、`test/ui.mjs`、AGENTS §7.6r |
+| 2026-xx-xx | **MISSION LOG 也有点阵带**：`.logstate` = `[14px 脊][ACTIVITY 键块 92px][点阵][状态块]`，44px，夹在 `.center-head` 与 `#scroll` 之间（滚动时不动）；相位色取代区色（thinking=moon / streaming=orange / running=tang / idle=g3） | 用户要求「在 log 界面合适的位置也放上」。放在标题下而不是转录里：它是**整列的读数**，滚走就没意义；也不用第二套语法——它就是 §7.6r 那条仪器条，只是"值带"是点阵。两处的相位来自同一个 `phaseFor()`，并且把传输层的 `meta.running` 也喂进去：模型思考几秒不出条目时，条子不会再显示 IDLE 而顶栏写着 RUNNING | `src/views/console/LogState.tsx`（新增）、`src/views/console/phase.ts`（新增：`PHASE_TONE` / `phaseLive` / `phaseWord`）、`src/braille.ts`（`phaseFor`）、`src/views/console/Workspace.tsx`（改用共享相位）、`src/views/Console.tsx`、`src/styles/lcars.css`（`.logstate`）、`src/i18n.ts`（`log.activity`）、`test/ui.mjs`、AGENTS §7.6r |
+| 2026-xx-xx | **对比度门禁扩到"块上的安静文字"**：`check-themes.mjs` 新增 `--t3` on `--g1` 一对（先按 `color-mix` 的 70% 白把颜色算出来再比），并把 `check-themes.mjs` 接进 `npm test`；`.ws-hd .st` 与 `.logstate` 的安静文字从 `--g2`/`--g3` 改成 `--t3` | 加点阵带时发现 `.ws-hd .st`（区头状态块）的安静态是 `--g2` on `--g1` = **3.1:1**，11px 标签不合格；换成 `--g3` 后有 3 个主题只有 4.2–4.5:1。`--t3`（70% 白）在 9 个主题下全部 ≥ 6.6:1。门禁之前只查"块色对黑"和"灰对背景"，从来没查过"灰在灰块上"——这类颜色恰恰是安静态最常用的 | `scripts/check-themes.mjs`（`mixWhite()` + 新 pair）、`package.json`（`test` 首跑主题门禁）、`src/styles/lcars.css`（`.ws-hd .st` / `.logstate`）、AGENTS §4.2b |
+| 2026-xx-xx | **点阵最终定在 18px cell 的节拍**：8 个点行（两行 braille cell）× **6 × 4.5px** 间距 = **36px 带**，圆点 **3.2px**；LOG 条同步从 44px 收到 36px；`idle` 稀疏度回到 9%（细网格上就是原来那个安静的节拍） | 上一版把点放到 6px/44px 带后用户判断「偏大，还是 18px 每字符合适」——这条记下来："点阵是大是小"其实是在问**点距**，不是在问点径。所以最终形态是**画出来的 braille 节拍**：cell 尺寸（6×4.5px）按 18px 字号那套走，点径与间距仍然各自独立（3.2px 圆点，横向 2.8px、纵向 1.3px 的缝）。`dots()` 因此收两个 pitch（`pitchX` / `pitchY`），因为 braille cell 本来就不是方的：2 列对 4 行 | `src/braille.ts`（`dots(bm, pitchX, pitchY, weight)`）、`src/components/Braille.tsx`（`pitchX` / `pitchY` / `rows=8`）、`src/styles/lcars.css`（`--band-dot: 3.2px`、`.logstate` 36px）、`test/braille.mjs`（两种 pitch 各自独立一条断言）、`test/ui.mjs`、AGENTS §7.6r / §4.2b |
+| 2026-xx-xx | **LOG 加了 `LATEST` 尾部控制（浮层）+ `ctrl+end` / `ctrl+home` 快捷键**，语义对齐 pi TUI 的 `tui.altScreen.bottom`（"回到末端并继续跟随"）。控制条从**在流 bar** 改成**绝对定位浮层**（新增 `.scroll-wrap` 包装层），并补 `CTRL END` 提示 | 用户要「快速到达底部当前会话的按钮，像原生 pi 终端 tui 那样的效果」。原来那条 `LATEST` 是 `flex: 0 0 32px` 的在流条：一滚动就**把输入区顶高 32px**（写草稿时最难受），而且只有鼠标一条路、没有任何键位提示。改成浮层后零布局位移，并照抄 TUI 的键：`ctrl+end` 回尾并恢复跟随、`ctrl+home` 回顶（回顶自然释放跟随，于是按钮浮现）。**输入框占键时让路**：`ctrl+end` 在 textarea 里是"光标到文末"，与 §4.3b 同一处 `imeBusy` 门禁 | `src/views/Console.tsx`（`.scroll-wrap`、`jumpRef`、`ctrl+end`/`ctrl+home` 监听）、`src/styles/lcars.css`（`.scroll-wrap` / `.jumpbar` 浮层 + 黑缝环 + 提示色）、`test/ui.mjs`（6 条：浮现 / 浮层不移布局 / 键提示 / 点击回尾 / ctrl+home·end / 输入框占键）、AGENTS §7.6s |
+| 2026-xx-xx | **发布前门禁 `scripts/check-release.mjs`**（notes 必须是当前版本且是最新一节 / 工作树干净 / `bin` 可执行 / LICENSE 在 / `files[]` 条目真实存在 / `publishConfig` 钉在 npmjs），并接进 `prepublishOnly`（连同 `npm test`）；分享包的 `README.txt` 新增 `WHAT'S NEW IN <ver>` 段，内容**从 CHANGELOG.md 抽取**，抽不到就 `exit 1` | 发布最容易犯的四个错都是「发出去之后才发现」：版本 bump 了但没写 notes、tarball 来自脏树、`bin` 丢了执行位、`files[]` 打错一个字导致包静默变瘦。把 notes 写进 CHANGELOG 并由脚本生成分享包文案，等于强制「先写说明再发版」，也不会出现两份文案对不上的情况。另外给 `release/` 的收件人一个「这版改了什么」的入口 —— 之前那份 README.txt 只有安装说明 | `scripts/check-release.mjs`（新增）、`scripts/build-release.mjs`（`plainNotes()` + `WHAT'S NEW`）、`package.json`（`prepublishOnly` / `files` 加 CHANGELOG）、`CHANGELOG.md`（新增）、`.gitignore`、`bin/pi-lcars.mjs`（+x）、AGENTS §11.1 |
 
 ---
 
@@ -1063,6 +1140,32 @@ browser ──EventSource(/api/stream)──► server.mjs ──session.subscri
 
 ---
 
+### 11.1 发布（npm）
+
+顺序是死的，四步走完才算发出去：
+
+```
+1  node scripts/check-release.mjs     # 门禁：notes / clean tree / bin 可执行 / LICENSE / files[]
+2  git add -A && git commit           # 清树（门禁要求 tarball 能由某个 commit 复现）
+3  npm publish                        # prepublishOnly = 门禁 + npm test；prepack = vite build
+4  npm view pi-lcars@<ver> version --registry=https://registry.npmjs.org
+```
+
+- **`publishConfig` 把发布钉在 `registry.npmjs.org`**：本机 `~/.npmrc` 的默认 registry 是
+  `registry.npmmirror.com`（装包走镜像更快），而 `publishConfig.registry` 对 `npm publish` 生效，
+  所以发布不会被镜像吞掉 —— `npm publish --dry-run` 会打印
+  `Publishing to https://registry.npmjs.org with tag latest and public access`，先看这一行。
+- **`prepublishOnly` 不跑在 `npm pack` 上**：`npm run release` 只用 prepack（构建 + 打包），
+  所以做分享包不会白等一次全量测试；只有真的推 npm 才付这 3–4 分钟。
+- **`dist/` 不进 git**，由 `prepack` 现场构建；门禁里只有 `dist/` 允许「不存在」
+  （全新 clone 时它还没生成），其余 `files[]` 条目必须真的在盘上。
+- **token 只进 `~/.npmrc`，永不进仓库**（`.gitignore` 已含 `.npmrc`）：
+  `read -rsp "token: " T && printf '//registry.npmjs.org/:_authToken=%s\n' "$T" >> ~/.npmrc`
+  —— 只对 npmjs 生效，镜像默认值不受影响。账号开了 2FA 时用 **Automation / Granular(write)** token，
+  否则 `npm publish` 会要 `--otp=`。
+- 版本号只改两处：`package.json` 与 `package-lock.json`（`packages[""].version`）；
+  UI 里显示的版本由 vite 从 `package.json` 注入（§7.6q），不需要手改。
+
 ## 12. 未决问题（待用户裁决）
 
 - [x] 是否要中文界面 → **是**：英文大写结构标签 + 中文正文/对话（见 §4.2）
@@ -1070,19 +1173,5 @@ browser ──EventSource(/api/stream)──► server.mjs ──session.subscri
   画板降级为视觉依据（§11）；动效语言见 §5
 - [x] 亮色/浅色变体 → **不做**：LCARS 是暗屏系统，浅色会毁掉「黑缝即网格」（§2.5）
 - [x] 右栏是否常驻 → **可折叠**：`⌘⇧B` 收成 24px 拉手条（§7.6f）
-- [ ] 目标形态：桌面宽屏 1600×1000 为主？是否需要 1440×900 / 1280×800 适配稿？
-  （当前实现只做宽度断点：1600 / 1280 / 1100 起，见 §4.2b）
-| 2026-xx-xx | **字体改为内置**：D-DIN 400/700（仪表）、Michroma 400（装饰）、IBM Plex Mono 400/600（代码），共 5 个 woff2 / 74,588 B，SIL OFL 1.1，从上游原样下载，`public/fonts/OFL-*.txt` 与文件同放，`scripts/fetch-fonts.mjs` 可复现（校验 `wOF2` 魔数、记录 sha256、生成 `src/fontPack.ts`）。CJK 仍不内置 | 用户要求「找合适的字体内置，并符合开源规范」。调研 `fontspace.io`（WordPress 聚合站，非 fontspace.com）：它把 Helvetica Neue / Microgramma / Eurostile / Lucida Grande 等商业字体也当免费发，页面上的 `License:` 一行不是授权书，下载包里没有 `OFL.txt` —— **发现可以在这里，取证只能在上游**；抽查 556 条 techno/sci-fi 相关条目只有 15 条写着「开放/可商用」，其中真正 OFL 的仍是 Orbitron / Rajdhani / Fredoka 这类 Google Fonts 老面孔。内置真正的原因是网格确定：实测 D-DIN 比 macOS DIN Alternate 窄 2–3%（`SUBAGENTWORKFLOW` 129 vs 133px，`GET_SUBAGENT_RESULT` 150 vs 154px），而 §7.5 8b 的「臂长随名字」正是靠这些宽度立的；同一张 1600px 版面不该在 Windows（Bahnschrift）与 Linux（无 DIN）上换一副骨架 | `scripts/fetch-fonts.mjs`、`src/styles/fonts.css`（新增，`main.tsx` 首先导入）、`src/styles/tokens.css`（`--din`/`--mono`）、`src/fontPack.ts`（生成）、`src/fonts.ts`（`decoFace()` 改 async，先 `document.fonts.load` 再比宽）、`src/views/About.tsx`（字族行 + `FONT PAYLOAD`）、`src/i18n.ts`（`about.fontsBody` / `about.role*`）、`public/fonts/`（3 份 OFL + README.txt）、`package.json`（`fonts` 脚本）、AGENTS §4.1 / §7.6q |
-| 2026-xx-xx | Markdown 渲染修三处：① `.md` 正文行高 `2.0 → 1.6`、行内代码 `15/2 → 15/1.4`、代码块 `13.5/2 → 13.5/1.55`，并让块内 `<code>` 归零（`padding:0`/`background:none`/`font:inherit`）；② 查看器的 `.md` 预览改走 `breaks:false` 方言（`CHAT` 保留 `breaks:true`）；③ 表格补 `align` 支持（`:--`/`:-:`/`--:` → `th[align]`/`td[align]`，右列 `tabular-nums`）+ 表头 11px 全大写 + `.md-tbl` 横向滚动容器 | 用户报「纯文本和代码区块行高拉开了过多间距，表格渲染不够完美」。实测三个独立病灶：正文 16px 配 32px 行高（§4.2 规定 24–26px）；行内代码 15/2 的 30px 行盒把所在段落顶高；代码块 13.5/2 的 27px 行距 + 行内内距叠在 `<pre>` 内距上。表格那边则是 `marked` 的 `align` 属性没有任何样式接住（数字列全左对齐），且 `.md` 是 flex 列、表格 min-content 会把整列撑宽。`breaks:true` 用在文档预览上是第四个病灶：README 的软换行每行变一个 `<br>`，这才是「纯文字看着间距大」的直接原因 | `src/components/Markdown.tsx`（`build(breaks)` 双实例 + `table` renderer + `breaks` prop）、`src/components/FileViewer.tsx`（`breaks={false}`）、`src/styles/lcars.css`（`.md` / `.md :not(pre) > code` / `.codeblk .cb-bd code` / `.md-tbl` / `th[align]`）、`src/views/Craft.tsx`（`?craft#markdown` 样例）、`test/ui.mjs`（8 条 markdown 断言）、AGENTS §3.5b |
-| 2026-xx-xx | **按站点拆模块（解耦）**：`src/views/Console.tsx` 4686 → 567 行，只留 shell（顶栏 / 三栏 / deck 栈）；会话构件进 `views/console/`（Sidenav · Transcript · Workspace · Terminal · Composer · Rail · blocks · nav · tools · turns），六个站位进 `views/stations/`（Mcp · Providers · Tree · History · Skills · Settings，每个文件一个 `XxxPanel`）。服务端同样拆：`server/index.mjs` 979 → 288 行，只留 config / 共享对象 / handler / 生命周期；31 个端点按站分到 `server/routes/{core,session,files,providers,mcp,skills,history}.mjs`，每个是 `(ctx) => routes` 工厂，端点体逐字切出、不改一行逻辑 | 一个 4000 行文件里改任何一处都要先读完整文件；更糟的是跨站耦合：`imeBusy` 被 5 个组件各自引用、字节格式化有 4 份实现（两种格式）、`?session=` 的取值方式在 20 处手工重复。拆分的判据不是「行数」而是**谁能改谁**：现在一个站位的改动只看它自己的文件，`?session=` 只由 `server/index.mjs` 的 `sessionOf()` 解释，query 只由 `server/http.mjs` 的 `query()` 解释 | `src/views/console/*`、`src/views/stations/*`、`src/views/Console.tsx`、`server/routes/*.mjs`、`server/http.mjs`、`server/index.mjs`、`src/views/Craft.tsx`（Workspace 改从 `./console/Workspace` 引入）、README 结构清单、AGENTS §11 |
-| 2026-xx-xx | **纯函数独立成模块**：新增 `src/format.ts`（`fmtSize` / `fmtSizeShort` / `fmtTok` / `mmss` / `ago` / `shortPath` / `pad2` / `firstLine` / `wordsOf`，零 DOM、零 import）与 `src/ime.ts`（`imeBusy`）。组件只 import，不再各自实现 | 同一个量在不同站位读法不同（`fmtBytes` 与 `fmtSize` 逐字重复、FileTree/FileViewer 又各写了一份紧凑版），而 IME 门禁这种「错一次就吞词」的判断被复制到 5 个 keydown 里 —— 复制品迟早会分叉，分叉就是行为不一致 | `src/format.ts`、`src/ime.ts`、`src/components/ui.tsx`、`src/components/FileTree.tsx`、`src/components/FileViewer.tsx`、`src/views/*` |
-| 2026-xx-xx | **死代码清理 + 门禁**：删 `demo/`（v0 原生实现，2173 行，无任何入口引用、不参与构建/测试/发布，README 与 PLAN 同步）；删未引用图标 9 个（`status-run` `status-warn` `act-theme` `fld-show` `fld-hide` `role-compact` `diff-add` `diff-del` `diff-file`，57 icons / 21 KB）；删 5 条死 CSS（`.anim-blink` `.tab-new` `.station .bdg` `.pane-tgl` `.attach-strip .as-lb`）与 3 个死 token（`--row` `--name` `--meta`，都是旧工具行网格的残留）；删服务端 5 个死导出（`listHistory` `fmtMs` `isInside` `customProviderIds` `sdkTried`）；`tsconfig.json` 开 `noUnusedLocals` | `listHistory` 是 `queryHistory` 的阻塞重复实现（55 行，注释写着「给脚本/测试用」但两边都没用）；`--row/--name/--meta` 是 §7.5 8b「折线臂」之前的四列网格残留；`sdkTried` 只被自己赋值。**发现方式必须是工具而不是肉眼**：用 tsc 的 `noUnusedLocals` 扫未用局部、用 `\b符号\b` 全仓扫描扫未用导出、用类名反查扫未用 CSS、用可达性遍历扫未引用文件 —— 肉眼看 4000 行 CSS 只会漏 | 删除 `demo/`、`.gitignore`（`release.zip`）、`scripts/build-icons.mjs`、`src/icons.ts`（生成）、`src/styles/lcars.css`、`src/styles/tokens.css`、`server/pi/{history,format,fs,providers,sdk}.mjs`、`tsconfig.json` |
-| 2026-xx-xx | 解耦后**用「行为快照」而不是「看起来没报错」验收**：写 `/tmp` 的一次性 sweep，在同一台机器上分别对拆前/拆后的服务端跑 41 个端点用例（GET 全量 + POST 用不合法的 body，让处理器跑到校验分支），把响应**形状**（易变值归一化）落成 JSON 再 diff；客户端靠 `npm test` 的 160 条 UI 断言 + `tsc --noEmit` | 纯机械搬运仍会搬错（本次就踩到：`historyCache as historyCacheRef` 的别名在切出路由时丢了，`CWD` 从 `let` 变成 `ctx.cfg` 的 getter 时差点写成拷贝，`ROOT` 因为出现在字符串 `"ROOT"` 里被误判为依赖）。tsc 对 `.mjs` 不设防，`node --check` 也不查未定义标识符 —— 只有「真的打一遍端点并比形状」能抓住运行时缺绑定。别名与 getter 两条结论已经写进 `server/routes/*` 与 `server/index.mjs` 的注释里 | `server/index.mjs`（`cfg` getter + `sessionOf`）、`server/routes/history.mjs`（`historyCache as historyCacheRef`）、验证脚本（一次性，未入库） |
-| 2026-xx-xx | **braille-thinking 动效研究页**：`boards/braille-thinking.html` —— 8 个盲文点阵候选（TRACE/ORBIT/WAVE/FALL/SPARK/BARS/GATHER/RUNNER），每卡带①实心盲文条②5px 点阵对照图③11/13/18px 字号适配条④18px **头部单行 4 格**裁切预览。控制项：速度(60/90/140/240ms)·字号·FULL/REDUCED·PAUSE·单帧 STEP。**空闲态另立一节**（A 不放 / B 灰化静帧 / C 慢速呼吸 / D 换成实心橙 AWAITING YOU） | 用户要「继续优化，只有第一个波形正确显示」——根因是 `paintDots` 只建了 `h` 个子节点却按 `h*w` 索引，第一张卡就抛异常、整帧循环死掉；修好后暴露出第二个真问题：**头部是单行 4 点行（18px），把 8 行图案裁第一行几乎全空** → 于是每个候选都补了一份 `LINE`（4 行专用）渲染器 | `boards/braille-thinking.html`、`AGENTS.md` |
-| 2026-xx-xx | 盲文点阵的**单行与多行必须分开渲染**：thinking 头部只有 4 个点行（18px），8 行图案裁行后是空图 | 采样时发现头部预览一片空白（`⠀⠀`）；不是 bug，是拿错了尺寸的素材。**同一语义要两种尺寸，就必须有两种实现**，不能靠裁切 | `boards/braille-thinking.html`（`LINE` 表） |
-| 2026-xx-xx | 空闲态四种设计：**A 不放**（最诚实：没推理就没区块）· **B 灰化静帧**（位置不变、颜色变灰，但等于骗人）· **C 慢速呼吸**（幅度以 24 帧周期涨落，语义是「待机」不是「在跑」）· **D 换实心橙 AWAITING YOU**（等审批/等回答时唯一该亮的东西，§2 一色一义） | 用户要求「增补一个空闲状态的设计」。空闲态的难点不是画什么，而是**「没有推理」和「推理刚开始」不能长得一样** —— 动的东西表示在跑，所以空闲态只能动幅度、不能动相位 | `boards/braille-thinking.html`（`.idle` 节） |
-| 2026-xx-xx | 单帧 `STEP` 按钮 + 顶栏 `FRAME` 读数；REDUCED 模式拍平成一张静止帧（`STATIC`）而不是停住旧帧 | 审动画必须能一帧一帧看，90ms 循环下人眼抓不到变化点；REDUCED 下停在一个旧帧会骗人（像卡住），拍一张新帧才是「不动的当前状态」 | `boards/braille-thinking.html` |
-| 2026-xx-xx | **THINKING 区加一条盲文氛围带**（`src/braille.ts` + `src/components/Braille.tsx` + `.ws-band`）：一条 30px（**两行** braille cell）的点阵带，落在 `.ws-hd` 与 `.ws-body` 之间的 4px 缝里（左缩进 14px 对齐躯体竖腿）。相位由 `phaseOf()` 从**真实 items** 推出：`idle` 稀疏慢闪 / `thinking` SPARK / `streaming` TRACE / `running` FALL / `done` 收拢成基线后 1.2s 回 idle。头部的**文字读数与动画同源**（`SCANNING / STREAMING / RUNNING / SETTLED / IDLE`），两者不可能互相矛盾 | 用户要「填充到 thinking 标题栏下方的动画，按模型动作类型区分」。三个已选候选（01 TRACE / 04 FALL / 05 SPARK）正好对应三种工作态，空闲与完成是另加的两个端态。**分区判定用优先级而不是时间戳**：命令在跑 > 文字在流 > 只有推理，因为「谁在干活」优先于「谁在说话」；`done` 做成**瞬时**（1.2s）而不是状态，否则一次跑完会在屏幕上永远停留一个"完成" | `src/braille.ts`、`src/components/Braille.tsx`、`src/views/console/Workspace.tsx`、`src/styles/lcars.css`、`test/braille.mjs`、`test/ui.mjs`、`package.json`、`boards/braille-thinking.html` |
-| 2026-xx-xx | 盲文带的**步进是 90ms 固定拍，且全局共用一个 rAF**；reduced motion 下完全不起时钟（保持一帧静止） | 十五个实例各跑一个 rAF 会以刷新率重绘一个 11fps 的动画（§5 要求固定步进，不是"跟着屏幕刷新"）。共用时钟后 N 个实例的开销与 1 个相同；reduced motion 停在一个**新画的**静止帧，而不是卡在旧帧上冒充"卡死" | `src/components/Braille.tsx` |
-| 2026-xx-xx | 盲文点的**折叠方向有单元测试**（dot1=0x01 左上、dot4=0x08 右上、dot7=0x40 左下、dot8=0x80 右下） | 转置/镜像的 bug 看起来**仍然是动效**，肉眼验收抓不到，只有在真实设备上给盲文读者看才会暴露；`test/braille.mjs` 用一行 U+28FF 全亮格 + 四个单点格把映射钉死 | `test/braille.mjs` |
-| 2026-xx-xx | 盲文带从**一行改成两行**（4 → 8 dot rows，15px → 30px）；`braille()` 的 cell 行之间补上 `\n` | 用户反馈「STREAM 里只看到一排符号，表现得不够全面」——第一版确实是单行。修的过程中发现第二个真 bug：`braille()` 把多个 cell 行**直接拼接**、没有换行符，于是两行被画成一行 76 格、横向溢出被 `overflow:hidden` 裁掉；而单行时这个 bug 完全看不出来。**「扩成两行」这件事本身就把隐藏的拼接 bug 暴露了** | `src/braille.ts`、`src/components/Braille.tsx`、`src/styles/lcars.css`、`test/braille.mjs`（新增换行断言）、`test/ui.mjs`、`boards/braille-thinking.html` |
+- [x] 目标形态：**1600×1000 为设计尺寸，1440×900 / 1280×800 为交付目标**。三档都进 `test/ui.mjs` 门禁，
+  不再单独出适配稿（画板只承担视觉依据）。1920 宽按 1600 的结构等比放大（左栏 320 仍是固定，中央区变宽）。

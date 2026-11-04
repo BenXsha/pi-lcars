@@ -6,7 +6,8 @@ import { t } from "../../i18n";
 import { firstLine, fmtTok, mmss, pad2, wordsOf } from "../../format";
 import { Icon } from "../../components/Icon";
 import { BrailleBand } from "../../components/Braille";
-import { phaseOf } from "../../braille";
+import { phaseFor } from "../../braille";
+import { phaseLive, phaseWord as wordOf } from "./phase";
 import { ApprovalDeck, MessageRow } from "../../components/ui";
 import { AskBlock, SkillBlock, SummaryBlock } from "./blocks";
 import { TerminalEntry } from "./Terminal";
@@ -189,32 +190,36 @@ function Zone(props: {
         <span class="st" data-live={props.live ? "1" : "0"}>
           {props.status}
         </span>
-        {/* The bent arm: the header is the horizontal leg, the body's left edge
-            is the vertical one, and this piece carries the concave fillet
-            across the 4px seam so the two read as one piece. It lives on the
-            header (not in the body) because the body scrolls and would clip it. */}
+        {/* The bent arm: the header is the horizontal leg, the wrapper below is
+            the vertical one, and this piece carries the concave fillet across
+            the 4px seam so the two read as one piece. It lives on the header
+            (not inside the body) because the body scrolls and would clip it. */}
         <span class="ws-arm" aria-hidden="true">
-          <svg width="28" height="18" viewBox="0 0 28 18">
-            <path d="M0,0 H28 Q14,0 14,18 H0 Z" />
+          <svg width="34" height="20" viewBox="0 0 34 20">
+            <path d="M0,0 H34 Q14,0 14,20 H0 Z" />
           </svg>
         </span>
       </header>
-      {props.band}
-      <div
-        class="ws-body"
-        ref={bodyRef}
-        onScroll={(e) => {
-          const el = e.currentTarget;
-          pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 32;
-        }}
-      >
-        {props.count ? (
-          props.children
-        ) : (
-          <div class="ws-empty">
-            <span>{props.empty}</span>
-          </div>
-        )}
+      {/* band + body share one rail: the leg runs from the arm to the foot with
+          no seam-wide hole where the band used to sit (AGENTS §7.6r) */}
+      <div class="ws-mid">
+        {props.band}
+        <div
+          class="ws-body"
+          ref={bodyRef}
+          onScroll={(e) => {
+            const el = e.currentTarget;
+            pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 32;
+          }}
+        >
+          {props.count ? (
+            props.children
+          ) : (
+            <div class="ws-empty">
+              <span>{props.empty}</span>
+            </div>
+          )}
+        </div>
       </div>
       {props.footer ? <div class="ws-foot">{props.footer}</div> : null}
       {props.zone === "thread" ? null : <i class="ws-joint" aria-hidden="true" />}
@@ -339,7 +344,16 @@ function Exchange(props: {
   );
 }
 
-export function Workspace({ items, onOpenDiff }: { items: Item[]; onOpenDiff?: (path: string, diff: DiffData) => void }) {
+export function Workspace({
+  items,
+  running: agentRunning,
+  onOpenDiff,
+}: {
+  items: Item[];
+  /** the transport's run flag — keeps the zone from reading IDLE mid-latency */
+  running?: boolean;
+  onOpenDiff?: (path: string, diff: DiffData) => void;
+}) {
   const zones = useMemo(() => zonesOf(items), [items]);
   const cycles = useMemo(() => cyclesOf(items), [items]);
   const tallies = useMemo(() => tallyOf(items, cycles), [items, cycles]);
@@ -361,24 +375,12 @@ export function Workspace({ items, onOpenDiff }: { items: Item[]; onOpenDiff?: (
   const tail = zones.thread[zones.thread.length - 1];
   const awaiting = !streaming && running === 0 && tail?.kind === "assistant";
   // The band answers "what is the model doing" for the whole session, so it
-  // reads every item — not just this zone's.
-  const phase = phaseOf({
-    items,
-    running: streaming,
-    since: Date.now() - (items[items.length - 1]?.ts ?? 0),
-  });
+  // reads every item — not just this zone's. One helper decides it, so the log
+  // strip and this zone can never describe the same moment differently.
+  const phase = phaseFor(items, agentRunning);
   // the reading and the motion come from one source, so they cannot disagree
-  const phaseWord =
-    phase === "thinking"
-      ? t("ws.stScan")
-      : phase === "streaming"
-        ? t("ws.streaming")
-        : phase === "running"
-          ? t("ws.running")
-          : phase === "done"
-            ? t("ws.stSettled")
-            : t("ws.stIdle");
-  const phaseBusy = phase === "thinking" || phase === "streaming" || phase === "running";
+  const phaseWord = wordOf(phase);
+  const phaseBusy = phaseLive(phase);
 
   const ack = (id: string) =>
     setAcks((prev) => {
