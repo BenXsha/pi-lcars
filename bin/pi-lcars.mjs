@@ -63,6 +63,7 @@ function parseArgs(argv) {
     switch (a) {
       case "status":
       case "stop":
+      case "open":
       case "version":
       case "doctor":
       case "help":
@@ -232,6 +233,7 @@ if (args.cmd === "help") {
   pi-lcars web            same thing
   pi-lcars --dev          start with vite HMR on :5173
   pi-lcars status         list running instances
+  pi-lcars open           open a running instance in the browser
   pi-lcars stop           stop the newest instance (--port N to pick one)
   pi-lcars doctor         check the pi backend and print the fix when it is missing
   pi-lcars --version      version + dist build time
@@ -244,7 +246,7 @@ if (args.cmd === "help") {
       --resume            reopen the newest session in the workspace
       --no-build          refuse to build a stale client
       --no-open/--open    skip or force the browser
-      --json              first stdout line is {url,port,pid,cwd}
+      --json              start: first stdout line is {url,port,pid,cwd}\n                          status: one JSON array on stdout
 `);
   process.exit(0);
 }
@@ -258,6 +260,18 @@ if (args.cmd === "version") {
 
 if (args.cmd === "status") {
   const rows = await readInstances();
+  // machine-readable form: the `/lcars` pi extension reattaches to an instance
+  // instead of starting a second one on the next free port
+  if (args.json) {
+    const live = await Promise.all(
+      rows.map(async (info) => {
+        const { ok, model, sessions } = await probe(info);
+        return { pid: info.pid, port: info.port, url: info.url, cwd: info.cwd, startedAt: info.startedAt ?? null, ok, model, sessions };
+      }),
+    );
+    process.stdout.write(`${JSON.stringify(live)}\n`);
+    process.exit(0);
+  }
   if (!rows.length) {
     process.stdout.write("no pi-lcars instance running\n");
     process.exit(0);
@@ -271,6 +285,18 @@ if (args.cmd === "status") {
     );
   }
   process.stdout.write("\n");
+  process.exit(0);
+}
+
+if (args.cmd === "open") {
+  // "I have the console running somewhere, show it to me" — the browser half of
+  // `start`, without starting a second instance (the `/lcars open` command in pi)
+  const rows = await readInstances();
+  if (!rows.length) die("no pi-lcars instance running — start one first", "E_NO_INSTANCE");
+  const target = args.port ? rows.find((r) => r.port === args.port) : rows[rows.length - 1];
+  if (!target) die(`no instance on port ${args.port}`, "E_NO_INSTANCE");
+  openBrowser(target.url);
+  process.stdout.write(`opened ${target.url}\n`);
   process.exit(0);
 }
 

@@ -3,14 +3,15 @@
 A web console for [pi](https://pi.dev) where the agent transcript reads like an LCARS station display —
 **but every pixel is driven by real session events.** No mock data, no scripted demo.
 
-```
-┌─ SPINE ─┬──────────── WORKSPACE ────────────┬─ RAIL ──┐
-│ sessions│ SHELF   workspace · model · think │ context │
-│ 01..06  │ TAB BAR  A · B · +                │ tools   │
-│         │ TRANSCRIPT (streams, diffs…)      │ agents  │
-│         │ COMPOSER  ENTRY ▸ [ ] RUN STOP    │ approval│
-└─────────┴───────────────────────────────────┴─────────┘
-```
+![the mission log](docs/console.png)
+
+<sub>The mission log: sessions on the left, the live transcript in the middle (tool rows, diffs,
+sub-agent calls), context and tool calls on the right, `ACTIVITY` reading the machine's state above it.</sub>
+
+![the three-zone workspace](docs/stream.png)
+
+<sub>`VIEW → STREAM`: the same session cut into three instruments — `I CONVERSATION`, `II THINKING`
+(with the dot matrix), `III TERMINAL` — each scrolling on its own, tied together by exchange.</sub>
 
 ## Run
 
@@ -26,7 +27,8 @@ npm i -g pi-lcars       # or install it, then just `pi-lcars`
   pi-lcars              start, open the browser
   pi-lcars --dev        vite dev server with HMR on :5173
   pi-lcars doctor       check the pi backend, print the fix when it is missing
-  pi-lcars status       running instances (pid, port, cwd, model)
+  pi-lcars status       running instances (pid, port, cwd, model); --json for scripts
+  pi-lcars open         open a running instance in the browser
   pi-lcars stop         stop the newest instance
 ```
 
@@ -39,6 +41,27 @@ The layout is built for a 1600×1000 desktop and verified down to **1280×800**
 three-zone STREAM view stacks into one column.
 
 Release notes live in [CHANGELOG.md](CHANGELOG.md).
+
+### From inside pi
+
+The package is also a pi package: installing it adds a `/lcars` command to the TUI,
+so you never leave the terminal to get the console.
+
+```bash
+pi install npm:pi-lcars        # once
+```
+
+```
+/lcars          start the console for this workspace (or reattach to the one
+                already running for it) and print the URL
+/lcars open     same, and open the browser
+/lcars status   what is running, and for which workspace
+/lcars stop     stop this workspace's console
+```
+
+It shells out to the same launcher the CLI uses, so `pi-lcars status` / `open` /
+`stop` and the footer's `:4173` agree with it. Nothing is offered to the model —
+the console is the operator's tool, not the agent's.
 
 ## Requirements
 
@@ -80,7 +103,8 @@ node scripts/check-release.mjs   # pre-publish gate: notes, clean tree, package 
 ## Layout
 
 ```
-bin/pi-lcars.mjs   launcher: args, build-if-stale, port walk, status/stop/doctor
+bin/pi-lcars.mjs   launcher: args, build-if-stale, port walk, status/open/stop/doctor
+extensions/        lcars.ts — the `/lcars` command pi loads from this package
 server/            Node, no runtime deps beyond the pi SDK
   index.mjs        the shell: config, shared objects, http + SSE lifecycle
   http.mjs         JSON envelope, error shape, body reader, query (one place)

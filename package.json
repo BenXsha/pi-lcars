@@ -1,6 +1,6 @@
 {
   "name": "pi-lcars",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "LCARS agent console for pi — one command boots the web UI and the in-process pi backend",
   "license": "MIT",
   "author": {
@@ -19,6 +19,7 @@
   "files": [
     "bin/",
     "server/",
+    "extensions/",
     "dist/",
     "CHANGELOG.md",
     "README.md"
@@ -32,7 +33,9 @@
     "lcars",
     "agent",
     "console",
-    "web-ui"
+    "web-ui",
+    "pi-package",
+    "pi-extension"
   ],
   "scripts": {
     "dev": "vite",
@@ -43,7 +46,7 @@
     "icons": "node scripts/build-icons.mjs",
     "fonts": "node scripts/fetch-fonts.mjs",
     "server": "node server/index.mjs",
-    "test": "node scripts/check-themes.mjs && node test/pi-env.mjs && node test/fonts.mjs && node test/braille.mjs && node test/mcp-config.mjs && node test/smoke.mjs && node test/launch.mjs && node test/ui.mjs",
+    "test": "node scripts/check-themes.mjs && node test/pi-env.mjs && node test/fonts.mjs && node test/braille.mjs && node test/extension.mjs && node test/mcp-config.mjs && node test/smoke.mjs && node test/launch.mjs && node test/ui.mjs",
     "test:smoke": "node test/smoke.mjs",
     "test:launch": "node test/launch.mjs",
     "check:themes": "node scripts/check-themes.mjs",
@@ -53,7 +56,8 @@
     "release": "node scripts/build-release.mjs",
     "test:braille": "node test/braille.mjs",
     "check:release": "node scripts/check-release.mjs",
-    "prepublishOnly": "node scripts/check-release.mjs && npm test"
+    "prepublishOnly": "node scripts/check-release.mjs && npm test",
+    "check:extension": "node test/extension.mjs"
   },
   "devDependencies": {
     "@preact/preset-vite": "^2.10.6",
@@ -68,5 +72,14 @@
   "publishConfig": {
     "registry": "https://registry.npmjs.org",
     "access": "public"
+  },
+  "bugs": {
+    "url": "https://gitee.com/benshawn/pi-lcars/issues"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/lcars.ts"
+    ],
+    "image": "https://gitee.com/benshawn/pi-lcars/raw/main/docs/console.png"
   }
 }

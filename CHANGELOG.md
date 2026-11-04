@@ -7,6 +7,45 @@ Release notes are written **before** the version is bumped: `scripts/build-relea
 reads the section for the current `package.json` version and prints it inside the
 share bundle's `README.txt`, and fails the build when there is no such section.
 
+## [0.5.0] — 2026-11-04
+
+The release that puts the console one keystroke away from the terminal: the
+package is now a pi package, so `pi install npm:pi-lcars` adds `/lcars` to the TUI.
+
+### Added
+
+- **`/lcars` in pi** (`extensions/lcars.ts`). `/lcars` starts the console for the
+  session's workspace — or reattaches to the instance already serving it — and
+  prints the URL; it also puts the port in the footer. `/lcars open` opens the
+  browser, `/lcars status` lists what runs where, `/lcars stop` stops *this*
+  workspace's console. The extension is dependency-free: it shells out to the
+  same `bin/pi-lcars.mjs` the CLI uses, so there is one set of instance records
+  and one port-walk, and `pi-lcars status|open|stop` agree with it.
+- **`pi-lcars open`** — open a running instance in the browser without starting a
+  second one.
+- **`pi-lcars status --json`** — the machine-readable form the extension (and any
+  script) reattaches with: `[{pid,port,url,cwd,startedAt,ok,model,sessions}]`.
+- **Gallery metadata** in `package.json`: the `pi-package` / `pi-extension`
+  keywords, `pi.extensions`, a `pi.image` preview, and a `bugs` link.
+- Screenshots in `docs/` (mission log, three-zone workspace) and a "From inside
+  pi" section in the README.
+
+### Changed
+
+- `test/extension.mjs` joins `npm test` (16 checks). It drives the real
+  extension against a real launcher and asserts the two things that break
+  silently: a second `/lcars` must reattach instead of walking to the next free
+  port, and `/lcars stop` must not touch another workspace's console. Node runs
+  the `.ts` file directly — the same type-stripping path pi's jiti takes, so no
+  build step sits between the test and the shipped file.
+
+### Notes
+
+- Nothing changes for `npx pi-lcars` users; the extension is inert unless pi
+  loads it.
+- The `pi.image` preview points at `docs/console.png` in the repository, so it
+  resolves once this release is pushed.
+
 ## [0.4.0] — 2026-11-04
 
 The release that made the console readable from across the room: the STREAM view

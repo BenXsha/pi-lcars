@@ -1076,6 +1076,7 @@ composer 上方出现 `QUEUED n` 条带，逐条显示待投递文本 + `deliver
 | 2026-xx-xx | **点阵最终定在 18px cell 的节拍**：8 个点行（两行 braille cell）× **6 × 4.5px** 间距 = **36px 带**，圆点 **3.2px**；LOG 条同步从 44px 收到 36px；`idle` 稀疏度回到 9%（细网格上就是原来那个安静的节拍） | 上一版把点放到 6px/44px 带后用户判断「偏大，还是 18px 每字符合适」——这条记下来："点阵是大是小"其实是在问**点距**，不是在问点径。所以最终形态是**画出来的 braille 节拍**：cell 尺寸（6×4.5px）按 18px 字号那套走，点径与间距仍然各自独立（3.2px 圆点，横向 2.8px、纵向 1.3px 的缝）。`dots()` 因此收两个 pitch（`pitchX` / `pitchY`），因为 braille cell 本来就不是方的：2 列对 4 行 | `src/braille.ts`（`dots(bm, pitchX, pitchY, weight)`）、`src/components/Braille.tsx`（`pitchX` / `pitchY` / `rows=8`）、`src/styles/lcars.css`（`--band-dot: 3.2px`、`.logstate` 36px）、`test/braille.mjs`（两种 pitch 各自独立一条断言）、`test/ui.mjs`、AGENTS §7.6r / §4.2b |
 | 2026-xx-xx | **LOG 加了 `LATEST` 尾部控制（浮层）+ `ctrl+end` / `ctrl+home` 快捷键**，语义对齐 pi TUI 的 `tui.altScreen.bottom`（"回到末端并继续跟随"）。控制条从**在流 bar** 改成**绝对定位浮层**（新增 `.scroll-wrap` 包装层），并补 `CTRL END` 提示 | 用户要「快速到达底部当前会话的按钮，像原生 pi 终端 tui 那样的效果」。原来那条 `LATEST` 是 `flex: 0 0 32px` 的在流条：一滚动就**把输入区顶高 32px**（写草稿时最难受），而且只有鼠标一条路、没有任何键位提示。改成浮层后零布局位移，并照抄 TUI 的键：`ctrl+end` 回尾并恢复跟随、`ctrl+home` 回顶（回顶自然释放跟随，于是按钮浮现）。**输入框占键时让路**：`ctrl+end` 在 textarea 里是"光标到文末"，与 §4.3b 同一处 `imeBusy` 门禁 | `src/views/Console.tsx`（`.scroll-wrap`、`jumpRef`、`ctrl+end`/`ctrl+home` 监听）、`src/styles/lcars.css`（`.scroll-wrap` / `.jumpbar` 浮层 + 黑缝环 + 提示色）、`test/ui.mjs`（6 条：浮现 / 浮层不移布局 / 键提示 / 点击回尾 / ctrl+home·end / 输入框占键）、AGENTS §7.6s |
 | 2026-xx-xx | **发布前门禁 `scripts/check-release.mjs`**（notes 必须是当前版本且是最新一节 / 工作树干净 / `bin` 可执行 / LICENSE 在 / `files[]` 条目真实存在 / `publishConfig` 钉在 npmjs），并接进 `prepublishOnly`（连同 `npm test`）；分享包的 `README.txt` 新增 `WHAT'S NEW IN <ver>` 段，内容**从 CHANGELOG.md 抽取**，抽不到就 `exit 1` | 发布最容易犯的四个错都是「发出去之后才发现」：版本 bump 了但没写 notes、tarball 来自脏树、`bin` 丢了执行位、`files[]` 打错一个字导致包静默变瘦。把 notes 写进 CHANGELOG 并由脚本生成分享包文案，等于强制「先写说明再发版」，也不会出现两份文案对不上的情况。另外给 `release/` 的收件人一个「这版改了什么」的入口 —— 之前那份 README.txt 只有安装说明 | `scripts/check-release.mjs`（新增）、`scripts/build-release.mjs`（`plainNotes()` + `WHAT'S NEW`）、`package.json`（`prepublishOnly` / `files` 加 CHANGELOG）、`CHANGELOG.md`（新增）、`.gitignore`、`bin/pi-lcars.mjs`（+x）、AGENTS §11.1 |
+| 2026-xx-xx | **加了 pi 扩展 `/lcars`**（`extensions/lcars.ts`）+ launcher 的 `status --json` / `open`，并给包加上 `pi-package`/`pi-extension` 关键词、`pi.extensions`、`pi.image`；`test/extension.mjs`（16 条）进 `npm test` | 用户要「推荐到 pi 社区 / 官方 packages」。官方 gallery（pi.dev/packages）是 **npm 索引**，唯一门槛是 `pi-package` 关键词，条目会承诺 `pi install npm:pi-lcars` —— 而我们原本包里没有任何 pi 资源，那句话会是空承诺，直接违反 §7「只呈现真实能力」。所以先让那句话成真：TUI 里一个命令起这台控制台。实现上坚持**不复制启动逻辑**（调同一个 launcher），并补 `status --json` 让扩展能 reattach；`open` 顺手成为 CLI 也能用的动作 | `extensions/lcars.ts`（新增）、`bin/pi-lcars.mjs`（`status --json` / `open`）、`test/extension.mjs`（新增）、`package.json`（`files` / `keywords` / `pi` / `bugs` / `prepublishOnly` 链）、`docs/console.png`、`docs/stream.png`、`README.md`、`CHANGELOG.md`、AGENTS §11.0 |
 
 ---
 
@@ -1139,6 +1140,32 @@ browser ──EventSource(/api/stream)──► server.mjs ──session.subscri
 - `contextWindow` 可能到 1M，`fmtTok` 必须处理 M，否则显示 `1000.0K`。
 
 ---
+
+### 11.0 pi 集成（`/lcars`）
+
+包同时是一个 **pi package**：`pi install npm:pi-lcars` 之后 TUI 里多一个 `/lcars`。
+
+| 输入 | 行为 |
+|---|---|
+| `/lcars` | 为**本会话 cwd** 起控制台（已有就 reattach）并打印 URL；端口写进 footer 状态位 |
+| `/lcars open` | 同上，并打开浏览器 |
+| `/lcars status` | 列出全部实例（url / cwd / model / 会话数 / 是否应答） |
+| `/lcars stop` | 只停**本 cwd** 的那一个（别的工作区的实例不碰） |
+
+硬规则：
+
+- **不重复实现启动逻辑**：`extensions/lcars.ts` 用 `execFile` 调同一个 `bin/pi-lcars.mjs`，
+  于是 `pi-lcars status|open|stop` 与 `/lcars` 看的是**同一份实例记录**、同一条端口自增逻辑。
+  为此 launcher 补了 `status --json`（`[{pid,port,url,cwd,startedAt,ok,model,sessions}]`）与 `open`。
+- **reattach 而不是再起一个**：否则第二次 `/lcars` 会在 4174 上再开一台，操作员得到两个控制台。
+  `test/extension.mjs` 钉住这条（断言实例数仍为 1）。
+- **零依赖、不 import 宿主包**：宿主 API（`registerCommand` / `ctx.cwd` / `ctx.ui.notify|setStatus` /
+  `AutocompleteItem`）在本文件里**本地声明类型**，不写 `peerDependencies`——否则 `npx pi-lcars`
+  的用户会多背一个从没用到的依赖。
+- **命令归操作员，不是模型**：不注册成 tool，模型看不到它（§7「只呈现真实能力」）。
+- 画廊收录规则：npm 关键词 **`pi-package`**（唯一门槛，无投稿表单）+ 可选 `pi.image` /
+  `pi.video` 预览；`pi.extensions` 指向扩展入口；`test/extension.mjs` 里有一条断言直接读
+  `package.json` 校验这三件事，`pi install` 才不会装到一个「命令不存在」的包。
 
 ### 11.1 发布（npm）
 
