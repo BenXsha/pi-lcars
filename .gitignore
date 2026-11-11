@@ -10,3 +10,10 @@ tmp/
 release/
 release.zip
 .npmrc
+
+# docs/ is local-only: only the two published screenshots are tracked (README
+# links them through jsDelivr). Promotion material — the Xiaohongshu cards,
+# the screencast and the recording script that makes it — stays on this machine.
+/docs/*
+!/docs/console.png
+!/docs/stream.png
